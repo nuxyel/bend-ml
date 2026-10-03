@@ -10,7 +10,7 @@ Lemas provados de `Nat` e `List` que a Base do Bend 2 ainda não tem. Servem de 
 
 ```python
 import Base
-import bend-ml-nat-lemmas@0.1.0/main.bend as NL
+import bend-ml-nat-lemmas@0.1.0.0/main.bend as NL
 
 def comm(a: Nat, +b: Nat) -> {Nat.add(a, b) == Nat.add(b, a) : Nat}:
   NL.add_comm(a, b)

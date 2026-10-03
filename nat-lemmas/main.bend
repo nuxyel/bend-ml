@@ -1,6 +1,6 @@
 # bend-ml-nat-lemmas: lemas provados de Nat e List que a Base do Bend não tem.
 #
-#   import bend-ml-nat-lemmas@0.1.0/main.bend as NL
+#   import bend-ml-nat-lemmas@0.1.0.0/main.bend as NL
 #   NL.add_comm(a, b)   NL.mul_assoc(a, b, c)   NL.product_append(xs, ys) ...
 #
 # Cada `law` afirma um fato; o `def` logo abaixo é a prova, checada pelo kernel.
