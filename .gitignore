@@ -1,0 +1,14 @@
+# Bend: binários e artefatos de build
+*.gpu
+*.bendtt
+build/
+dist/
+
+# Local
+.scratch/
+.DS_Store
+
+# Python (reference/)
+.venv/
+__pycache__/
+*.pyc
