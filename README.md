@@ -8,7 +8,7 @@ Machine learning em [Bend 2](https://bend-lang.com), com **tipos dependentes**: 
 
 | Pacote | Estado | O que é |
 |---|---|---|
-| `bend-ml-nat-lemmas` | em andamento (v0.1) | Lemas provados de `Nat` e `List` que a Base do Bend ainda não tem |
+| [`bend-ml-nat-lemmas`](nat-lemmas) | v0.1 | Lemas provados de `Nat` e `List` que a Base do Bend ainda não tem |
 | `bend-ml-bpe-tokenizer` | planejado (v0.3) | Tokenizer BPE byte-level com roundtrip provado |
 | `bend-ml-tensor` | planejado (v0.4) | Tensores com shape no tipo + autograd |
 
@@ -28,7 +28,7 @@ Machine learning em [Bend 2](https://bend-lang.com), com **tipos dependentes**: 
 
 ```bash
 export PATH="$HOME/.bend/bin:$PATH"
-bend nat-lemmas/PROOF.bend   # ALL PROOFS CHECK
+bend nat-lemmas/main.bend   # ALL PROOFS CHECK
 ```
 
 ## Licença
