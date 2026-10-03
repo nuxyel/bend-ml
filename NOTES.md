@@ -119,8 +119,10 @@ Demos relevantes para nós: `proof_numerics` (prova de `add_comm`, `add_assoc`, 
 
 ## v0.1 — nat-lemmas (2026-10-03)
 
-- 14 leis provadas em `nat-lemmas/main.bend` (Nat: soma/produto; List: append/length; `product_append`). `bend nat-lemmas/main.bend` → `ALL PROOFS CHECK`. Nenhum `@unsafe` nem `?TODO`. Nenhuma dívida de prova.
+- 15 leis provadas em `nat-lemmas/main.bend` (Nat: soma/produto; List: append/length; `product_append`). `bend nat-lemmas/main.bend` → `ALL PROOFS CHECK`. Nenhum `@unsafe` nem `?TODO`. Nenhuma dívida de prova.
 - **Descoberta:** um `import ... as NL` só expõe os defs do próprio arquivo, não os reexporta. Por isso o pacote publicável é **um arquivo só**, com `law` e prova lado a lado (a separação `LAWS.bend`/`PROOF.bend` fica para projetos de aplicação, não para bibliotecas).
 - **Descoberta:** em `%e : P`, `_` marca onde está o lado direito `b` de `e : {a == b}`; o objetivo vira `P` com `a`. Quando o objetivo tem `a` e não `b`, usar `Equal.sym` antes.
 - **Descoberta:** lemas sobre lista com elementos usados mais de uma vez precisam de `for +xs` e `Con{+h, +t}`.
 - `--verdict` ainda não rodado (falta Lean 4.34.0).
+- **Publicado no BendHub:** `bend-ml-nat-lemmas@0.1.0.0`, hash `0xa7aa06c09e97c6747c12cc64bb5203d9` (2026-10-03). Versões do BendHub têm **quatro números** (`0.1.0.0`). Import: `import bend-ml-nat-lemmas@0.1.0.0/main.bend as NL`. Verificado em pasta limpa.
+- O comentário de uso em `nat-lemmas/main.bend` foi corrigido para `0.1.0.0` depois da publicação; só mudou comentário, mas o hash publicado é o do arquivo anterior.
