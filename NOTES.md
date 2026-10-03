@@ -116,3 +116,11 @@ Demos relevantes para nós: `proof_numerics` (prova de `add_comm`, `add_assoc`, 
 3. `git init` e remote no GitHub (hoje o diretório não é um repositório).
 4. Prova de conceito: vetor com tamanho no tipo, para decidir a representação de shapes.
 5. Começar o `nat-lemmas`.
+
+## v0.1 — nat-lemmas (2026-10-03)
+
+- 14 leis provadas em `nat-lemmas/main.bend` (Nat: soma/produto; List: append/length; `product_append`). `bend nat-lemmas/main.bend` → `ALL PROOFS CHECK`. Nenhum `@unsafe` nem `?TODO`. Nenhuma dívida de prova.
+- **Descoberta:** um `import ... as NL` só expõe os defs do próprio arquivo, não os reexporta. Por isso o pacote publicável é **um arquivo só**, com `law` e prova lado a lado (a separação `LAWS.bend`/`PROOF.bend` fica para projetos de aplicação, não para bibliotecas).
+- **Descoberta:** em `%e : P`, `_` marca onde está o lado direito `b` de `e : {a == b}`; o objetivo vira `P` com `a`. Quando o objetivo tem `a` e não `b`, usar `Equal.sym` antes.
+- **Descoberta:** lemas sobre lista com elementos usados mais de uma vez precisam de `for +xs` e `Con{+h, +t}`.
+- `--verdict` ainda não rodado (falta Lean 4.34.0).
