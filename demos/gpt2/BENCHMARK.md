@@ -1,6 +1,6 @@
 # GPT-2 small: Bend × PyTorch
 
-**Resumo:** o GPT-2 small de 124 M de parâmetros roda em Bend e **gera exatamente os mesmos tokens do PyTorch**, com logits iguais em até 2e-4. É ~35× mais lento no total e ~3 s por token contra milissegundos.
+**Resumo:** o GPT-2 small de 124 M de parâmetros roda em Bend e **gera exatamente os mesmos tokens do PyTorch**, com logits iguais em até 2e-4. É ~40× mais lento no total e ~3 s por token contra milissegundos.
 
 ## Verificação (`reference/test_gpt2.py`)
 
