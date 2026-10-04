@@ -286,3 +286,21 @@ A ~82x gain over v1; distance to PyTorch (16 threads) ~33x, (1 thread, 0.30 s) ~
 - Packages in v2: nat-lemmas 0.1.0.0, bpe 0.1.1.0, tensor 0.1.1.0, **tensor-array 0.1.1.0 (new)**, autograd 0.1.0.0. `reference/check_all.py`: 27/27 (quick) and 32/32 (`--full`).
 - Pending for Renan: (1) review the tone of the thread and record the video (`docs/launch/`); (2) if you want the GPU, install CUDA 12 at `/usr/local/cuda` and I will measure `!`; (3) the parallel gain in matrix · vector requires partitioning the `Array` without copying (idea in exp. 9) — worth a report to the Bend team: `Array.clone` is O(n) and `Array.fork` is `@unsafe`.
 - **Finding for the GPU attempt:** the Bend binary honors the `CUDA_HOME` environment variable (default `/usr/local/cuda`) and only needs `include/nvrtc.h` (plus `cuda.h`) and `lib64/libnvrtc` from that directory, then links with `-lcuda -lnvrtc`. A user-local CUDA 12 toolkit could therefore be tried without sudo. Not done.
+
+### English republication (2026-10-04)
+
+The whole repository was translated to English (documentation, comments, CLI and demo messages, commit messages), so each package was republished with English source comments and README. The proofs and the API are unchanged; every package passes `ALL PROOFS CHECK` and `--verdict`.
+
+| Package | New version | Hash |
+|---|---|---|
+| `bend-ml-nat-lemmas` | 0.1.1.0 | `0x2bbe4207657ea8b1158567d930651411` |
+| `bend-ml-bpe-tokenizer` | 0.1.2.0 | `0xa071a92aabcffe6fc04dc3a60f0096ba` |
+| `bend-ml-tensor` | 0.1.2.0 | `0x48e80e20946abebea50e06561806a40d` |
+| `bend-ml-tensor-array` | 0.1.2.0 | `0x83d7a8813f8d06d870224fde14ffb05a` |
+| `bend-ml-autograd` | 0.1.1.0 | `0x0ed882696c6c048c64c66242a999a426` |
+
+The older versions stay on BendHub (publication is permanent). The demos and benchmarks now import the new versions; `reference/check_all.py --full` is 32/32.
+
+The test inputs that contain accented Portuguese words (`reference/test_bpe.py`, `test_gpt2_tok.py`, `gpt2_prep.py`) were kept on purpose: they exercise multi-byte UTF-8.
+
+Commit history: rewritten on 2026-10-04 to remove the `Co-Authored-By` trailers, translate the messages to English and split the work into small commits (the content of each commit is unchanged; the tags `v0.1.0` and `v1.0.0` point to the equivalent commits).
