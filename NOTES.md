@@ -211,3 +211,23 @@ Todos os números: 1 thread salvo indicação, mediana de 3 execuções, Intel C
 - **Paralelismo, ordem de grandeza:** com trabalho independente e arrays pequenos (784 elementos), 16 threads dão ~4 a 6× (3,2 G mult-soma: 0,88 s em 1 thread, 0,13 s em 22). No produto 100×784×128 em blocos de linhas (`bench/mm_par.bend`), ~2,1× com 8 threads, igual para 2^d = 8 ou 16 blocos. Não depende de blocagem (`bench/mm_tile.bend`: 1, 8, 16 e 32 blocos de colunas, mesmo tempo) nem do custo dos clones (22% do tempo). O `pow2` do guia chega a 8×, então o limite é do tipo de carga. CPU híbrida: o teto prático é menor que 22×.
 - **O tamanho do `Array` custa:** o mesmo produto com arrays de 2^20 casas em vez de 2^17 ficou ~60% mais lento (1,9 s -> 3,1 s para 4 G mult-soma): a profundidade da árvore entra em cada `get`. Alocar o menor array possível.
 - **Distância ao PyTorch no produto 100×784×128:** PyTorch 1 thread = 0,162 ms (62 G mult-soma/s); 16 threads = 0,047 ms (212 G/s). Bend: listas 44 M/s (**~1400× atrás**), `Array` 1 thread 2,3 G/s (**~27× atrás**), `Array` com blocos paralelos ~4,5 G/s (**~47× atrás do PyTorch paralelo**). O que sobra: código escalar contra AVX/FMA com BLAS.
+
+### Exp. 6: MNIST completo sobre `Array` (`demos/mnist/fast.bend`, 2026-10-04)
+
+Matrizes planas em `Array<F32>`, `gemm` com strides (cobre `X·W`, `H·Wᵀ` e `Xᵀ·dZ` sem transpor), bias/relu/máscara/SGD em lugar por índice, softmax e entropia cruzada por linha com listas de 10, lotes lidos do arquivo a cada passo (`File.read_at`). 1 thread.
+
+| 50 lotes | perda | acertos | tempo |
+|---|---|---|---|
+| listas (`train.bend`) | 1,6616005 | 7829 | ~42 s |
+| **`Array` (`fast.bend`)** | **1,6616004** | **7829** | **0,9 s** |
+| PyTorch | 1,661600 | 7829 | 0,02 s |
+
+| 1 época (600 lotes) | perda | acertos | tempo |
+|---|---|---|---|
+| listas | 0,52047706 | 9129 | 544,3 s |
+| **`Array`** | **0,5204771** | **9129** | **11,5 s** (47× mais rápido) |
+| PyTorch 1 thread | 0,520477 | 9128 | 0,30 s |
+| PyTorch 16 threads | 0,520477 | 9129 | 0,21 s |
+
+Distância ao PyTorch (1 thread): de ~1800× para **~38×**. Correção preservada (mesma perda e mesmos acertos).
+Os ~19 ms por lote se dividem em ~9 ms de `gemm` (20 M mult-soma a 2,3 G/s) e ~10 ms de todo o resto (monta `X` com 78 400 `set`, lê 78 KB, bias/relu/máscara/SGD sobre ~100 mil elementos com get+set).
