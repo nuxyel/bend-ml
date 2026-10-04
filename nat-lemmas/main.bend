@@ -1,21 +1,21 @@
-# bend-ml-nat-lemmas: lemas provados de Nat e List que a Base do Bend não tem.
+# bend-ml-nat-lemmas: Nat and List lemmas, proved, that Bend's Base does not have.
 #
 #   import bend-ml-nat-lemmas@0.1.0.0/main.bend as NL
 #   NL.add_comm(a, b)   NL.mul_assoc(a, b, c)   NL.product_append(xs, ys) ...
 #
-# Cada `law` afirma um fato; o `def` logo abaixo é a prova, checada pelo kernel.
-# Como ler uma prova: ela é uma função cujo TIPO é a afirmação.
-#   - `match` faz análise de casos (o número é 0, ou é 1 + p).
-#   - Uma chamada da própria função é a hipótese de indução ("já sei que vale
-#     para p, então provo para 1 + p").
-#   - `%e : P` reescreve o objetivo usando a igualdade `e`.
-#   - `{==}` fecha quando os dois lados já calculam para a mesma coisa.
-# Um parâmetro leva `+` quando a prova o usa mais de uma vez.
+# Each `law` states a fact; the `def` right below it is the proof, checked by the kernel.
+# How to read a proof: it is a function whose TYPE is the statement.
+#   - `match` does case analysis (the number is 0, or it is 1 + p).
+#   - A call to the function itself is the induction hypothesis ("I already know
+#     it holds for p, so I prove it for 1 + p").
+#   - `%e : P` rewrites the goal using the equality `e`.
+#   - `{==}` closes the goal when both sides already compute to the same thing.
+# A parameter carries `+` when the proof uses it more than once.
 
 import Base
 
-# Produto dos elementos de uma lista de Nat; a lista vazia vale 1.
-# É o "número de elementos" de um tensor cuja shape é a lista.
+# Product of the elements of a list of Nat; the empty list is 1.
+# It is the "number of elements" of a tensor whose shape is the list.
 def product(xs: List<&2, Nat>) -> Nat:
   match xs:
     case Nil{}:
@@ -29,7 +29,7 @@ law add_zero:
   {Nat.add(a, 0n) == a : Nat}
 
 # a + 0 == a
-# Caso 0: 0 + 0 calcula para 0. Passo: usa a hipótese para p.
+# Case 0: 0 + 0 computes to 0. Step: uses the hypothesis for p.
 def add_zero(a):
   match a:
     case 0n:
@@ -95,8 +95,8 @@ def mul_zero(a):
     case 1n+p:
       mul_zero(p)
 
-# x + (y + z) == y + (x + z): troca os termos do meio de uma soma tripla.
-# (Lema auxiliar; não é uma lei publicada.)
+# x + (y + z) == y + (x + z): swaps the middle terms of a triple sum.
+# (Auxiliary lemma; not a published law.)
 def add_swap(x: Nat, +y: Nat, +z: Nat) -> {Nat.add(x, Nat.add(y, z)) == Nat.add(y, Nat.add(x, z)) : Nat}:
   match x:
     case 0n:
@@ -160,8 +160,8 @@ law mul_assoc:
   {Nat.mul(a, Nat.mul(b, c)) == Nat.mul(Nat.mul(a, b), c) : Nat}
 
 # a * (b * c) == (a * b) * c
-# Passo: (1+p)*(b*c) = b*c + p*(b*c). A hipótese diz p*(b*c) == (p*b)*c, e a
-# distributividade diz b*c + (p*b)*c == (b + p*b)*c, que é o lado direito.
+# Step: (1+p)*(b*c) = b*c + p*(b*c). The hypothesis says p*(b*c) == (p*b)*c, and
+# distributivity says b*c + (p*b)*c == (b + p*b)*c, which is the right-hand side.
 def mul_assoc(a, b, c):
   match a:
     case 0n:
@@ -175,7 +175,7 @@ law mul_one_l:
   {Nat.mul(1n, a) == a : Nat}
 
 # 1 * a == a
-# 1 * a calcula para a + 0, e já provamos que a + 0 == a.
+# 1 * a computes to a + 0, and we already proved that a + 0 == a.
 def mul_one_l(a):
   add_zero(a)
 
@@ -243,9 +243,9 @@ law product_append:
   {product(List.append(&2, Nat, xs, ys)) == Nat.mul(product(xs), product(ys)) : Nat}
 
 # product (xs ++ ys) == product xs * product ys
-# Nil: product ys == 1 * product ys (pela lei mul_one_l, lida ao contrário).
-# Con: product(h :: t ++ ys) = h * product(t ++ ys); a hipótese troca isso por
-# h * (product t * product ys), e mul_assoc fecha.
+# Nil: product ys == 1 * product ys (by the mul_one_l law, read backwards).
+# Con: product(h :: t ++ ys) = h * product(t ++ ys); the hypothesis replaces that with
+# h * (product t * product ys), and mul_assoc closes it.
 def product_append(xs, ys):
   match xs:
     case Nil{}:
