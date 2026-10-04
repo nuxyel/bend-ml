@@ -1,0 +1,9 @@
+SOME PROOFS FAIL
+Error:
+- expected : T.Mat<3n, 5n>
+- observed : T.Mat<4n, 5n>
+Location: bad
+4 | def bad() -> T.Mat<2n, 5n>:
+5>|   T.Mat.matmul(2n, 3n, 5n, T.Mat.fill(2n, 3n, 1.0), T.Mat.fill(4n, 5n, 1.0))
+  |                                                     ^^^^^^^^^^^^^^^^^^^^^^^
+6 | def main() -> Nat:
