@@ -1,0 +1,9 @@
+SOME PROOFS FAIL
+Error:
+- expected : Sigma<&1, &1, Mat<3n, 2n>, _ => F32>
+- observed : Sigma<&1, &1, Mat<2n, 2n>, _ => F32>
+Location: main
+44 | def main() -> IO(Unit):
+45>|   show3(Mat.dot(2n, 3n, 2n, 3n, 0, 0, 0, 0.0, Mat.get(2n, 3n, Mat.new(2n, 3n, 3n, 1.0), 0, 0), Mat.get(2n, 2n, Mat.new(2n, 2n, 2n, 1.0), 0, 0)))
+   |                                                                                                ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+46 | 

@@ -1,0 +1,12 @@
+SOME PROOFS FAIL
+Error:
+- expected : Vec.Con<2n>
+- observed : Vec.Con<3n>
+Context:
+- a : Vec.Con<2n>
+- b : Vec.Con<3n>
+Location: main
+55 |     b : Vec(4n) = Vec.fill(4n, 3.0)
+56>|     c : Vec(3n) = Vec.add(3n, a, b)
+   |                                  ^
+57 |     IO.print(F32.show(Vec.dot(3n, c, c, 0.0)))
