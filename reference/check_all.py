@@ -13,9 +13,9 @@ FULL = "--full" in sys.argv
 results = []
 
 
-def run(name, cmd, ok_if=None, timeout=3600):
+def run(name, cmd, ok_if=None, timeout=3600, extra_env=None):
     t0 = time.time()
-    r = subprocess.run(cmd, capture_output=True, text=True, cwd=ROOT, env=ENV, timeout=timeout)
+    r = subprocess.run(cmd, capture_output=True, text=True, cwd=ROOT, env=dict(ENV, **(extra_env or {})), timeout=timeout)
     out = r.stdout + r.stderr
     ok = (r.returncode == 0) if ok_if is None else ok_if(out, r.returncode)
     results.append(ok)
@@ -58,6 +58,10 @@ def main():
     run("tensor vs PyTorch", [PY, "reference/test_tensor.py"])
     run("tensor-array vs PyTorch", [PY, "reference/test_tensor_array.py"])
     run("autograd vs PyTorch (gradient checking)", [PY, "reference/test_autograd.py"])
+    cases = "80" if FULL else "30"
+    run(f"autograd on {120 if FULL else 30} random expression trees vs PyTorch", [PY, "reference/test_autograd_random.py"], extra_env={"FUZZ_CASES": "120" if FULL else "30"})
+    run(f"BPE fuzz ({cases} random corpora) vs the Python reference", [PY, "reference/test_fuzz_bpe.py"], extra_env={"FUZZ_CASES": cases})
+    run("published packages import from BendHub and apply their laws", [PY, "reference/test_published.py"])
 
     # 4. GPT-2 tokenizer vs tiktoken
     data = os.path.join(ROOT, "demos/gpt2/data/merges_num.txt")
