@@ -1,7 +1,7 @@
 // Renders video/scene.html frame by frame with Brave and encodes it with ffmpeg.
 //   node render_video.mjs                  full video -> bend-ml.mp4 (not committed; attached to the release)
 //   node render_video.mjs --stills 1,3,12  PNG stills of those seconds -> frames/still-<t>.png (for review)
-//   node render_video.mjs --poster         poster.png (hook frame) and teaser.webp (first 5.6 s)
+//   node render_video.mjs --poster         poster.png (the hook, after the error)
 import puppeteer from "puppeteer-core";
 import http from "node:http";
 import fs from "node:fs";
@@ -10,7 +10,8 @@ import { spawn, spawnSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const here = path.dirname(fileURLToPath(import.meta.url));
-const FPS = 30, W = 1920, H = 1080;
+// frames are rendered at 60 fps and each pair is blended into one 30 fps frame (motion blur)
+const FPS = 60, OUT_FPS = 30, W = 1920, H = 1080;
 const browserPath = process.env.BRAVE || "/usr/bin/brave";
 const args = process.argv.slice(2);
 const mime = { ".html": "text/html", ".js": "text/javascript", ".mjs": "text/javascript", ".css": "text/css", ".json": "application/json", ".woff2": "font/woff2", ".txt": "text/plain", ".png": "image/png", ".svg": "image/svg+xml" };
@@ -42,18 +43,18 @@ try {
       console.log("still", t);
     }
   } else if (args[0] === "--poster") {
-    fs.writeFileSync(path.join(here, "poster.png"), await frame(3.2, { type: "png" }));
+    fs.writeFileSync(path.join(here, "poster.png"), await frame(6.0, { type: "png" }));
     console.log("poster.png");
   } else {
     const out = path.join(here, "bend-ml.mp4");
     const ff = spawn("ffmpeg", ["-y", "-loglevel", "error", "-f", "image2pipe", "-framerate", String(FPS), "-c:v", "mjpeg", "-i", "-",
-      "-vf", "scale=in_range=full:out_range=tv,format=yuv420p", "-c:v", "libx264", "-preset", "slow", "-crf", "17", "-color_range", "tv", "-movflags", "+faststart", out], { stdio: ["pipe", "inherit", "inherit"] });
+      "-vf", `tmix=frames=2,fps=${OUT_FPS},scale=in_range=full:out_range=tv,format=yuv420p`, "-c:v", "libx264", "-preset", "slow", "-crf", "17", "-color_range", "tv", "-movflags", "+faststart", out], { stdio: ["pipe", "inherit", "inherit"] });
     const done = new Promise((r) => ff.on("close", r));
     const total = Math.round(DURATION * FPS);
     for (let f = 0; f < total; f++) {
       const buf = await frame(f / FPS, { type: "jpeg", quality: 95 });
       if (!ff.stdin.write(buf)) await new Promise((r) => ff.stdin.once("drain", r));
-      if (f % 150 === 0) console.log(`frame ${f}/${total}`);
+      if (f % 300 === 0) console.log(`frame ${f}/${total}`);
     }
     ff.stdin.end();
     await done;

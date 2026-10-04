@@ -16,6 +16,6 @@ node charts.mjs
 if [ "$video" = 1 ]; then
   node render_video.mjs --poster
   node render_video.mjs               # writes bend-ml.mp4 (attach it to the release; it is not committed)
-  ffmpeg -y -loglevel error -t 5.6 -i bend-ml.mp4 -vf "fps=15,scale=960:-1:flags=lanczos" -loop 0 -c:v libwebp -quality 72 -compression_level 6 teaser.webp
+  ffmpeg -y -loglevel error -t 7 -i bend-ml.mp4 -vf "fps=15,scale=960:-1:flags=lanczos" -loop 0 -c:v libwebp -quality 72 -compression_level 6 teaser.webp
 fi
 echo "media ready in docs/media/"
