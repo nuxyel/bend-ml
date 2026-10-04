@@ -43,7 +43,7 @@ The tokenizer in Bend (pre-tokenizer + 50,000 rules, package `bend-ml-bpe-tokeni
 | Bend: 8 tokens, total | 49.8 s |
 | PyTorch (CPU, no KV cache, 16 threads): 8 tokens, total including loading the weights | 1.3 s |
 
-Setup: Intel Core Ultra 7 155H (22 threads), 32 GB; Bend 2.0.35 (1 effective thread), clang 22.1.8; PyTorch 2.14.1 (CPU). No GPU: the RTX 4050 (6 GB) is not used (Bend asks for CUDA 12 at `/usr/local/cuda` and Arch ships 13).
+Setup: Intel Core Ultra 7 155H (22 threads), 32 GB; Bend 2.0.35 (1 effective thread), clang 22.1.8; PyTorch 2.14.1 (CPU). The GPU was tried and is slower than the CPU for these kernels (NOTES.md, experiment 10), so it is not used.
 
 ## Memory
 

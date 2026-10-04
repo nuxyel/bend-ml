@@ -35,7 +35,7 @@ Every product, every gradient and every update has its shape checked by the type
 | OS | Linux 7.2.5 (Omarchy) |
 | Bend | 2.0.35, native binary (`bend ... -o`), clang 22.1.8; 1 thread (the list-based `matmul` only reached ~1.8x with more threads) |
 | PyTorch | 2.14.1 (CPU), Python 3.14.7, 16 threads or 1 thread |
-| GPU | not used (Bend asks for CUDA 12; Arch has CUDA 13; the 6 GB RTX 4050 stays out) |
+| GPU | tried and slower than the CPU (NOTES.md, experiment 10), so not used |
 
 ## Result of one full epoch
 

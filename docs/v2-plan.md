@@ -52,7 +52,7 @@ Axis 1 (performance), every experiment measured and recorded in `NOTES.md` (expe
 | 1-2. lists vs `Array` | ~49x on one thread (44 M vs 2,200 M multiply-adds/s) |
 | 3. why parallelism stalls at ~1.8x | the bottleneck was the data structure and the `Array` size (2^20 vs 2^17 costs ~60%); clones do **not** cause contention; the cache/tiling hypothesis was refuted |
 | 4. tiling | no effect (1, 8, 16, 32 blocks of columns: same time) |
-| 5. GPU | **not done**: Bend asks for CUDA 12 and the machine has Arch's CUDA 13. The Bend binary honors `CUDA_HOME`, so a user-local CUDA 12 toolkit (headers and `libnvrtc`) could be tried without sudo; it is left as a pending item |
+| 5. GPU | **done, no gain**: a user-local CUDA 12.9 (headers and `libnvrtc`, through `CUDA_HOME`, no sudo) makes `!` run on the RTX 4050, but the GPU is 3x to 18x slower than the 22-thread CPU on every kernel tried (`NOTES.md`, experiment 10; setup in `docs/gpu-setup.md`) |
 | 6. full MNIST | 544 s → 6.6 s per epoch, same loss and hits |
 | 7. GPT-2 | ~3 s → ~0.1 s per token, same ids and logits |
 | Finding | parallelizing matrix · vector by copying the matrix costs 10x more than computing; future solution: split the `Array` tree without copying |
