@@ -12,3 +12,8 @@ dist/
 .venv/
 __pycache__/
 *.pyc
+
+# dados baixados
+demos/mnist/data/
+demos/gpt2/data/
+*.bin
