@@ -1,0 +1,22 @@
+{
+  "_note": "Every number shown in the README charts and the video. Measured on an Intel Core Ultra 7 155H, 32 GB, Bend 2.0.35, PyTorch 2.14.1 (CPU, 16 threads).",
+  "mnist_epoch_seconds": {
+    "bend_v1_lists": 544,
+    "bend_v2_array": 7.0,
+    "pytorch": 0.2,
+    "source": "demos/mnist/BENCHMARK.md; v2 and PyTorch re-measured on 2026-10-04 on an idle machine (runs: 7.0, 7.0, 7.2 s, and 12.5 s once under load; PyTorch 0.18, 0.20, 0.55 s)"
+  },
+  "gpt2_seconds_per_token": {
+    "bend_v1_lists": 3.0,
+    "bend_v2_array": 0.1,
+    "pytorch_1_thread": 0.055,
+    "pytorch_16_threads": 0.021,
+    "source": "demos/gpt2/BENCHMARK.md; v2 re-measured on 2026-10-04 (0.1 s per token after a 7 s load)"
+  },
+  "gpt2_load_seconds": { "bend": 7, "source": "re-measured 2026-10-04 with the streaming loader" },
+  "gpt2_peak_rss_mb": { "before": 2326, "after": 1462, "source": "NOTES.md, stability work; scripts/peak_rss.sh" },
+  "list_vs_array_speedup": { "value": 49, "source": "NOTES.md, experiment 1" },
+  "gpu": { "compute_bound_speedup": 3.8, "memory_bound_slowdown_min": 3, "memory_bound_slowdown_max": 18, "source": "NOTES.md, experiment 10" },
+  "project": { "packages": 5, "laws": 24, "checks_quick": 31, "checks_full": 36, "bend": "2.0.35", "lean": "4.34.0" },
+  "ratios": { "mnist_pytorch_ahead_min": 25, "mnist_pytorch_ahead_max": 35, "gpt2_pytorch_ahead_min": 2, "gpt2_pytorch_ahead_max": 5 }
+}

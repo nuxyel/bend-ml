@@ -1,0 +1,39 @@
+reference/.venv/bin/python reference/check_all.py --full
+ok   nat-lemmas/main.bend: ALL PROOFS CHECK (0s)
+ok   nat-lemmas/main.bend --verdict (kernel em Lean) (0s)
+ok   nat-lemmas/main.bend: no @unsafe or ?TODO
+ok   bpe/main.bend: ALL PROOFS CHECK (0s)
+ok   bpe/main.bend --verdict (kernel em Lean) (0s)
+ok   bpe/main.bend: no @unsafe or ?TODO
+ok   tensor/main.bend: ALL PROOFS CHECK (0s)
+ok   tensor/main.bend --verdict (kernel em Lean) (0s)
+ok   tensor/main.bend: no @unsafe or ?TODO
+ok   tensor-array/main.bend: ALL PROOFS CHECK (0s)
+ok   tensor-array/main.bend --verdict (kernel em Lean) (0s)
+ok   tensor-array/main.bend: no @unsafe or ?TODO
+ok   autograd/main.bend: ALL PROOFS CHECK (0s)
+ok   autograd/main.bend --verdict (kernel em Lean) (0s)
+ok   autograd/main.bend: no @unsafe or ?TODO
+ok   tensor/tests/bad_matmul.bend must be a type error (0s)
+ok   tensor/tests/bad_reshape.bend must be a type error (0s)
+ok   tensor-array/tests/bad_matmul.bend must be a type error (0s)
+ok   tensor-array/tests/bad_grad.bend must be a type error (0s)
+ok   tensor/tests/ok.bend compiles and runs (0s)
+ok   tensor-array/tests/ok.bend compiles and runs (0s)
+ok   tensor-array/tests/checked.bend rejects wrong label counts (0s)
+ok   bpe vs Python reference (train/encode/decode) (6s)
+ok   tensor vs PyTorch (6s)
+ok   tensor-array vs PyTorch (36s)
+ok   autograd vs PyTorch (gradient checking) (4s)
+ok   autograd on 120 random expression trees vs PyTorch (13s)
+ok   BPE fuzz (80 random corpora) vs the Python reference (77s)
+ok   published packages import from BendHub and apply their laws (0s)
+ok   compile the GPT-2 tokenizer (2s)
+ok   GPT-2 tokenizer vs tiktoken (14s)
+ok   compile GPT-2 (Array) (4s)
+ok   GPT-2 (Array) in Bend vs PyTorch (3 prompts) (113s)
+ok   compile MNIST (Array) (2s)
+ok   MNIST (Array) in Bend, 50 batches (1s)
+ok   MNIST in PyTorch, 50 batches (1s)
+
+TOTAL: 36/36 checks ok

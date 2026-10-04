@@ -1,0 +1,8 @@
+SOME PROOFS FAIL
+Error:
+- expected : 12n
+- observed : 15n
+Location: bad
+4 | def bad() -> T.Mat<5n, 3n>:
+5>|   T.Mat.reshape(2n, 6n, 5n, 3n, {==}, T.Mat.fill(2n, 6n, 1.0))
+  |                                 ^^^^

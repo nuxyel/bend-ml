@@ -1,0 +1,1 @@
+epoch 1 train_loss=0.5204771 test_correct=9129/10000 train_seconds=7.2

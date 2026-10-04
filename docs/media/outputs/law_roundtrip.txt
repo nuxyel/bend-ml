@@ -1,0 +1,7 @@
+law roundtrip
+   # LAW 1 (roundtrip): with a well-formed table (all rule ids
+   # distinct), decoding what was encoded returns the original bytes.
+     for +table: List<&2, Rule>
+     for +bs: List<&2, Nat>
+     for +w: {True{} == wf(table) : Bool}
+     {decode(table, encode(table, lift(bs))) == bs : List<&2, Nat>}

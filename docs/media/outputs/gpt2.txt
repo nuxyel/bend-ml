@@ -1,0 +1,11 @@
+weights loaded in 7s
+prompt ids: 464 3139 286 4881 318 
+  id 262  logit -100.24986  pos 4  t=0.4s
+  id 3139  logit -97.601974  pos 5  t=0.6s
+  id 286  logit -49.064972  pos 6  t=0.7s
+  id 262  logit -73.67762  pos 7  t=0.8s
+  id 4141  logit -88.8842  pos 8  t=0.9s
+  id 2066  logit -96.78347  pos 9  t=1.0s
+  id 11  logit -57.253235  pos 10  t=1.1s
+  id 290  logit -102.21436  pos 11  t=1.2s
+text: The capital of France is the capital of the French Republic, and
