@@ -1,10 +1,10 @@
-"""Reordena as definições de um .bend para que cada uma venha depois das que usa."""
+"""Reorders the definitions of a .bend file so that each one comes after the ones it uses."""
 import re, sys
 
 def main(path):
     s = open(path).read()
     head_end = s.index("\n\n", s.index("import")) if "import" in s else 0
-    # separa cabeçalho (comentários + imports) do resto
+    # separates the header (comments + imports) from the rest
     lines = s.split("\n")
     i = 0
     while i < len(lines) and (lines[i].startswith("#") or lines[i].startswith("import") or lines[i].strip() == ""):
@@ -25,7 +25,7 @@ def main(path):
     deps = {}
     for n, b in names.items():
         d = set()
-        # corpo sem a primeira linha de declaração
+        # body without the first declaration line
         for other in names:
             if other != n and re.search(r"(?<![\w.])" + re.escape(other) + r"(?![\w]|\.\w)", b):
                 d.add(other)
