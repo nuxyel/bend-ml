@@ -49,6 +49,7 @@ v1 used linked lists for the matrices and measured ~1800x PyTorch on MNIST. v2 m
 
 ## What is proved and what is tested
 
+- **Reviewing the claims:** [`docs/AUDIT.md`](docs/AUDIT.md) lists the trust base and a checklist; `reference/list_laws.py` prints every law statement.
 - **Proved by the kernel** (`bend X.bend --verdict`): the laws above, in five packages. No `@unsafe`, no `?TODO`, in any of them.
 - **By the type**: the shapes of `matmul`, of each layer gradient (`dW: Mat<i,o>`) and `reshape` with a proof. The whole MNIST training step is checked this way.
 - **Tested, not proved**: all `F32` numerics (it is not a real number; it rounds). Gradient checking and comparison with PyTorch live in `reference/`. The tokenizer is exact on ASCII; bytes ≥ 128 count as letters in the GPT-2 pre-tokenizer.
