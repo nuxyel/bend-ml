@@ -1,10 +1,10 @@
-# bend-ml-tensor: tensores com a shape no TIPO. Erro de shape é erro de tipo.
+# bend-ml-tensor: tensors with the shape in the TYPE. A shape error is a type error.
 #
 #   import bend-ml-tensor@0.1.0.0/main.bend as T
 #
-# Vec<n> é um vetor de n números F32; Mat<r, c> é uma matriz r x c (lista de r
-# linhas com c números). As dimensões são parâmetros de tipo apagados: não custam
-# nada em tempo de execução, mas o checker as confere em toda operação.
+# Vec<n> is a vector of n F32 numbers; Mat<r, c> is an r x c matrix (a list of r
+# rows with c numbers each). The dimensions are erased type parameters: they cost
+# nothing at run time, but the checker verifies them in every operation.
 
 import Base
 import bend-ml-nat-lemmas@0.1.0.0/main.bend as NL
@@ -16,7 +16,7 @@ type Mat<-r: Nat, -c: Nat> is Data:
   Mat{rows: List<&2, List<&2, F32>>}
 
 # ---------------------------------------------------------------------
-# listas de F32 (internas; as operações públicas fixam as dimensões)
+# lists of F32 (internal; the public operations fix the dimensions)
 # ---------------------------------------------------------------------
 
 def zip_with.add(xs: List<&2, F32>, ys: List<&2, F32>) -> List<&2, F32>:
@@ -121,7 +121,7 @@ def Vec.relu(-n: Nat, a: Vec<n>) -> Vec<n>:
       Vec{relu.l(xs)}
 
 # ---------------------------------------------------------------------
-# listas de linhas (internas)
+# lists of rows (internal)
 # ---------------------------------------------------------------------
 
 def heads(rows: List<&2, List<&2, F32>>) -> List<&2, F32>:
@@ -138,7 +138,7 @@ def tails(rows: List<&2, List<&2, F32>>) -> List<&2, List<&2, F32>>:
     case _:
       Nil{}
 
-# transposta de uma matriz com `c` colunas (c é quem encolhe, vem primeiro)
+# transpose of a matrix with `c` columns (c is the one that shrinks, so it comes first)
 def transpose.go(c: Nat, +rows: List<&2, List<&2, F32>>) -> List<&2, List<&2, F32>>:
   match c:
     case 0n:
@@ -181,7 +181,7 @@ def rows.relu(xs: List<&2, List<&2, F32>>) -> List<&2, List<&2, F32>>:
     case Con{r, t}:
       relu.l(r) <> rows.relu(t)
 
-# soma por colunas
+# column sums
 def rows.col_sums(c: Nat, +rows: List<&2, List<&2, F32>>) -> List<&2, F32>:
   match c:
     case 0n:
@@ -210,7 +210,7 @@ def matmul.rows(a: List<&2, List<&2, F32>>, +bt: List<&2, List<&2, F32>>) -> Lis
     case Con{r, t}:
       matmul.row(r, bt) <> matmul.rows(t, bt)
 
-# junta todas as linhas numa lista só
+# joins all the rows into a single list
 def flatten.l(rows: List<&2, List<&2, F32>>) -> List<&2, F32>:
   match rows:
     case Nil{}:
@@ -218,7 +218,7 @@ def flatten.l(rows: List<&2, List<&2, F32>>) -> List<&2, F32>:
     case Con{r, t}:
       List.append(&2, F32, r, flatten.l(t))
 
-# quebra uma lista em r linhas de c números
+# splits a list into r rows of c numbers
 def chunk.l(r: Nat, +c: Nat, +xs: List<&2, F32>) -> List<&2, List<&2, F32>>:
   match r:
     case 0n:
@@ -246,7 +246,7 @@ def Mat.sub(-r: Nat, -c: Nat, a: Mat<r, c>, b: Mat<r, c>) -> Mat<r, c>:
     case Mat{x} Mat{y}:
       Mat{rows.zip_sub(x, y)}
 
-# produto elemento a elemento (Hadamard)
+# element-wise product (Hadamard)
 def Mat.mul(-r: Nat, -c: Nat, a: Mat<r, c>, b: Mat<r, c>) -> Mat<r, c>:
   match a b:
     case Mat{x} Mat{y}:
@@ -267,46 +267,46 @@ def Mat.transpose(-r: Nat, +c: Nat, a: Mat<r, c>) -> Mat<c, r>:
     case Mat{x}:
       Mat{transpose.go(c, x)}
 
-# (n x k) · (k x m) = (n x m): as dimensões internas têm que ser a mesma k
+# (n x k) · (k x m) = (n x m): the inner dimensions must be the same k
 def Mat.matmul(-n: Nat, +k: Nat, +m: Nat, a: Mat<n, k>, b: Mat<k, m>) -> Mat<n, m>:
   match a b:
     case Mat{x} Mat{y}:
       Mat{matmul.rows(x, transpose.go(m, y))}
 
-# (n x k) · (m x k)ᵀ = (n x m): o segundo operando já vem TRANSPOSTO (guardado como
-# m linhas de k números). Evita transpor pesos grandes a cada chamada; o tipo
-# continua exigindo a mesma dimensão interna k.
+# (n x k) · (m x k)ᵀ = (n x m): the second operand arrives already TRANSPOSED (stored as
+# m rows of k numbers). It avoids transposing large weights on every call; the type
+# still requires the same inner dimension k.
 def Mat.matmul_t(-n: Nat, -k: Nat, -m: Nat, a: Mat<n, k>, bt: Mat<m, k>) -> Mat<n, m>:
   match a bt:
     case Mat{x} Mat{y}:
       Mat{matmul.rows(x, y)}
 
-# soma bias (um vetor de m números) a cada linha de uma matriz n x m
+# adds a bias (a vector of m numbers) to each row of an n x m matrix
 def Mat.add_row(-n: Nat, -m: Nat, a: Mat<n, m>, b: Vec<m>) -> Mat<n, m>:
   match a b:
     case Mat{x} Vec{v}:
       Mat{rows.add_row(x, v)}
 
-# soma de cada coluna: Mat<n, m> -> Vec<m>
+# sum of each column: Mat<n, m> -> Vec<m>
 def Mat.col_sums(-n: Nat, +m: Nat, a: Mat<n, m>) -> Vec<m>:
   match a:
     case Mat{x}:
       Vec{rows.col_sums(m, x)}
 
-# matriz · vetor: (n x k) · k = n
+# matrix · vector: (n x k) · k = n
 def Mat.matvec(-n: Nat, +k: Nat, a: Mat<n, k>, v: Vec<k>) -> Vec<n>:
   match a v:
     case Mat{x} Vec{ys}:
       Vec{heads(matmul.rows(x, ys <> Nil{}))}
 
-# Reshape: só compila com a PROVA de que o número de elementos não muda.
+# Reshape: compiles only with the PROOF that the number of elements does not change.
 def Mat.reshape(-r1: Nat, -c1: Nat, r2: Nat, +c2: Nat, -p: {Nat.mul(r1, c1) == Nat.mul(r2, c2) : Nat}, a: Mat<r1, c1>) -> Mat<r2, c2>:
   match a:
     case Mat{x}:
       Mat{chunk.l(r2, c2, flatten.l(x))}
 
 # ---------------------------------------------------------------------
-# funções por linha: softmax, GELU, layernorm
+# per-row functions: softmax, GELU, layernorm
 # ---------------------------------------------------------------------
 
 def max.go(xs: List<&2, F32>, cur: F32) -> F32:
@@ -337,7 +337,7 @@ def div.l(xs: List<&2, F32>, +s: F32) -> List<&2, F32>:
     case Con{+h, t}:
       (h / s : F32) <> div.l(t, s)
 
-# softmax estável: subtrai o máximo antes de exponenciar
+# stable softmax: subtracts the maximum before exponentiating
 def softmax.fin(+es: List<&2, F32>) -> List<&2, F32>:
   div.l(es, sum.go(es, 0.0))
 
@@ -351,7 +351,7 @@ def rows.softmax(xs: List<&2, List<&2, F32>>) -> List<&2, List<&2, F32>>:
     case Con{r, t}:
       softmax.l(r) <> rows.softmax(t)
 
-# GELU com a aproximação por tanh (a mesma do GPT-2)
+# GELU with the tanh approximation (the same as GPT-2)
 def gelu.f(+x: F32) -> F32:
   (0.5 * (x * (1.0 + F32.tanh((0.7978846 * (x + (0.044715 * (x * (x * x : F32) : F32) : F32) : F32) : F32)) : F32) : F32) : F32)
 
@@ -383,7 +383,7 @@ def sq_sum(xs: List<&2, F32>, acc: F32) -> F32:
     case Con{+h, t}:
       sq_sum(t, (acc + (h * h : F32) : F32))
 
-# (x - média) / sqrt(variância + eps), depois * gamma + beta
+# (x - mean) / sqrt(variance + eps), then * gamma + beta
 def layernorm.fin(+cs: List<&2, F32>, +d: F32, +eps: F32, +gamma: List<&2, F32>, +beta: List<&2, F32>) -> List<&2, F32>:
   zip_with.add(zip_with.mul(scale.l((1.0 / F32.sqrt(((sq_sum(cs, 0.0) / d : F32) + eps : F32)) : F32), cs), gamma), beta)
 
@@ -407,7 +407,7 @@ def Mat.gelu(-r: Nat, -c: Nat, a: Mat<r, c>) -> Mat<r, c>:
     case Mat{x}:
       Mat{rows.gelu(x)}
 
-# normaliza cada linha (d colunas) e aplica gamma e beta, vetores de d números
+# normalizes each row (d columns) and applies gamma and beta, vectors of d numbers
 def Mat.layernorm(-n: Nat, d: Nat, eps: F32, g: Vec<d>, bt: Vec<d>, a: Mat<n, d>) -> Mat<n, d>:
   match g bt a:
     case Vec{gamma} Vec{beta} Mat{x}:
@@ -419,7 +419,7 @@ def Vec.softmax(-n: Nat, a: Vec<n>) -> Vec<n>:
       Vec{softmax.l(xs)}
 
 # ---------------------------------------------------------------------
-# construção e leitura com verificação de tamanho
+# construction and reading with size checking
 # ---------------------------------------------------------------------
 
 def len.eq(xs: List<&2, F32>, n: Nat) -> Bool:
@@ -447,7 +447,7 @@ def Vec.of2(-n: Nat, ok: Bool, xs: List<&2, F32>) -> Maybe<&2, Vec<n>>:
     case False{}:
       None{}
 
-# Vec<n> a partir de uma lista, só se ela tem exatamente n números
+# Vec<n> from a list, only if it has exactly n numbers
 def Vec.of(n: Nat, +xs: List<&2, F32>) -> Maybe<&2, Vec<n>>:
   Vec.of2(n, len.eq(xs, n), xs)
 
@@ -458,7 +458,7 @@ def Mat.of2(-r: Nat, -c: Nat, ok: Bool, rs: List<&2, List<&2, F32>>) -> Maybe<&2
     case False{}:
       None{}
 
-# Mat<r, c> a partir de linhas, só se são exatamente r linhas de c números
+# Mat<r, c> from rows, only if they are exactly r rows of c numbers
 def Mat.of(+r: Nat, +c: Nat, +rs: List<&2, List<&2, F32>>) -> Maybe<&2, Mat<r, c>>:
   Mat.of2(r, c, rows.ok(rs, c, r), rs)
 
@@ -473,11 +473,11 @@ def Mat.to_rows(-r: Nat, -c: Nat, a: Mat<r, c>) -> List<&2, List<&2, F32>>:
       x
 
 # ---------------------------------------------------------------------
-# LAWS: quando um reshape é possível, e uma prova reaproveitada do nat-lemmas
+# LAWS: when a reshape is possible, and a proof reused from nat-lemmas
 # ---------------------------------------------------------------------
 
-# LEI (reshape_swap): r x c e c x r têm o mesmo número de elementos
-# (a multiplicação é comutativa), então esse reshape sempre existe.
+# LAW (reshape_swap): r x c and c x r have the same number of elements
+# (multiplication is commutative), so this reshape always exists.
 law reshape_swap:
   for +r: Nat
   for +c: Nat
@@ -486,8 +486,8 @@ law reshape_swap:
 def reshape_swap(r, c):
   NL.mul_comm(r, c)
 
-# LEI (reshape_flat): r x c tem o mesmo número de elementos que 1 x (r*c)
-# (multiplicar por 1 não muda nada), então achatar uma matriz sempre existe.
+# LAW (reshape_flat): r x c has the same number of elements as 1 x (r*c)
+# (multiplying by 1 changes nothing), so flattening a matrix always exists.
 law reshape_flat:
   for +r: Nat
   for +c: Nat
@@ -496,10 +496,10 @@ law reshape_flat:
 def reshape_flat(r, c):
   Equal.sym(Nat, Nat.mul(1n, Nat.mul(r, c)), Nat.mul(r, c), NL.mul_one_l(Nat.mul(r, c)))
 
-# Mat<r, c> -> Mat<1, r*c>: a prova vem da lei acima
+# Mat<r, c> -> Mat<1, r*c>: the proof comes from the law above
 def Mat.flatten(+r: Nat, +c: Nat, a: Mat<r, c>) -> Mat<1n, Nat.mul(r, c)>:
   Mat.reshape(r, c, 1n, Nat.mul(r, c), reshape_flat(r, c), a)
 
-# Mat<r, c> -> Mat<c, r> pelos mesmos dados (não é a transposta!): só reinterpreta
+# Mat<r, c> -> Mat<c, r> over the same data (it is NOT the transpose!): it only reinterprets
 def Mat.reshape_swap(+r: Nat, +c: Nat, a: Mat<r, c>) -> Mat<c, r>:
   Mat.reshape(r, c, c, r, reshape_swap(r, c), a)
