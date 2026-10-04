@@ -1,32 +1,34 @@
 # bend-ml-tensor
 
-Tensores em Bend 2 com a **shape no tipo**: um erro de shape é um erro de tipo, não uma falha em tempo de execução.
+Tensors in Bend 2 with the **shape in the type**: a shape error is a type error, not a run-time failure.
 
-- Bend: **2.0.35** · Licença: MIT · Depende de `bend-ml-nat-lemmas@0.1.0.0`.
-- `bend tensor/main.bend` e `bend tensor/main.bend --verdict` → `ALL PROOFS CHECK` (sem `@unsafe`, sem `?TODO`).
+- Bend: **2.0.35** · License: MIT · Depends on `bend-ml-nat-lemmas@0.1.0.0`.
+- `bend tensor/main.bend` and `bend tensor/main.bend --verdict` → `ALL PROOFS CHECK` (no `@unsafe`, no `?TODO`).
 
 ```python
 import Base
-import bend-ml-tensor@0.1.1.0/main.bend as T
+import bend-ml-tensor@0.1.2.0/main.bend as T
 
 def prod() -> T.Mat<2n, 4n>:
   T.Mat.matmul(2n, 3n, 4n, T.Mat.fill(2n, 3n, 2.0), T.Mat.fill(3n, 4n, 3.0))
 ```
 
-## Tipos
+This package stores matrices as lists of rows. For a ~50x faster flat-`Array` version with the same shape guarantees, see [`bend-ml-tensor-array`](../tensor-array).
 
-- `Vec<n>`: vetor com `n` números `F32`.
-- `Mat<r, c>`: matriz `r × c` (lista de `r` linhas com `c` números).
-- As dimensões são parâmetros de tipo **apagados**: não custam nada em tempo de execução, mas o checker as confere em toda operação.
-- `Mat.of(r, c, linhas)` e `Vec.of(n, lista)` só devolvem um valor (`Some`) se os tamanhos reais batem.
+## Types
 
-## Operações
+- `Vec<n>`: a vector of `n` `F32` numbers.
+- `Mat<r, c>`: an `r × c` matrix (a list of `r` rows with `c` numbers each).
+- The dimensions are **erased** type parameters: they cost nothing at run time, but the checker verifies them in every operation.
+- `Mat.of(r, c, rows)` and `Vec.of(n, list)` only return a value (`Some`) if the real sizes match.
 
-`Mat.add/sub/mul/scale`, `Mat.matmul`, `Mat.matmul_t` (o segundo operando já transposto, para pesos grandes: `Mat<n,k> · Mat<m,k>ᵀ = Mat<n,m>`), `Mat.transpose`, `Mat.relu`, `Mat.gelu` (tanh, como o GPT-2), `Mat.softmax` (por linha, estável), `Mat.layernorm`, `Mat.add_row` (soma um bias `Vec<m>` a cada linha), `Mat.col_sums`, `Mat.matvec`, `Mat.reshape`, `Mat.flatten`, `Mat.reshape_swap`; e `Vec.add/sub/mul/scale/dot/sum/relu/softmax`.
+## Operations
 
-## Erro de shape = erro de tipo
+`Mat.add/sub/mul/scale`, `Mat.matmul`, `Mat.matmul_t` (the second operand already transposed, for large weights: `Mat<n,k> · Mat<m,k>ᵀ = Mat<n,m>`), `Mat.transpose`, `Mat.relu`, `Mat.gelu` (tanh, like GPT-2), `Mat.softmax` (per row, stable), `Mat.layernorm`, `Mat.add_row` (adds a `Vec<m>` bias to each row), `Mat.col_sums`, `Mat.matvec`, `Mat.reshape`, `Mat.flatten`, `Mat.reshape_swap`; and `Vec.add/sub/mul/scale/dot/sum/relu/softmax`.
 
-`(2×3) · (4×5)` não compila (`tensor/tests/bad_matmul.bend`):
+## A shape error is a type error
+
+`(2×3) · (4×5)` does not compile (`tensor/tests/bad_matmul.bend`):
 
 ```
 Error:
@@ -34,7 +36,7 @@ Error:
 - observed : T.Mat<4n, 5n>
 ```
 
-`reshape` de 2×6 (12 elementos) para 5×3 (15) é recusado, porque não existe a prova `12 == 15` (`tensor/tests/bad_reshape.bend`):
+A `reshape` from 2×6 (12 elements) to 5×3 (15) is refused, because there is no proof of `12 == 15` (`tensor/tests/bad_reshape.bend`):
 
 ```
 Error:
@@ -42,27 +44,28 @@ Error:
 - observed : 15n
 ```
 
-`reshape` de 2×6 para 3×4 compila porque a prova é só calcular (`{==}`).
+A `reshape` from 2×6 to 3×4 compiles because the proof is just computing (`{==}`).
 
-## LAWS provadas (em português)
+## Proved LAWS (in plain language)
 
-| Lei | O que afirma |
+| Law | What it states |
 |---|---|
-| `reshape_swap` | `r × c` e `c × r` têm o mesmo número de elementos: `r*c = c*r` (usa `mul_comm` do nat-lemmas). Por isso `Mat.reshape_swap` sempre existe. |
-| `reshape_flat` | `r × c` tem o mesmo número de elementos que `1 × (r*c)`: `r*c = 1*(r*c)` (usa `mul_one_l`). Por isso `Mat.flatten` sempre existe. |
+| `reshape_swap` | `r × c` and `c × r` have the same number of elements: `r*c = c*r` (uses `mul_comm` from nat-lemmas). So `Mat.reshape_swap` always exists. |
+| `reshape_flat` | `r × c` has the same number of elements as `1 × (r*c)`: `r*c = 1*(r*c)` (uses `mul_one_l`). So `Mat.flatten` always exists. |
 
-Além das leis, **o próprio tipo de `Mat.matmul` é uma garantia**: `Mat<n,k> → Mat<k,m> → Mat<n,m>`; e `Mat.reshape` só aceita um argumento que é uma prova de `r1*c1 = r2*c2`.
+Besides the laws, **the type of `Mat.matmul` is itself a guarantee**: `Mat<n,k> → Mat<k,m> → Mat<n,m>`; and `Mat.reshape` only accepts an argument that is a proof of `r1*c1 = r2*c2`.
 
-## O que NÃO é provado
+## What is NOT proved
 
-- Os números: `F32` não é um número real (arredondamento), então a correção numérica é validada por testes contra o PyTorch, não por prova (`reference/test_tensor.py`): `matmul`, `transpose`, `relu`, `softmax` (inclusive com valores enormes), `gelu` e `layernorm` batem com erro máximo da ordem de 1e-6.
-- A invariante interna "cada linha tem exatamente `c` números" vale porque as operações a preservam e os construtores a verificam (`Mat.of`); ela não é uma prova no tipo.
+- The numbers: `F32` is not a real number (it rounds), so numerical correctness is validated by tests against PyTorch, not by proof (`reference/test_tensor.py`): `matmul`, `transpose`, `relu`, `softmax` (even with huge values), `gelu` and `layernorm` match with a maximum error on the order of 1e-6.
+- The internal invariant "each row has exactly `c` numbers" holds because the operations preserve it and the constructors check it (`Mat.of`); it is not a proof in the type.
 
-## Desempenho
+## Performance
 
-Os dados são listas (copiáveis e sem índices com custo logarítmico): ≈ 44 milhões de multiplicações-e-somas por segundo numa thread. Veja `demos/mnist/BENCHMARK.md` quando existir.
+The data are lists (copyable, with no logarithmic-cost indexing): about 44 million multiply-adds per second on one thread. See `demos/mnist/BENCHMARK.md`.
 
-## Versões
+## Versions
 
-- `0.1.1.0`: acrescenta `Mat.matmul_t`.
-- `0.1.0.0`: primeira publicação.
+- `0.1.2.0`: the same API, with English comments and README.
+- `0.1.1.0`: adds `Mat.matmul_t`.
+- `0.1.0.0`: first publication.
