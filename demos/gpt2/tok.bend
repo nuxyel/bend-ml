@@ -6,7 +6,7 @@
 # outros alfabetos, mas não separa símbolos Unicode que não são letras (travessão, emoji).
 
 import Base
-import bend-ml-bpe-tokenizer@0.1.0.0/main.bend as BPE
+import bend-ml-bpe-tokenizer@0.1.1.0/main.bend as BPE
 
 # ---- leitura de arquivos ----
 
