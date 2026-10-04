@@ -7,7 +7,7 @@
 # Run from the repository root, after `reference/gpt2_prep.py --split`.
 
 import Base
-import bend-ml-tensor-array@0.1.2.0/main.bend as TA
+import bend-ml-tensor-array@0.1.3.0/main.bend as TA
 import bend-ml-tensor@0.1.2.0/main.bend as T
 import bend-ml-bpe-tokenizer@0.1.2.0/main.bend as BPE
 import ./load.bend as L
@@ -202,10 +202,28 @@ def nm(+i: Nat, f: String) -> String:
 def get_list(name: String, +n: Nat) -> IO(List<&2, F32>):
   L.read_floats("demos/gpt2/data/w/" ++ name ++ ".bin", n)
 
-def get_mat(name: String, +r: Nat, +c: Nat) -> IO(TA.Mat<r, c>):
+# reads the file in 1 MB blocks and writes each block straight into the matrix, so only one
+# block is a list at any time
+def stream_mat(-r: Nat, -c: Nat, k: Nat, +off: U32, +idx: U32, m: File & Result<&1, &1, U32 & String, List<&2, U32>>, acc: TA.Mat<r, c>) -> IO(TA.Mat<r, c>):
+  match k m:
+    case 0n Tuple{f, rs}:
+      do IO<TA.Mat<r, c>>:
+        File.close(f)
+        return acc
+    case 1n+p Tuple{f, rs}:
+      do IO<TA.Mat<r, c>>:
+        bs : List<&2, U32> <- IO.pass(List<&2, U32>, rs)
+        m2 : File & Result<&1, &1, U32 & String, List<&2, U32>> <- File.read_at(f, (off + 1048576 : U32), 1048576)
+        stream_mat(r, c, p, (off + 1048576 : U32), (idx + 262144 : U32), m2, TA.Mat.fill_at(r, c, idx, L.f32s(bs), acc))
+
+def get_mat2(-r: Nat, -c: Nat, path: String, +n: Nat, z: TA.Mat<r, c>) -> IO(TA.Mat<r, c>):
   do IO<TA.Mat<r, c>>:
-    fl : List<&2, F32> <- L.read_floats("demos/gpt2/data/w/" ++ name ++ ".bin", Nat.mul(r, c))
-    return TA.Mat.from_list(r, c, fl)
+    f : File <- IO.try(File, File.open(path, "r"))
+    m : File & Result<&1, &1, U32 & String, List<&2, U32>> <- File.read_at(f, 0, 1048576)
+    stream_mat(r, c, L.blocks_of(Nat.mul(n, 4n), 1048576n), 0, 0, m, z)
+
+def get_mat(name: String, +r: Nat, +c: Nat) -> IO(TA.Mat<r, c>):
+  get_mat2(r, c, "demos/gpt2/data/w/" ++ name ++ ".bin", Nat.mul(r, c), TA.Mat.zeros(r, c))
 
 def load_layer(+i: Nat) -> IO(Layer):
   do IO<Layer>:
