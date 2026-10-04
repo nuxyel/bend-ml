@@ -1,7 +1,7 @@
 import Base
 import ./main.bend as TA
 
-# ---- leitura de números em texto ----
+# ---- reading numbers from text ----
 
 def rb_done(m: File & Result<&1, &1, U32 & String, List<&2, U32>>) -> IO(List<&2, U32>):
   (f, r) = m
@@ -52,11 +52,11 @@ def floats(+xs: List<&2, U32>) -> List<&2, F32>:
 def unwrap(-r: Nat, -c: Nat, m: Maybe<&1, TA.Mat<r, c>>) -> IO(TA.Mat<r, c>):
   match m:
     case None{}:
-      IO.die(TA.Mat<r, c>, 1, "tamanho invalido")
+      IO.die(TA.Mat<r, c>, 1, "invalid size")
     case Some{x}:
       IO.pure(TA.Mat<r, c>, x)
 
-# lê uma matriz r x c de um arquivo de texto
+# reads an r x c matrix from a text file
 
 def load(+r: Nat, +c: Nat, path: String) -> IO(TA.Mat<r, c>):
   do IO<TA.Mat<r, c>>:
@@ -85,7 +85,7 @@ def nat2(m: Maybe<&2, Nat>) -> Nat:
     case None{}:
       0n
 
-# ---- modos ----
+# ---- modes ----
 
 def nat(s: String) -> Nat:
   nat2(Nat.read(s))
@@ -245,14 +245,14 @@ def dispatch2(a1: Bool, a2: Bool, a3: Bool, a4: Bool, a5: Bool, a6: Bool, a7: Bo
     case False{} False{} False{} False{} False{} False{} False{} False{} False{} False{} True{} Con{n, Con{c, Con{fz, Con{fy, Nil{}}}}}:
       r_hits(nat(n), nat(c), fz, fy)
     case _ _ _ _ _ _ _ _ _ _ _ _:
-      IO.print("uso invalido")
+      IO.print("invalid usage")
 
 def dispatch(args: List<String>) -> IO(Unit):
   match args:
     case Con{prog, Con{+mode, rest}}:
       dispatch2(String.eq(mode, "nn"), String.eq(mode, "nt"), String.eq(mode, "tn"), String.eq(mode, "bias"), String.eq(mode, "relu"), String.eq(mode, "relu_bwd"), String.eq(mode, "sgd"), String.eq(mode, "add"), String.eq(mode, "colsum"), String.eq(mode, "ce"), String.eq(mode, "hits"), rest)
     case _:
-      IO.print("uso invalido")
+      IO.print("invalid usage")
 
 def main() -> IO(Unit):
   do IO<Unit>:
