@@ -1,15 +1,15 @@
-# MLP 784-128-10 no MNIST, treinado em Bend com camadas de formato checado pelo tipo.
+# MLP 784-128-10 on MNIST, trained in Bend with layers whose shapes are checked by the type.
 #
-#   bend demos/mnist/train.bend -- <épocas> <máx. lotes (0 = todos)> <lr>
+#   bend demos/mnist/train.bend -- <epochs> <max batches (0 = all)> <lr>
 #
-# Gêmeo em PyTorch: reference/mnist_torch.py (mesmos pesos iniciais, mesma ordem
-# de lotes, SGD puro). Rodar da raiz do repositório.
+# PyTorch twin: reference/mnist_torch.py (same initial weights, same batch order,
+# plain SGD). Run from the repository root.
 
 import Base
 import bend-ml-tensor@0.1.0.0/main.bend as T
 import bend-ml-autograd@0.1.0.0/main.bend as AG
 
-# ---- leitura de números em texto ----
+# ---- reading numbers from text ----
 def rb_done(m: File & Result<&1, &1, U32 & String, List<&2, U32>>) -> IO(List<&2, U32>):
   (f, r) = m
   do IO<List<&2, U32>>:
@@ -70,7 +70,7 @@ def raw_done(m: File & Result<&1, &1, U32 & String, List<&2, U32>>) -> IO(List<&
     File.close(f)
     return bs
 
-# lê `n` bytes a partir de `off`
+# reads `n` bytes starting at `off`
 def read_at(path: String, off: U32, n: U32) -> IO(List<&2, U32>):
   do IO<List<&2, U32>>:
     f : File <- IO.try(File, File.open(path, "r"))
@@ -78,7 +78,7 @@ def read_at(path: String, off: U32, n: U32) -> IO(List<&2, U32>):
     raw_done(m)
 
 # ---------------------------------------------------------------------
-# modelo e dados (os formatos entram nos TIPOS)
+# model and data (the shapes enter the TYPES)
 # ---------------------------------------------------------------------
 
 type P is Data:
@@ -87,7 +87,7 @@ type P is Data:
 type Batch is Data:
   Batch{x: T.Mat<100n, 784n>, y: List<&2, Nat>}
 
-# byte (0..255) -> F32 em [0, 1]
+# byte (0..255) -> F32 in [0, 1]
 def px(+b: U32) -> F32:
   (U32.to_f32(b) / 255.0 : F32)
 
@@ -115,7 +115,7 @@ def mk_batch(mx: Maybe<&2, T.Mat<100n, 784n>>, y: List<&2, Nat>) -> Maybe<&2, Ba
 def make(imgs: List<&2, U32>, labs: List<&2, U32>) -> Maybe<&2, Batch>:
   mk_batch(T.Mat.of(100n, 784n, take_rows(100n, 784n, px.l(List.take(&2, U32, imgs, 78400n)))), labels.l(List.take(&2, U32, labs, 100n)))
 
-# n lotes de 100 imagens a partir de `imgs` (784 bytes cada) e `labs`; mb é o lote atual
+# n batches of 100 images from `imgs` (784 bytes each) and `labs`; mb is the current batch
 def batches(n: Nat, +imgs: List<&2, U32>, +labs: List<&2, U32>, mb: Maybe<&2, Batch>) -> List<&2, Batch>:
   match n mb:
     case 0n _:
@@ -129,7 +129,7 @@ def load_batches(n: Nat, +imgs: List<&2, U32>, +labs: List<&2, U32>) -> List<&2,
   batches(n, imgs, labs, make(imgs, labs))
 
 # ---------------------------------------------------------------------
-# um passo de treino: forward, perda, backward e SGD
+# one training step: forward, loss, backward and SGD
 # ---------------------------------------------------------------------
 
 def s5(+w1: T.Mat<784n, 128n>, +b1: T.Vec<128n>, +w2: T.Mat<128n, 10n>, +b2: T.Vec<10n>, +lr: F32, +x: T.Mat<100n, 784n>, loss: F32, dw2: T.Mat<128n, 10n>, db2: T.Vec<10n>, +dz1: T.Mat<100n, 128n>) -> F32 & P:
@@ -153,7 +153,7 @@ def train_step(p: P, b: Batch, +lr: F32) -> F32 & P:
     case P{+w1, +b1, +w2, +b2} Batch{+x, +y}:
       s2(w1, b1, w2, b2, lr, x, y, AG.linear(100n, 784n, 128n, x, w1, b1))
 
-# percorre os lotes; r é o resultado do passo anterior (perda, parâmetros)
+# walks the batches; r is the result of the previous step (loss, parameters)
 def epoch(bs: List<&2, Batch>, +lr: F32, +acc: F32, r: F32 & P) -> F32 & P:
   match bs r:
     case Nil{} Tuple{l, p}:
@@ -162,7 +162,7 @@ def epoch(bs: List<&2, Batch>, +lr: F32, +acc: F32, r: F32 & P) -> F32 & P:
       epoch(t, lr, (acc + l : F32), train_step(p, b, lr))
 
 # ---------------------------------------------------------------------
-# avaliação: acurácia
+# evaluation: accuracy
 # ---------------------------------------------------------------------
 
 def gt_head(xs: List<&2, F32>, +v: F32) -> Bool:
@@ -220,7 +220,7 @@ def eval(bs: List<&2, Batch>, +p: P, acc: Nat) -> Nat:
       eval(t, p, Nat.add(acc, batch_ok(p, b)))
 
 # ---------------------------------------------------------------------
-# carga dos pesos iniciais (escritos por reference/mnist_torch.py)
+# loading the initial weights (written by reference/mnist_torch.py)
 # ---------------------------------------------------------------------
 
 def mk_p(m1: Maybe<&2, T.Mat<784n, 128n>>, m2: Maybe<&2, T.Vec<128n>>, m3: Maybe<&2, T.Mat<128n, 10n>>, m4: Maybe<&2, T.Vec<10n>>) -> Maybe<&2, P>:
@@ -234,25 +234,25 @@ def load_p(w1: List<&2, U32>, b1: List<&2, U32>, w2: List<&2, U32>, b2: List<&2,
   mk_p(T.Mat.of(784n, 128n, take_rows(784n, 128n, floats(w1))), T.Vec.of(128n, floats(b1)), T.Mat.of(128n, 10n, take_rows(128n, 10n, floats(w2))), T.Vec.of(10n, floats(b2)))
 
 # ---------------------------------------------------------------------
-# laço de épocas com medição de tempo
+# epoch loop with timing
 # ---------------------------------------------------------------------
 
 def ms_show(+ms: Nat) -> String:
   Nat.show(Nat.div(ms, 1000n)) ++ "." ++ Nat.show(Nat.div(Nat.mod(ms, 1000n), 100n))
 
-# força a época (ao abrir r), mede o tempo, imprime e devolve os parâmetros
+# forces the epoch (when opening r), measures the time, prints and returns the parameters
 def report(+k: Nat, +nb: Nat, t0: Nat, r: F32 & P, test: List<&2, Batch>) -> IO(P):
   match r:
     case Tuple{l, +p}:
       do IO<P>:
         t1 : Nat <- IO.now()
-        IO.print("epoca " ++ Nat.show(k) ++ " loss_treino=" ++ F32.show((l / F32.from_nat(nb) : F32)) ++ " acertos_teste=" ++ Nat.show(eval(test, p, 0n)) ++ "/10000 segundos=" ++ ms_show(Nat.sub(t1, t0)))
+        IO.print("epoch " ++ Nat.show(k) ++ " train_loss=" ++ F32.show((l / F32.from_nat(nb) : F32)) ++ " test_correct=" ++ Nat.show(eval(test, p, 0n)) ++ "/10000 seconds=" ++ ms_show(Nat.sub(t1, t0)))
         return p
 
 def run(e: Nat, +k: Nat, +nb: Nat, +lr: F32, +train: List<&2, Batch>, +test: List<&2, Batch>, p: P) -> IO(Unit):
   match e:
     case 0n:
-      IO.print("fim")
+      IO.print("done")
     case 1n+q:
       do IO<Unit>:
         t0 : Nat <- IO.now()
@@ -262,7 +262,7 @@ def run(e: Nat, +k: Nat, +nb: Nat, +lr: F32, +train: List<&2, Batch>, +test: Lis
 def go(e: Nat, +nb: Nat, +lr: F32, mp: Maybe<&2, P>, imgs: List<&2, U32>, labs: List<&2, U32>, timgs: List<&2, U32>, tlabs: List<&2, U32>) -> IO(Unit):
   match mp:
     case None{}:
-      IO.print("pesos iniciais invalidos (rode reference/mnist_torch.py --make-init)")
+      IO.print("invalid initial weights (run reference/mnist_torch.py --make-init)")
     case Some{p}:
       run(e, 1n, nb, lr, load_batches(nb, imgs, labs), load_batches(100n, timgs, tlabs), p)
 
@@ -293,14 +293,14 @@ def go2(me: Maybe<&2, Nat>, mm: Maybe<&2, Nat>, ml: Maybe<&2, F32>) -> IO(Unit):
     case Some{e} Some{m} Some{lr}:
       go3(e, nb_of(m), lr)
     case _ _ _:
-      IO.print("uso: train.bend -- epocas max_lotes lr")
+      IO.print("usage: train.bend -- epochs max_batches lr")
 
 def dispatch(args: List<String>) -> IO(Unit):
   match args:
     case Con{prog, Con{e, Con{m, Con{lr, Nil{}}}}}:
       go2(Nat.read(e), Nat.read(m), F32.read(lr))
     case _:
-      IO.print("uso: train.bend -- epocas max_lotes lr")
+      IO.print("usage: train.bend -- epochs max_batches lr")
 
 def main() -> IO(Unit):
   do IO<Unit>:
