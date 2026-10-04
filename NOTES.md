@@ -278,3 +278,10 @@ Distância ao PyTorch: 6,3 s contra 0,21 s (16 threads, ~30×) e 0,30 s (1 threa
 | PyTorch (16 threads) | 0,19 a 0,21 s | 0,520477 / 9129; 0,270433 / 9298; 0,215613 / 9418 |
 
 Ganho de ~82× sobre a v1; distância ao PyTorch (16 threads) ~33×, (1 thread, 0,30 s) ~22×. Mesmas perdas e acertos nas três épocas.
+
+### Eixo 2 (garantias) e fecho da v2 (2026-10-04)
+
+- **`bend-ml-bpe-tokenizer@0.1.1.0`** (publicado): `train_wf` (a tabela de `train` é sempre bem formada, por indução sobre `train.go` com o invariante "todos os ids já usados são menores que o próximo", usando 4 lemas de `Nat`: `lt_succ`, `lt_ne`, `lt_up`, e de lista: `below_has`, `below_up`, `below_cons`, `below_fresh`) e `roundtrip_trained` (consequência direta: roundtrip para qualquer tabela treinada, sem hipótese). `--verdict` ok. Importado do BendHub numa pasta limpa, com a lei aplicada.
+- O README do `bpe` declarava "train não tem prova"; agora tem.
+- Pacotes na v2: nat-lemmas 0.1.0.0, bpe 0.1.1.0, tensor 0.1.1.0, **tensor-array 0.1.1.0 (novo)**, autograd 0.1.0.0. `reference/check_all.py`: 27/27 (rápido) e 32/32 (`--full`).
+- Pendências para o Renan: (1) revisar o tom da thread e gravar o vídeo (`docs/launch/`); (2) se quiser a GPU, instalar o CUDA 12 em `/usr/local/cuda` e eu meço o `!`; (3) o ganho paralelo em matriz·vetor exige particionar o `Array` sem copiar (ideia na exp. 9) — vale um relato ao time do Bend: `Array.clone` é O(n) e `Array.fork` é `@unsafe`.

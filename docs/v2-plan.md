@@ -42,3 +42,21 @@ Regra: um experimento descartado também entra nas notas (com o número). Nada d
 1. Cada técnica do eixo 1 medida e registrada, com a distância final para o PyTorch.
 2. Pelo menos uma garantia nova do eixo 2 provada (`--verdict`) e publicada.
 3. `check_all.py --full` verde; benchmarks e README atualizados; `v2.0.0` publicada.
+
+## Resultado (2026-10-04)
+
+Eixo 1 (desempenho), todos os experimentos medidos e registrados em `NOTES.md` (exp. 1 a 9):
+
+| Experimento | Resultado |
+|---|---|
+| 1-2. listas vs `Array` | ~49× num thread (44 M vs 2 200 M mult-soma/s) |
+| 3. por que o paralelo trava em ~1,8× | o gargalo era a estrutura de dados e o tamanho do `Array` (2^20 vs 2^17 custa ~60%); clones **não** causam contenção; a hipótese de cache/blocagem foi refutada |
+| 4. blocagem | sem efeito (1, 8, 16, 32 blocos de colunas: mesmo tempo) |
+| 5. GPU | **não feita**: o Bend pede CUDA 12 e a máquina tem o CUDA 13 do Arch; tentar sem sudo exigiria baixar o toolkit 12 e o link em `/usr/local/cuda`; fica como pendência |
+| 6. MNIST completo | 544 s → 6,6 s por época, mesma perda e acertos |
+| 7. GPT-2 | ~3 s → ~0,1 s por token, mesmos ids e logits |
+| Achado | paralelizar matriz·vetor copiando a matriz custa 10× mais que calcular; solução futura: partir a árvore do `Array` sem copiar |
+
+Eixo 2 (garantias): `train_wf` e `roundtrip_trained` provadas e publicadas em `bend-ml-bpe-tokenizer@0.1.1.0`; o passo de treino do MNIST inteiro é checado por tipo (`tensor-array`).
+
+Não feito: invariante `capacidade >= r*c` no tipo de `Mat` (fica documentada como limite).
