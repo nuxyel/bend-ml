@@ -15,17 +15,23 @@ gh release upload v2.1.0 docs/media/bend-ml.mp4 --clobber
 
 Needs `node`, `ffmpeg` and a Chromium-based browser (`/usr/bin/brave`, or set `$BRAVE`). To look at single frames: `node docs/media/render_video.mjs --stills 3,14,40`.
 
+## Look and motion
+
+The identity is Bend's own: the colours of bend-lang.com (warm paper `#f2eee7`, ink `#4d4a44`, violet `#8b83b5`, green `#7e9a5e`, red `#c46a60`, orange `#c4845c`), one monospace family (a subset of iA Writer Mono S, renamed "Bend ML Mono" as its license requires), and Bend's blinking violet block cursor.
+
+The film is one continuous paper plane with a camera that travels between the shots, instead of cuts. One object carries the story: the 26 matrix cells form the two matrices, jam, fold into the 3×3 logo glyph, reflow in the reshape, become the check boxes of the packages, the token chips of GPT-2 and the benchmark bars, and fly back into the glyph at the end. Cells move on a damped spring, the camera on exponential easing, and the frames are rendered at 60 fps and blended in pairs into 30 fps (motion blur).
+
 ## Storyboard
 
-| Time | Scene | Caption |
+| Time | Shot | On screen |
 |---|---|---|
-| 0–6 s | A `(2×3)·(4×5)` product: the grids collide, the inner dimensions 3 ≠ 4 turn red, and the real compiler error appears. | In bend-ml, this does not compile. |
-| 6–10 s | The `bend-ml` wordmark and the tagline. | — |
-| 10–19 s | `reshape` 2×6 → 5×3 is refused (`expected 12n / observed 15n`); 2×6 → 3×4 compiles because the proof `{==}` is just computing. | reshape needs a proof that the size is preserved. / 12 = 12: the proof is just computing. |
-| 19–29 s | `bend bpe/main.bend --verdict` → `ALL PROOFS CHECK`, the `roundtrip` law, and the counters 24 laws · 5 packages · 0 @unsafe. | Proofs checked again by a Lean-proved kernel. / 24 laws. 5 packages. No @unsafe. |
-| 29–43 s | GPT-2 small: loading (sped up, labelled), then the prompt and 8 tokens at their real pace (1.2 s), and the ids compared with PyTorch. | GPT-2 small, 124 M parameters, written in Bend. / Real time: the prompt and 8 tokens in 1.2 s. / Same tokens as PyTorch. |
-| 43–53 s | Honest benchmark: MNIST epoch and GPT-2 time per token, v1 → v2 and PyTorch, with the note that PyTorch is still ahead. | Fast enough to be real. Honest about the gap. |
-| 53–60 s | The 36 checks of `make check-full` roll by, then the repository card. | — |
+| 0–7 s | close, slow push-in | `Mat<2, 3> · Mat<4, 5>`; the grids slide together, jam, and the mismatched column and row turn red; the real error; "this does not compile." |
+| 7–12 s | to the title | the cells fold into the glyph above `bend-ml` and the violet cursor; "machine learning in Bend 2". |
+| 12–21 s | pan right | `reshape`: 12 cells in 15 slots, the 3 empty slots turn red, "12 ≠ 15: rejected."; the slots become 3×4, the cells settle in violet, "12 = 12: it compiles." and the call with `{==}`. |
+| 21–31 s | pan down | the five packages with their law counts, 24 laws and 0 @unsafe; `decode(encode(s)) == s`; ALL PROOFS CHECK and a green tick per package. |
+| 31–44 s | pan right | GPT-2: loading (7 s, shown 3.5× faster), then the prompt and the 8 tokens at their real pace (1.2 s), each with its id; the ids against PyTorch; "same tokens as PyTorch". |
+| 44–54 s | pan down | Bend-style bars: v1 hatched (off the chart), v2 violet, PyTorch grey; "PyTorch is still ~35× faster on MNIST, ~2–5× on GPT-2." |
+| 54–60 s | pull back over the whole film, then settle | the cells fly back into the glyph; `github.com/nuxyel/bend-ml`, "5 packages on BendHub · 24 laws · MIT", 36/36 checks. |
 
 ## Posting
 
