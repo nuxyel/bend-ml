@@ -1,6 +1,6 @@
 # bend-ml-tensor: tensors with the shape in the TYPE. A shape error is a type error.
 #
-#   import bend-ml-tensor@0.1.0.0/main.bend as T
+#   import bend-ml-tensor@0.1.2.0/main.bend as T
 #
 # Vec<n> is a vector of n F32 numbers; Mat<r, c> is an r x c matrix (a list of r
 # rows with c numbers each). The dimensions are erased type parameters: they cost
