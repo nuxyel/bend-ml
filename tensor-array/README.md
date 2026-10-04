@@ -1,44 +1,44 @@
 # bend-ml-tensor-array
 
-Tensores em Bend 2 sobre `Array<F32>` plano, **com a shape no tipo**: a mesma garantia do [`bend-ml-tensor`](../tensor) (produto com dimensões erradas não compila), mas **~50× mais rápido** que o `bend-ml-tensor` baseado em listas, porque lê e escreve por índice e roda produtos em blocos de linhas em paralelo.
+Tensors in Bend 2 over a flat `Array<F32>`, **with the shape in the type**: the same guarantee as [`bend-ml-tensor`](../tensor) (a product with wrong dimensions does not compile), but **~50x faster** than the list-based `bend-ml-tensor`, because it reads and writes by index and runs products in parallel blocks of rows.
 
-- Bend: **2.0.35** · Licença: MIT.
-- `bend tensor-array/main.bend` e `--verdict` → `ALL PROOFS CHECK` (sem `@unsafe`, sem `?TODO`).
-- Testes contra o PyTorch: `reference/test_tensor_array.py` (52 verificações, erro máximo ≈ 1,4e-6).
+- Bend: **2.0.35** · License: MIT.
+- `bend tensor-array/main.bend` and `--verdict` → `ALL PROOFS CHECK` (no `@unsafe`, no `?TODO`).
+- Tests against PyTorch: `reference/test_tensor_array.py` (52 checks, maximum error ≈ 1.4e-6).
 
 ```python
 import Base
-import bend-ml-tensor-array@0.1.1.0/main.bend as TA
+import bend-ml-tensor-array@0.1.2.0/main.bend as TA
 
 def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 128n>:
-  TA.Mat.matmul(100n, 784n, 128n, 3n, a, w)   # 3n = 2^3 = 8 blocos paralelos
+  TA.Mat.matmul(100n, 784n, 128n, 3n, a, w)   # 3n = 2^3 = 8 parallel blocks
 ```
 
-## Como funciona
+## How it works
 
-- `Mat<r, c>` guarda `r*c` números num `Array<F32>` linha a linha (índice `i*c + j`). As dimensões são parâmetros de tipo **apagados**.
-- Um `Array` é afim (um só dono), então **toda operação devolve também o que leu**: `Mat.matmul(a, b)` devolve `MMul{a, b, c}`. Use `Mat.clone` quando precisar de duas cópias.
-- `par` (nos produtos) é o log2 do número de blocos calculados em paralelo; `0` é sequencial. Divide as linhas de `C`, ou as colunas quando `n = 1` (matriz · vetor). Cada bloco trabalha numa cópia (`Array.clone`, barato) de `A` e `B`.
+- `Mat<r, c>` stores `r*c` numbers in an `Array<F32>`, row by row (index `i*c + j`). The dimensions are **erased** type parameters.
+- An `Array` is affine (a single owner), so **every operation also returns what it read**: `Mat.matmul(a, b)` returns `MMul{a, b, c}`. Use `Mat.clone` when you need two copies.
+- `par` (in the products) is the log2 of the number of blocks computed in parallel; `0` is sequential. It splits the rows of `C`, or the columns when `n = 1` (matrix · vector). Each block works on a copy (`Array.clone`, cheap) of `A` and `B`.
 
-## Operações
+## Operations
 
-| Operação | Tipo |
+| Operation | Type |
 |---|---|
-| `Mat.zeros`, `Mat.fill`, `Mat.of_list`, `Mat.from_list`, `Mat.to_list`, `Mat.clone` | `Mat<r,c>` (`of_list` só devolve `Some` se a lista tem `r*c` números; `from_list` não confere) |
+| `Mat.zeros`, `Mat.fill`, `Mat.of_list`, `Mat.from_list`, `Mat.to_list`, `Mat.clone` | `Mat<r,c>` (`of_list` only returns `Some` if the list has `r*c` numbers; `from_list` does not check) |
 | `Mat.matmul` | `Mat<n,k> · Mat<k,m> = Mat<n,m>` |
-| `Mat.matmul_nt` | `Mat<n,k> · Mat<m,k>ᵀ = Mat<n,m>` (pesos com uma linha por saída) |
-| `Mat.matmul_tn` | `Mat<k,n>ᵀ · Mat<k,m> = Mat<n,m>` (gradiente de pesos: `Xᵀ · dY`) |
-| `Mat.add_row` | soma um bias `Mat<1,m>` a cada linha de `Mat<n,m>` |
-| `Mat.relu`, `Mat.relu_bwd` | ativação e o gradiente que a atravessa |
-| `Mat.sgd`, `Mat.add` | `w - lr·dw` e `a + b` |
+| `Mat.matmul_nt` | `Mat<n,k> · Mat<m,k>ᵀ = Mat<n,m>` (weights with one row per output) |
+| `Mat.matmul_tn` | `Mat<k,n>ᵀ · Mat<k,m> = Mat<n,m>` (weight gradient: `Xᵀ · dY`) |
+| `Mat.add_row` | adds a bias `Mat<1,m>` to each row of `Mat<n,m>` |
+| `Mat.relu`, `Mat.relu_bwd` | the activation and the gradient that passes through it |
+| `Mat.sgd`, `Mat.add` | `w - lr·dw` and `a + b` |
 | `Mat.col_sums` | `Mat<n,m> -> Mat<1,m>` |
-| `Mat.softmax_ce` | entropia cruzada média e seu gradiente `(softmax − one-hot)/n` |
-| `Mat.count_correct` | acertos de argmax por linha |
-| `Mat.read_row`, `Mat.write_row` | uma linha como lista |
+| `Mat.softmax_ce` | mean cross-entropy and its gradient `(softmax − one-hot)/n` |
+| `Mat.count_correct` | argmax hits per row |
+| `Mat.read_row`, `Mat.write_row` | a row as a list |
 
-## Erro de shape = erro de tipo
+## A shape error is a type error
 
-`(2×3) · (4×5)` não compila (`tensor-array/tests/bad_matmul.bend`):
+`(2×3) · (4×5)` does not compile (`tensor-array/tests/bad_matmul.bend`):
 
 ```
 Error:
@@ -46,25 +46,26 @@ Error:
 - observed : TA.Mat<4n, 5n>
 ```
 
-E o gradiente de uma camada não fecha com as dimensões trocadas (`tests/bad_grad.bend`): `matmul_tn(x, dy)` com `x: 100×784` e `dy: 100×128` é `784×128`; pedir `128×784` dá `expected MMulTN<128n,100n,784n>, observed MMulTN<784n,100n,128n>`.
+And a layer's gradient does not type-check with swapped dimensions (`tests/bad_grad.bend`): `matmul_tn(x, dy)` with `x: 100×784` and `dy: 100×128` is `784×128`; asking for `128×784` gives `expected MMulTN<128n,100n,784n>, observed MMulTN<784n,100n,128n>`.
 
-## Desempenho (1 thread, 100 M multiplicações-e-somas)
+## Performance (1 thread, 100 M multiply-adds)
 
-| | tempo | mult-soma/s |
+| | time | multiply-adds/s |
 |---|---|---|
-| `bend-ml-tensor` (listas) | 2,27 s | 44 M |
-| `bend-ml-tensor-array` (`Array.get`/`set` por índice) | **0,046 s** | **2 200 M** |
-| PyTorch (1 thread, BLAS) | 0,0016 s | 62 000 M |
+| `bend-ml-tensor` (lists) | 2.27 s | 44 M |
+| `bend-ml-tensor-array` (`Array.get`/`set` by index) | **0.046 s** | **2,200 M** |
+| PyTorch (1 thread, BLAS) | 0.0016 s | 62,000 M |
 
-Com blocos paralelos o produto grande de MNIST (100×784·784×128) ganha ~2× em 8 threads. O PyTorch continua ~27× à frente num thread: o Bend 2.0.35 gera código escalar, sem BLAS nem SIMD. Veja `demos/mnist/BENCHMARK.md` para o treino completo.
+With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 8 threads. PyTorch is still ~27x ahead on one thread: Bend 2.0.35 generates scalar code, with no BLAS or SIMD. See `demos/mnist/BENCHMARK.md` for the full training run.
 
-## O que NÃO é provado
+## What is NOT proved
 
-- A invariante "a capacidade do `Array` é `>= r*c`" vale porque os construtores (`zeros`, `fill`, `of_list`) alocam o tamanho certo; ela não é um fato no tipo.
-- `softmax_ce` e `count_correct` esperam `labels` com `n` entradas (uma por linha); não é checado pelo tipo.
-- A numérica em `F32` é validada por testes contra o PyTorch, não por prova.
+- The invariant "the `Array` capacity is `>= r*c`" holds because the constructors (`zeros`, `fill`, `of_list`) allocate the right size; it is not a fact in the type.
+- `softmax_ce` and `count_correct` expect `labels` with `n` entries (one per row); this is not checked by the type.
+- `F32` numerics are validated by tests against PyTorch, not by proof.
 
-## Versões
+## Versions
 
-- `0.1.1.0`: divisão por colunas para `n = 1` (matriz · vetor) e `Mat.from_list`.
-- `0.1.0.0`: primeira publicação.
+- `0.1.2.0`: the same API, with English comments and README.
+- `0.1.1.0`: column split for `n = 1` (matrix · vector) and `Mat.from_list`.
+- `0.1.0.0`: first publication.
