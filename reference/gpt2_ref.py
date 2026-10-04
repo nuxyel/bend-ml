@@ -61,12 +61,14 @@ def main():
         top = torch.topk(first, 5)
         print("top5_ids", top.indices.tolist())
         print("top5_logits", " ".join(f"{v:.4f}" for v in top.values.tolist()))
-        gen = []
+        gen = []; lgs = []
         cur = list(ids)
         for _ in range(n):
-            nxt = int(forward(p, cur)[-1].argmax())
-            gen.append(nxt); cur.append(nxt)
+            lg = forward(p, cur)[-1]
+            nxt = int(lg.argmax())
+            gen.append(nxt); lgs.append(float(lg[nxt])); cur.append(nxt)
     print("gerados", gen)
+    print("logits", " ".join(f"{v:.5f}" for v in lgs))
     print("texto", repr(enc.decode(cur)))
 
 

@@ -92,3 +92,31 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+def split_weights():
+    """Um arquivo .bin por tensor em demos/gpt2/data/w/; pesos Conv1D gravados TRANSPOSTOS ([saída, entrada])."""
+    os.makedirs(f"{D}/w", exist_ok=True)
+    raw = np.fromfile(f"{D}/weights.bin", dtype="<f4")
+    pos = 0
+    def take(*shape):
+        nonlocal pos
+        n = int(np.prod(shape)); a = raw[pos:pos + n].reshape(*shape); pos += n
+        return a
+    def put(name, a):
+        np.ascontiguousarray(a, dtype="<f4").tofile(f"{D}/w/{name}.bin")
+    put("wte", take(50257, 768)); put("wpe", take(1024, 768))
+    for l in range(12):
+        put(f"h{l}.ln1_g", take(768)); put(f"h{l}.ln1_b", take(768))
+        put(f"h{l}.aw", take(768, 2304).T); put(f"h{l}.ab", take(2304))
+        put(f"h{l}.pw", take(768, 768).T); put(f"h{l}.pb", take(768))
+        put(f"h{l}.ln2_g", take(768)); put(f"h{l}.ln2_b", take(768))
+        put(f"h{l}.fw", take(768, 3072).T); put(f"h{l}.fb", take(3072))
+        put(f"h{l}.mw", take(3072, 768).T); put(f"h{l}.mb", take(768))
+    put("lnf_g", take(768)); put("lnf_b", take(768))
+    assert pos == raw.size
+    print("w/*.bin escritos:", len(os.listdir(f"{D}/w")), "arquivos")
+
+
+if __name__ == "__main__" and "--split" in sys.argv:
+    split_weights()
