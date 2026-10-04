@@ -1,6 +1,24 @@
 # GPT-2 small: Bend × PyTorch
 
-**Resumo:** o GPT-2 small de 124 M de parâmetros roda em Bend e **gera exatamente os mesmos tokens do PyTorch**, com logits iguais em até 2e-4. É ~40× mais lento no total e ~3 s por token contra milissegundos.
+**Resumo (v2):** o GPT-2 small de 124 M de parâmetros roda em Bend e **gera exatamente os mesmos tokens do PyTorch**, com logits iguais em até 2e-4. Na v1 levava ~3 s por token (~150× o PyTorch); na v2 (produtos matriz·vetor sobre `Array`) leva **~0,1 s por token**: ~5× o PyTorch com 16 threads (21 ms por forward de 11 tokens) e ~2× o PyTorch com 1 thread (55 ms). O que ainda pesa é carregar os pesos (9 s contra ~1 s), porque os 124 M de números viram árvores de nós (~10 GB de memória durante a carga).
+
+## v2: `demos/gpt2/fast.bend` (pacote `bend-ml-tensor-array@0.1.1.0`)
+
+| GPT-2 small, "The capital of France is", 8 tokens | por token | total |
+|---|---|---|
+| Bend v1 (listas) | ~3 s | 49,8 s |
+| Bend v2 com `par = 3` (cópias da matriz por tarefa) | ~1,1 s | 22 s |
+| **Bend v2, sequencial (`par = 0`)** | **~0,1 s** | **11,1 s** (9 s de carga + 1,2 s para os 8 tokens) |
+| PyTorch (CPU, 16 threads, sem KV cache): forward de 11 tokens | **21 ms** | 1,3 s no `gpt2_ref.py` (inclui ~1 s para carregar os pesos) |
+| PyTorch (CPU, 1 thread, sem KV cache): forward de 11 tokens | 55 ms | |
+
+Mesma verificação da v1 (`reference/test_gpt2.py`): 3 prompts, 22 tokens, ids idênticos, |Δlogit| ≤ 2e-4.
+
+Em matriz·vetor, `par = 3` é ~10× **pior** que sequencial: o custo de clonar a matriz de pesos por tarefa supera o de calcular (cada peso é lido uma vez). Medição isolada em `NOTES.md`, exp. 9.
+
+---
+
+## v1: listas (`demos/gpt2/gpt2.bend`), mantido como linha de base
 
 ## Verificação (`reference/test_gpt2.py`)
 

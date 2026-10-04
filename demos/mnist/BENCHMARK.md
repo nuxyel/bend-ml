@@ -1,6 +1,28 @@
 # MNIST: benchmark honesto, Bend × PyTorch
 
-**Resumo:** os resultados são **idênticos** (mesma perda, mesma acurácia), mas o Bend é cerca de **1800 vezes mais lento** que o PyTorch numa thread. Não tento esconder: o Bend 2.0.35 não tem BLAS nem kernels vetorizados, e as matrizes aqui são listas encadeadas.
+**Resumo (v2):** os resultados são **idênticos** (mesma perda, mesma acurácia em 1 e em 3 épocas). Na v1 o Bend levava **544 s por época** (~1800× o PyTorch); na v2, com matrizes em `Array` plano e produtos paralelos, leva **6,6 s** (~33× o PyTorch com 16 threads, ~22× com 1). A diferença entre v1 e v2 é a estrutura de dados, não a linguagem; o que resta é código escalar contra BLAS/SIMD.
+
+## v2: `Array` plano (`demos/mnist/fast.bend`, pacote `bend-ml-tensor-array@0.1.1.0`)
+
+| | 1 época | perda / acertos após 1, 2, 3 épocas |
+|---|---|---|
+| **Bend v2, 16 threads** | **6,6 s** | 0,5204771 / 9129 · 0,27043572 / 9298 · 0,2156194 / 9418 |
+| Bend v2, 1 thread | 18,1 s | |
+| PyTorch, 16 threads | 0,19 a 0,21 s | 0,520477 / 9129 · 0,270433 / 9298 · 0,215613 / 9418 |
+| PyTorch, 1 thread | 0,30 s | |
+
+Cada produto, cada gradiente e cada atualização tem o formato conferido pelo tipo (`dW` pedido com as dimensões trocadas não compila: `docs/shape-error-array-bad_grad.txt`). Como chegamos aqui, passo a passo (cada número em `NOTES.md`, exp. 1 a 9):
+
+| passo | época |
+|---|---|
+| v1: matrizes em listas encadeadas | 544,3 s |
+| `Array` plano, `Array.get/set` por índice, 1 thread | 11,5 s |
+| + produtos grandes em 2^3 blocos paralelos (16 threads) | 6,3 s |
+| API tipada do pacote (conversões lista↔Array nos wrappers) | 6,6 s |
+
+---
+
+## v1: listas (`demos/mnist/train.bend`), mantido como linha de base
 
 ## Configuração
 
