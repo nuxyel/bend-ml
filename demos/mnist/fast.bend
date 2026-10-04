@@ -1,14 +1,14 @@
-# MLP 784-128-10 no MNIST com o pacote bend-ml-tensor-array: cada produto, cada
-# gradiente e cada atualização tem o formato conferido pelo tipo.
+# MLP 784-128-10 on MNIST with the bend-ml-tensor-array package: every product, every
+# gradient and every update has its shape checked by the type.
 #
-#   bend demos/mnist/fast.bend -o /tmp/mnist_fast && /tmp/mnist_fast <épocas> <máx. lotes (0 = todos)> <lr>
+#   bend demos/mnist/fast.bend -o /tmp/mnist_fast && /tmp/mnist_fast <epochs> <max batches (0 = all)> <lr>
 #
-# Mesmos dados, pesos iniciais, ordem de lotes e lr do train.bend e do reference/mnist_torch.py.
+# Same data, initial weights, batch order and lr as train.bend and reference/mnist_torch.py.
 
 import Base
 import bend-ml-tensor-array@0.1.1.0/main.bend as TA
 
-# ---- leitura de números em texto ----
+# ---- reading numbers from text ----
 
 def rb_done(m: File & Result<&1, &1, U32 & String, List<&2, U32>>) -> IO(List<&2, U32>):
   (f, r) = m
@@ -63,7 +63,7 @@ def raw_done(m: File & Result<&1, &1, U32 & String, List<&2, U32>>) -> IO(List<&
     File.close(f)
     return bs
 
-# lê `n` bytes a partir de `off`
+# reads `n` bytes starting at `off`
 
 def read_at(path: String, off: U32, n: U32) -> IO(List<&2, U32>):
   do IO<List<&2, U32>>:
@@ -74,7 +74,7 @@ def read_at(path: String, off: U32, n: U32) -> IO(List<&2, U32>):
 
 
 # ---------------------------------------------------------------------
-# parâmetros e passo de treino (lote de 100)
+# parameters and training step (batch of 100)
 # ---------------------------------------------------------------------
 
 type Pm is Type:
@@ -83,7 +83,7 @@ type Pm is Type:
 type St2 is Type:
   St2{loss: F32, pm: Pm}
 
-# 4. SGD nos quatro parâmetros
+# 4. SGD on the four parameters
 
 def u4(loss: F32, w1: TA.Mat<784n, 128n>, b1: TA.Mat<1n, 128n>, w2: TA.Mat<128n, 10n>, r: TA.MPair<1n, 10n>) -> St2:
   match r:
@@ -105,7 +105,7 @@ def u1(+lr: F32, loss: F32, b1: TA.Mat<1n, 128n>, db1: TA.Mat<1n, 128n>, w2: TA.
     case TA.MPair{w1, dw1}:
       u2(lr, loss, w1, w2, dw2, b2, db2, TA.Mat.sgd(1n, 128n, lr, b1, db1))
 
-# 3. gradiente da primeira camada: dW1 = Xᵀ · dZ1 (784 x 128), db1 = soma das linhas de dZ1
+# 3. gradient of the first layer: dW1 = Xᵀ · dZ1 (784 x 128), db1 = sum of the rows of dZ1
 
 def s13(+lr: F32, loss: F32, w1: TA.Mat<784n, 128n>, b1: TA.Mat<1n, 128n>, w2: TA.Mat<128n, 10n>, dw2: TA.Mat<128n, 10n>, b2: TA.Mat<1n, 10n>, db2: TA.Mat<1n, 10n>, dw1: TA.Mat<784n, 128n>, r: TA.MColSum<100n, 128n>) -> St2:
   match r:
@@ -122,7 +122,7 @@ def s11(+lr: F32, loss: F32, x: TA.Mat<100n, 784n>, w1: TA.Mat<784n, 128n>, b1: 
     case TA.MPair{dz1, h}:
       s12(lr, loss, w1, b1, w2, dw2, b2, db2, TA.Mat.matmul_tn(784n, 100n, 128n, 3n, x, dz1))
 
-# 2. gradientes da segunda camada e da relu
+# 2. gradients of the second layer and of the relu
 
 def s10(+lr: F32, loss: F32, x: TA.Mat<100n, 784n>, w1: TA.Mat<784n, 128n>, b1: TA.Mat<1n, 128n>, w2: TA.Mat<128n, 10n>, dw2: TA.Mat<128n, 10n>, b2: TA.Mat<1n, 10n>, h: TA.Mat<100n, 128n>, dh: TA.Mat<100n, 128n>, r: TA.MColSum<100n, 10n>) -> St2:
   match r:
@@ -139,7 +139,7 @@ def s8(+lr: F32, loss: F32, x: TA.Mat<100n, 784n>, w1: TA.Mat<784n, 128n>, b1: T
     case TA.MMulTN{h, g2, dw2}:
       s9(lr, loss, x, w1, b1, dw2, b2, h, TA.Mat.matmul_nt(100n, 10n, 128n, 0n, g2, w2))
 
-# 1. forward da segunda camada e perda
+# 1. forward of the second layer and the loss
 
 def s7(+lr: F32, x: TA.Mat<100n, 784n>, w1: TA.Mat<784n, 128n>, b1: TA.Mat<1n, 128n>, h: TA.Mat<100n, 128n>, w2: TA.Mat<128n, 10n>, b2: TA.Mat<1n, 10n>, r: TA.MCE<100n, 10n>) -> St2:
   match r:
@@ -159,7 +159,7 @@ def s5(+lr: F32, x: TA.Mat<100n, 784n>, w1: TA.Mat<784n, 128n>, b1: TA.Mat<1n, 1
 def s4(+lr: F32, x: TA.Mat<100n, 784n>, w1: TA.Mat<784n, 128n>, b1: TA.Mat<1n, 128n>, w2: TA.Mat<128n, 10n>, b2: TA.Mat<1n, 10n>, labels: List<&2, Nat>, h: TA.Mat<100n, 128n>) -> St2:
   s5(lr, x, w1, b1, b2, labels, TA.Mat.matmul(100n, 128n, 10n, 0n, h, w2))
 
-# 0. forward da primeira camada
+# 0. forward of the first layer
 
 def s3(+lr: F32, x: TA.Mat<100n, 784n>, w1: TA.Mat<784n, 128n>, w2: TA.Mat<128n, 10n>, b2: TA.Mat<1n, 10n>, labels: List<&2, Nat>, r: TA.MBias<100n, 128n>) -> St2:
   match r:
@@ -177,7 +177,7 @@ def step(pm: Pm, x: TA.Mat<100n, 784n>, labels: List<&2, Nat>, +lr: F32) -> St2:
       s2(lr, w2, b1, b2, labels, TA.Mat.matmul(100n, 784n, 128n, 3n, x, w1))
 
 # ---------------------------------------------------------------------
-# avaliação: acertos em um lote (só forward)
+# evaluation: hits in one batch (forward only)
 # ---------------------------------------------------------------------
 
 type Cn is Type:
@@ -214,7 +214,7 @@ def evb(pm: Pm, x: TA.Mat<100n, 784n>, labels: List<&2, Nat>) -> Cn:
       e1(w2, b1, b2, labels, TA.Mat.matmul(100n, 784n, 128n, 3n, x, w1))
 
 # ---------------------------------------------------------------------
-# dados e laço de épocas
+# data and epoch loop
 # ---------------------------------------------------------------------
 
 def scale255(bs: List<&2, U32>) -> List<&2, F32>:
@@ -234,7 +234,7 @@ def labs_nat(bs: List<&2, U32>) -> List<&2, Nat>:
 def unwrap_x(m: Maybe<&1, TA.Mat<100n, 784n>>) -> IO(TA.Mat<100n, 784n>):
   match m:
     case None{}:
-      IO.die(TA.Mat<100n, 784n>, 1, "lote invalido")
+      IO.die(TA.Mat<100n, 784n>, 1, "invalid batch")
     case Some{x}:
       IO.pure(TA.Mat<100n, 784n>, x)
 
@@ -270,7 +270,7 @@ def report(+k: Nat, +nb: Nat, t0: Nat, t1: Nat, loss: F32, c: Cn) -> IO(Pm):
   match c:
     case Cn{n, pm}:
       do IO<Pm>:
-        IO.print("epoca " ++ Nat.show(k) ++ " loss_treino=" ++ F32.show((loss / F32.from_nat(nb) : F32)) ++ " acertos_teste=" ++ Nat.show(n) ++ "/10000 segundos_treino=" ++ ms_show(Nat.sub(t1, t0)))
+        IO.print("epoch " ++ Nat.show(k) ++ " train_loss=" ++ F32.show((loss / F32.from_nat(nb) : F32)) ++ " test_correct=" ++ Nat.show(n) ++ "/10000 train_seconds=" ++ ms_show(Nat.sub(t1, t0)))
         return pm
 
 def epoch_end(+k: Nat, +nb: Nat, t0: Nat, t1: Nat, r: St2) -> IO(Pm):
@@ -283,7 +283,7 @@ def epoch_end(+k: Nat, +nb: Nat, t0: Nat, t1: Nat, r: St2) -> IO(Pm):
 def epochs(e: Nat, +k: Nat, +nb: Nat, +lr: F32, pm: Pm) -> IO(Unit):
   match e:
     case 0n:
-      IO.print("fim")
+      IO.print("done")
     case 1n++q:
       do IO<Unit>:
         t0 : Nat <- IO.now()
@@ -295,7 +295,7 @@ def epochs(e: Nat, +k: Nat, +nb: Nat, +lr: F32, pm: Pm) -> IO(Unit):
 def unwrap(-r: Nat, -c: Nat, m: Maybe<&1, TA.Mat<r, c>>) -> IO(TA.Mat<r, c>):
   match m:
     case None{}:
-      IO.die(TA.Mat<r, c>, 1, "pesos iniciais com tamanho invalido")
+      IO.die(TA.Mat<r, c>, 1, "initial weights have an invalid size")
     case Some{x}:
       IO.pure(TA.Mat<r, c>, x)
 
@@ -327,14 +327,14 @@ def go2(me: Maybe<&2, Nat>, mm: Maybe<&2, Nat>, ml: Maybe<&2, F32>) -> IO(Unit):
     case Some{e} Some{m} Some{lr}:
       go3(e, nb_of(m), lr)
     case _ _ _:
-      IO.print("uso: fast.bend -- epocas max_lotes lr")
+      IO.print("usage: fast.bend -- epochs max_batches lr")
 
 def dispatch(args: List<String>) -> IO(Unit):
   match args:
     case Con{prog, Con{e, Con{m, Con{lr, Nil{}}}}}:
       go2(Nat.read(e), Nat.read(m), F32.read(lr))
     case _:
-      IO.print("uso: fast.bend -- epocas max_lotes lr")
+      IO.print("usage: fast.bend -- epochs max_batches lr")
 
 def main() -> IO(Unit):
   do IO<Unit>:
