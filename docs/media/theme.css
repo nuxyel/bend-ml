@@ -1,0 +1,22 @@
+@font-face { font-family: "JB"; font-weight: 400; src: url("fonts/JetBrainsMono-Regular.woff2") format("woff2"); }
+@font-face { font-family: "JB"; font-weight: 700; src: url("fonts/JetBrainsMono-Bold.woff2") format("woff2"); }
+:root {
+  --bg: #0b0f14; --panel: #121820; --panel2: #18202a; --border: #2a3441;
+  --fg: #e6edf3; --dim: #7d8a99; --red: #ff6b6b; --green: #3ddc84; --blue: #5aa9ff;
+  --amber: #f0b429; --purple: #b794f6; --cyan: #4dd0e1;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { background: transparent; font-family: "JB", monospace; color: var(--fg); }
+.term { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
+  box-shadow: 0 18px 48px rgba(0,0,0,.45); }
+.term .bar { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; background: var(--panel2);
+  border-bottom: 1px solid var(--border); }
+.term .dot { width: 12px; height: 12px; border-radius: 50%; }
+.term .title { margin-left: 10px; color: var(--dim); font-size: 14px; }
+.term .body { padding: 18px 22px 20px; font-size: 18px; line-height: 1.5; white-space: pre; }
+.term .prompt { color: var(--green); font-weight: 700; }
+.term .cmd { color: var(--fg); font-weight: 700; }
+.c-red { color: var(--red); } .c-green { color: var(--green); } .c-blue { color: var(--blue); }
+.c-amber { color: var(--amber); } .c-dim { color: var(--dim); } .c-purple { color: var(--purple); }
+.c-cyan { color: var(--cyan); } .b { font-weight: 700; }
+.hl { background: rgba(240,180,41,.13); display: inline-block; width: 100%; }

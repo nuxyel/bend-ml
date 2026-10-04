@@ -17,3 +17,6 @@ __pycache__/
 demos/mnist/data/
 demos/gpt2/data/
 *.bin
+docs/media/node_modules/
+docs/media/frames/
+docs/media/.tmp-shot.html

@@ -1,0 +1,9 @@
+{
+  "name": "bend-ml-media",
+  "private": true,
+  "type": "module",
+  "description": "Renders the README screenshots, charts and the presentation video",
+  "dependencies": {
+    "puppeteer-core": "^25.0.0"
+  }
+}
