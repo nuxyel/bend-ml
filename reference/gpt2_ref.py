@@ -1,6 +1,6 @@
-"""Forward do GPT-2 small em PyTorch a partir de weights.bin (mesmos pesos do Bend).
+"""GPT-2 small forward pass in PyTorch from weights.bin (the same weights as Bend).
 
-Uso: gpt2_ref.py "prompt" [n_tokens]   ->  ids do prompt, top-5 logits do 1º passo, ids gerados (guloso), texto.
+Usage: gpt2_ref.py "prompt" [n_tokens]   ->  prompt ids, top-5 logits of the first step, generated ids (greedy), text.
 """
 import os, sys
 import numpy as np
@@ -67,9 +67,9 @@ def main():
             lg = forward(p, cur)[-1]
             nxt = int(lg.argmax())
             gen.append(nxt); lgs.append(float(lg[nxt])); cur.append(nxt)
-    print("gerados", gen)
+    print("generated", gen)
     print("logits", " ".join(f"{v:.5f}" for v in lgs))
-    print("texto", repr(enc.decode(cur)))
+    print("text", repr(enc.decode(cur)))
 
 
 if __name__ == "__main__":

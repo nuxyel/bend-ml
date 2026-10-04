@@ -1,10 +1,10 @@
-"""Prepara os dados do GPT-2 small para o Bend e valida a equivalência do BPE.
+"""Prepares the GPT-2 small data for Bend and validates the BPE equivalence.
 
-Gera em demos/gpt2/data:
-  weights.bin     float32 little-endian, na ordem de WEIGHT_ORDER abaixo
-  merges_num.txt  uma regra por linha: "a b" com a, b no esquema do bpe/ (byte -> 0..255, M{k} -> 256+k)
-  perm.txt        256 números: o id GPT-2 do byte b
-Também confere, com tiktoken, que aplicar as regras em ordem (o que o Bend faz) dá os mesmos ids.
+Writes to demos/gpt2/data:
+  weights.bin     little-endian float32, in the order of WEIGHT_ORDER below
+  merges_num.txt  one rule per line: "a b" with a, b in the bpe/ scheme (byte -> 0..255, M{k} -> 256+k)
+  perm.txt        256 numbers: the GPT-2 id of byte b
+It also checks, with tiktoken, that applying the rules in order (what Bend does) gives the same ids.
 """
 import json, os, sys
 import numpy as np
@@ -47,15 +47,15 @@ def main():
     lines = []
     for k, (a, b) in enumerate(merges):
         ia, ib, im = vocab[a], vocab[b], vocab[a + b]
-        assert im == 256 + k, (k, a, b, im)  # o id da fusão k é 256+k
+        assert im == 256 + k, (k, a, b, im)  # the id of merge k is 256+k
         na = inv[ia] if ia < 256 else ia
         nb = inv[ib] if ib < 256 else ib
         lines.append(f"{na} {nb}")
     open(f"{D}/merges_num.txt", "w").write("\n".join(lines) + "\n")
     open(f"{D}/perm.txt", "w").write(" ".join(map(str, perm)) + "\n")
-    print("merges_num.txt e perm.txt ok (50000 regras, ids 256+k confirmados)")
+    print("merges_num.txt and perm.txt ok (50000 rules, ids 256+k confirmed)")
 
-    # pesos
+    # weights
     if not os.path.exists(f"{D}/weights.bin") or "--force" in sys.argv:
         total = 0
         with safe_open(f"{D}/model.safetensors", "pt") as f, open(f"{D}/weights.bin", "wb") as out:
@@ -64,9 +64,9 @@ def main():
             for n in weight_order():
                 t = f.get_tensor(pre + n).float().numpy().astype("<f4")
                 out.write(t.tobytes()); total += t.size
-        print("weights.bin escrito:", total, "floats")
+        print("weights.bin written:", total, "floats")
 
-    # equivalência do BPE (regras em ordem) com tiktoken
+    # BPE equivalence (rules in order) with tiktoken
     try:
         import tiktoken, regex
         enc = tiktoken.get_encoding("gpt2")
@@ -84,10 +84,10 @@ def main():
             ref = enc.encode(s)
             same = ids == ref
             ok &= same
-            print("tiktoken == regras em ordem:", same, "|", s[:40])
-        print("EQUIVALÊNCIA COM TIKTOKEN:", "ok" if ok else "FALHOU")
+            print("tiktoken == rules in order:", same, "|", s[:40])
+        print("EQUIVALENCE WITH TIKTOKEN:", "ok" if ok else "FAILED")
     except Exception as e:
-        print("tiktoken não verificado:", repr(e)[:200])
+        print("tiktoken not verified:", repr(e)[:200])
 
 
 if __name__ == "__main__":
@@ -95,7 +95,7 @@ if __name__ == "__main__":
 
 
 def split_weights():
-    """Um arquivo .bin por tensor em demos/gpt2/data/w/; pesos Conv1D gravados TRANSPOSTOS ([saída, entrada])."""
+    """One .bin file per tensor in demos/gpt2/data/w/; Conv1D weights written TRANSPOSED ([output, input])."""
     os.makedirs(f"{D}/w", exist_ok=True)
     raw = np.fromfile(f"{D}/weights.bin", dtype="<f4")
     pos = 0
@@ -115,7 +115,7 @@ def split_weights():
         put(f"h{l}.mw", take(3072, 768).T); put(f"h{l}.mb", take(768))
     put("lnf_g", take(768)); put("lnf_b", take(768))
     assert pos == raw.size
-    print("w/*.bin escritos:", len(os.listdir(f"{D}/w")), "arquivos")
+    print("w/*.bin written:", len(os.listdir(f"{D}/w")), "files")
 
 
 if __name__ == "__main__" and "--split" in sys.argv:
