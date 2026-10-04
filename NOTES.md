@@ -1,287 +1,288 @@
-# NOTES — Fase 0 (reconhecimento)
+# NOTES — Phase 0 (reconnaissance)
 
-Data: 2026-10-03. Tudo abaixo foi verificado na máquina ou em fonte primária (guia instalado, `base.bend`, repositório oficial, site). O que **não** foi verificado está marcado como *(não verificado)*.
+Date: 2026-10-03. Everything below was verified on the machine or in a primary source (the installed guide, `base.bend`, the official repository, the site). What was **not** verified is marked *(not verified)*.
 
-## Versão fixada
+## Pinned version
 
-- **Bend 2.0.35** (`bend version`). Fixar esta versão até segunda ordem.
-- Repositório oficial: `github.com/bendlang/bend` (não `HigherOrderCO/Bend`, que é o Bend 1).
-- Instalado com `curl -fsSL https://bend-lang.com/install.sh | sh` (script lido antes de rodar: baixa o release do GitHub, confere SHA256, instala só em `~/.bend`, sem sudo).
-- Atualizar: `bend update` (roda o instalador de novo). Não atualizar sem registrar aqui, pois o Bend 2 muda rápido.
-- Telemetria: uma consulta por dia ao bend-lang.com (versão, OS, CPU). Desligar com `export BEND_NO_TELEMETRY=1`.
+- **Bend 2.0.35** (`bend version`). Pin this version until further notice.
+- Official repository: `github.com/bendlang/bend` (not `HigherOrderCO/Bend`, which is Bend 1).
+- Installed with `curl -fsSL https://bend-lang.com/install.sh | sh` (script read before running: it downloads the GitHub release, checks the SHA256, installs only into `~/.bend`, no sudo).
+- Update: `bend update` (runs the installer again). Do not update without recording it here, since Bend 2 changes fast.
+- Telemetry: one query per day to bend-lang.com (version, OS, CPU). Turn it off with `export BEND_NO_TELEMETRY=1`.
 - PATH: `export PATH="$HOME/.bend/bin:$PATH"`.
 
-## Onde está o quê
+## Where things are
 
-| O quê | Onde |
+| What | Where |
 |---|---|
-| Guia da linguagem (677 linhas) | `bend guide` ou `~/.bend/guide/GUIDE.md` |
-| Efeitos (C/JS customizados) | `bend guide effects` |
-| Shaders / código paralelo | `bend guide shaders` |
-| Base (3009 linhas) | `~/.bend/bend2/base.bend` ou `bend base [nome]` |
-| Kernel de provas em Lean | `~/.bend/bend2/bendtt.lean` |
-| Exemplos e demos | só no repo GitHub: `demos/` (não vêm no instalador) |
-| Papers | `paper/BendTT.pdf`, `paper/BendRT.pdf` no repo |
+| Language guide (677 lines) | `bend guide` or `~/.bend/guide/GUIDE.md` |
+| Effects (custom C/JS) | `bend guide effects` |
+| Shaders / parallel code | `bend guide shaders` |
+| Base (3009 lines) | `~/.bend/bend2/base.bend` or `bend base [name]` |
+| Lean proof kernel | `~/.bend/bend2/bendtt.lean` |
+| Examples and demos | only in the GitHub repo: `demos/` (not shipped by the installer) |
+| Papers | `paper/BendTT.pdf`, `paper/BendRT.pdf` in the repo |
 
-Demos relevantes para nós: `proof_numerics` (prova de `add_comm`, `add_assoc`, `mul_comm`, `mul_dist` e `divmod` sobre `Nat`; é o modelo para o `nat-lemmas`), `proof_typed_eval`, `proof_insertion_sort`, `pure_par_sum`, `pure_par_sort`.
+Demos relevant to us: `proof_numerics` (proof of `add_comm`, `add_assoc`, `mul_comm`, `mul_dist` and `divmod` over `Nat`; it is the model for `nat-lemmas`), `proof_typed_eval`, `proof_insertion_sort`, `pure_par_sum`, `pure_par_sort`.
 
-## Como é um projeto de provas
+## What a proof project looks like
 
-- `LAWS.bend`: o humano escreve as leis (`law nome: for x: T  {a == b : T}`).
-- `PROOF.bend`: importa o `LAWS.bend` e prova cada lei com um `def` de mesmo nome.
-- `bend PROOF.bend` imprime `ALL PROOFS CHECK` ou `SOME PROOFS FAIL`. É o portão antes de commitar.
-- Não há táticas: proposição é tipo, prova é `def`. `{==}` é reflexividade, `%e : P` reescreve, chamada recursiva é hipótese de indução.
-- `?nome` imprime o objetivo; `?TODO` deixa a prova aberta.
-- Velocidade do checker: o teste de `add_zero` com `Nat` levou **0,17 s** no total.
+- `LAWS.bend`: the human writes the laws (`law name: for x: T  {a == b : T}`).
+- `PROOF.bend`: imports `LAWS.bend` and proves each law with a `def` of the same name.
+- `bend PROOF.bend` prints `ALL PROOFS CHECK` or `SOME PROOFS FAIL`. It is the gate before committing.
+- There are no tactics: a proposition is a type, a proof is a `def`. `{==}` is reflexivity, `%e : P` rewrites, a recursive call is the induction hypothesis.
+- `?name` prints the goal; `?TODO` leaves the proof open.
+- Checker speed: the `add_zero` test over `Nat` took **0.17 s** in total.
 
-## O que a Base oferece
+## What Base offers
 
-- Tipos: `Nat` (unário: `Zero`/`Succ`), `U32`, `F32`, `Char`, `String` (lista de `Char`), `List`, `Array` (árvore binária, mutação in-place), `Map` (chaves `String`), `Maybe`, `Result`, `Sigma`, `Either`, `Equal`.
-- **Lemas existentes (muito poucos):**
-  - Igualdade: `Equal.cong`, `Equal.sym`, `Equal.trans`.
+- Types: `Nat` (unary: `Zero`/`Succ`), `U32`, `F32`, `Char`, `String` (a list of `Char`), `List`, `Array` (binary tree, in-place mutation), `Map` (`String` keys), `Maybe`, `Result`, `Sigma`, `Either`, `Equal`.
+- **Existing lemmas (very few):**
+  - Equality: `Equal.cong`, `Equal.sym`, `Equal.trans`.
   - Nat: `Nat.ge_refl`, `Nat.max_ge_l`, `Nat.max_ge_r`.
   - Word/U32: `Word.add_comm`, `U32.add_comm`.
-- **Não existe na Base:** `Nat.add_comm`, `add_assoc`, `mul_comm`, `mul_assoc`, distributividade, nenhum lema de `List` (`append_assoc`, `length_append`, `reverse_reverse`...), nada sobre `product`. **Conclusão: o pacote `nat-lemmas` é necessário**, e provavelmente também lemas de `List`.
-- O demo `proof_numerics` já prova os lemas de Nat acima, então dá para usar como ponto de partida (ler antes de reescrever).
-- Operações de `List`: `map`, `length`, `append`, `reverse`, `take`, `drop`, `zip`, `foldl`, `foldr`, `filter`, `sort`, `range`, `replicate`.
+- **Not in Base:** `Nat.add_comm`, `add_assoc`, `mul_comm`, `mul_assoc`, distributivity, no `List` lemma (`append_assoc`, `length_append`, `reverse_reverse`...), nothing about `product`. **Conclusion: the `nat-lemmas` package is necessary**, and probably `List` lemmas too.
+- The `proof_numerics` demo already proves the Nat lemmas above, so it can be used as a starting point (read it before rewriting).
+- `List` operations: `map`, `length`, `append`, `reverse`, `take`, `drop`, `zip`, `foldl`, `foldr`, `filter`, `sort`, `range`, `replicate`.
 
-## Números
+## Numbers
 
-- Só existem **`Nat`, `U32` e `F32`**. Não há `U64`, `I32`, `I64` nem `F64` (limitação do Metal, segundo o README).
-- **Não existe tipo "byte".** Bytes serão `U32` (valor 0–255) numa `List<U32>`; o limite fica numa prova/invariante nossa.
-- Operações de `F32`: `add sub mul div mod pow neg abs sqrt exp log log2 log10 sin cos tan asin acos atan atan2 sinh cosh tanh floor ceil trunc round min max clamp lerp`, comparações, `show`, `read`, `from_nat`, `to_nat`. Testado: `F32.exp(1.0)` imprime `2.7182817`.
-- **As operações de `F32` são `law` primitivas, sem prova**: na Base aparecem como `law F32.add: for a: F32 for b: F32  F32`. Ou seja, são opacas para o provador. Isso bate com a regra 5 do `CLAUDE.md` (não provar nada numérico sobre float).
-- Consequência para a Fase 3: acumular loss e somas grandes em `F32` perde precisão; sem `F64`, o gradient checking precisa de tolerâncias maiores.
-- `Nat` literal acima de `256n` vira `U32.to_nat`, com teto em `4294967295n`. Cuidado com `Nat` unário em dimensões grandes (ex.: 784, 50257); precisa de teste de desempenho antes de decidir a representação das shapes.
+- Only **`Nat`, `U32` and `F32`** exist. There is no `U64`, `I32`, `I64` or `F64` (a Metal limitation, according to the README).
+- **There is no "byte" type.** Bytes will be `U32` (value 0–255) in a `List<U32>`; the bound is our own proof/invariant.
+- `F32` operations: `add sub mul div mod pow neg abs sqrt exp log log2 log10 sin cos tan asin acos atan atan2 sinh cosh tanh floor ceil trunc round min max clamp lerp`, comparisons, `show`, `read`, `from_nat`, `to_nat`. Tested: `F32.exp(1.0)` prints `2.7182817`.
+- **The `F32` operations are primitive `law`s, with no proof**: in Base they appear as `law F32.add: for a: F32 for b: F32  F32`. That is, they are opaque to the prover. This matches rule 5 of `CLAUDE.md` (do not prove anything numerical about floats).
+- Consequence for Phase 3: accumulating loss and large sums in `F32` loses precision; without `F64`, gradient checking needs larger tolerances.
+- A `Nat` literal above `256n` becomes `U32.to_nat`, capped at `4294967295n`. Beware of unary `Nat` in large dimensions (e.g. 784, 50257); a performance test is needed before deciding the shape representation.
 
 ## Backends
 
-- Compila para **C** (precisa de clang 14+; 19+ para `!`), **JS**, **Metal** (macOS) e **CUDA** (Linux). Lua, Luau e Python estão planejados.
-- A GPU é ativada por chamada com `!` (ex.: `f!(x)`); em binário nativo, `./prog --gpu off` força CPU e `--gpu 4GB` limita o heap da GPU.
-- **Nesta máquina:**
-  - clang 22.1.8 instalado (ok).
-  - `nvidia-smi` mostra RTX 4050 Laptop, 6141 MiB, driver 610.57.04.
-  - **CUDA Toolkit não está instalado** (`nvcc` ausente; `/usr/local/cuda` e `/opt/cuda` não existem). O guia diz que no Linux precisa de **CUDA 12 em `/usr/local/cuda`**.
-  - Ou seja: a GPU **não** roda ainda. Falta instalar o CUDA 12 e testar com `pow2!`. *(não verificado se o CUDA 12 do Arch/Omarchy funciona com o driver 610 e com a RTX 4050; testar antes de planejar a Fase 3 em GPU.)*
-  - Sem GPU, `!` roda em paralelo na CPU, então o código continua funcionando.
-- Sem memória unificada (placa dedicada), mover dados CPU↔GPU tem custo; o ganho do Apple Silicon descrito no guia não vale aqui.
+- It compiles to **C** (needs clang 14+; 19+ for `!`), **JS**, **Metal** (macOS) and **CUDA** (Linux). Lua, Luau and Python are planned.
+- The GPU is enabled per call with `!` (e.g. `f!(x)`); in a native binary, `./prog --gpu off` forces the CPU and `--gpu 4GB` limits the GPU heap.
+- **On this machine:**
+  - clang 22.1.8 installed (ok).
+  - `nvidia-smi` shows an RTX 4050 Laptop, 6141 MiB, driver 610.57.04.
+  - **The CUDA Toolkit is not installed** (`nvcc` missing; `/usr/local/cuda` and `/opt/cuda` do not exist). The guide says that on Linux it needs **CUDA 12 at `/usr/local/cuda`**.
+  - That is: the GPU does **not** run yet. CUDA 12 must be installed and tested with `pow2!`. *(not verified whether Arch/Omarchy's CUDA 12 works with driver 610 and the RTX 4050; test before planning Phase 3 on the GPU.)*
+  - Without a GPU, `!` runs in parallel on the CPU, so the code still works.
+- Without unified memory (a discrete card), moving data CPU↔GPU has a cost; the Apple Silicon gain described in the guide does not apply here.
 
 ## IO
 
-- `File.open`, `File.read`, **`File.read_bytes`**, `File.read_at`, `File.size`, `File.write`, `File.write_bytes` (esta recebe `List<U32>`), `File.close`. Suficiente para carregar MNIST e pesos.
-- Também há `IO.args`, `IO.now` (para benchmark), `IO.random_u32`, `IO.get_env`, `IO.fork/join`, `IO.thread_count`, TCP/UDP, `Process.run`.
-- Efeitos próprios em C/JS são possíveis (`bend guide effects`), mas a API C não tem promessa de ABI: reconstruir a cada atualização.
-- Estado do carregamento de arquivos grandes (GPT-2 tem ~500 MB de pesos) *(não verificado)*: lista de `U32` usa muita memória; avaliar `Array` e leitura em blocos.
+- `File.open`, `File.read`, **`File.read_bytes`**, `File.read_at`, `File.size`, `File.write`, `File.write_bytes` (this one takes `List<U32>`), `File.close`. Enough to load MNIST and weights.
+- There is also `IO.args`, `IO.now` (for benchmarks), `IO.random_u32`, `IO.get_env`, `IO.fork/join`, `IO.thread_count`, TCP/UDP, `Process.run`.
+- Custom effects in C/JS are possible (`bend guide effects`), but the C API has no ABI promise: rebuild on every update.
+- State of loading large files (GPT-2 has ~500 MB of weights) *(not verified)*: a `U32` list uses a lot of memory; evaluate `Array` and block reading.
 
-## Provas e confiança
+## Proofs and trust
 
-- `bend X.bend --verdict` reverifica com o kernel provado em Lean. **Requer `lean` v4.34.0** (via elan) ou `$BENDTT` apontando para o kernel compilado. **Não está instalado aqui**; o comando falhou com `Executable not found in $PATH: "lean"`. Instalar o elan antes de publicar, para poder dizer "verificado pelo kernel auditado".
-- `@unsafe def` pula a checagem de terminação e o checker mostra `SOME PROOFS FAIL`. **Proibido sem aviso** (regra 4). Sem `@unsafe`, não há como "contornar" uma prova, exceto deixar `?TODO`, que o checker acusa.
-- Recursão mútua é proibida; o parâmetro que encolhe deve vir primeiro (a checagem de terminação lê da esquerda para a direita).
-- Não existe `if`; usar `match` em `True{}`/`False{}`.
-- `match` só inspeciona parâmetro ou variável de padrão, nunca valor calculado (`match f(x):` é recusado). É preciso passar por uma função auxiliar.
-- Variáveis são **afins** (usadas no máximo uma vez); `+x` permite reuso se o tipo for `Data`. Isso vai afetar muito o autograd (um valor usado no forward e no backward precisa de `+`). Já avisar o Renan: é a parte mais estranha para quem vem de Python.
+- `bend X.bend --verdict` re-checks with the Lean-proved kernel. **It requires `lean` v4.34.0** (via elan) or `$BENDTT` pointing to the compiled kernel. **It is not installed here**; the command failed with `Executable not found in $PATH: "lean"`. Install elan before publishing, to be able to say "verified by the audited kernel".
+- `@unsafe def` skips the termination check and the checker shows `SOME PROOFS FAIL`. **Forbidden without a warning** (rule 4). Without `@unsafe`, there is no way to "work around" a proof, except leaving `?TODO`, which the checker flags.
+- Mutual recursion is forbidden; the shrinking parameter must come first (the termination check reads from left to right).
+- There is no `if`; use `match` on `True{}`/`False{}`.
+- `match` only inspects a parameter or a pattern variable, never a computed value (`match f(x):` is refused). You have to go through a helper function.
+- Variables are **affine** (used at most once); `+x` allows reuse if the type is `Data`. This will affect autograd a lot (a value used in the forward and the backward pass needs `+`). Warn Renan already: it is the strangest part for someone coming from Python.
 
 ## BendHub
 
-- Site: `hub.bend-lang.com` ("mini Hacker News": abas Packages e Posts, busca, `/post/new`, `/auctions`).
-- Login: `bend login`, **só via GitHub**. Publicar: `bend arquivo.bend --publish nome@versao` (publica o arquivo e tudo que ele importa). Sem nome: `--publish` devolve o hash e a linha `import 0x<hash>/main.bend as P`.
-- Importar: `import nome@versao/main.bend as P`, ou por hash.
-- Publicação é **pública e permanente**; dependentes referenciam por hash. Colocar `LICENSE` ao lado do arquivo de entrada (primeira linha `SPDX-License-Identifier: MIT`). Sem `LICENSE`, vira MIT-0. Adicionar `LICENSE` depois muda o hash, e exige nova versão.
-- **Nomes:** nomes com **12+ caracteres** são gratuitos (primeiro a chegar); nomes curtos são vendidos em leilão. **`bpe`, `tensor` e `nat-lemmas` são curtos demais ou próximos disso** (`nat-lemmas` tem 10). Usar nomes longos, por exemplo `bend-ml-bpe-tokenizer` e `bend-ml-nat-lemmas`. Nomes podem ser retirados em 14 dias se nenhuma versão foi vinculada; não podem ser transferidos.
-- **Já existe algo parecido?** *Não verificado.* A página do hub carrega a lista por JavaScript e o fetch mostrou só os títulos das abas. Falta olhar o hub no navegador (busca por `tokenizer`, `bpe`, `tensor`, `autograd`, `matrix`, `nat`) antes de decidir entre contribuir e diferenciar. Ação para o Renan.
+- Site: `hub.bend-lang.com` ("mini Hacker News": Packages and Posts tabs, search, `/post/new`, `/auctions`).
+- Login: `bend login`, **GitHub only**. Publish: `bend file.bend --publish name@version` (publishes the file and everything it imports). Without a name: `--publish` returns the hash and the line `import 0x<hash>/main.bend as P`.
+- Import: `import name@version/main.bend as P`, or by hash.
+- Publication is **public and permanent**; dependents reference by hash. Put a `LICENSE` next to the entry file (first line `SPDX-License-Identifier: MIT`). Without a `LICENSE`, it becomes MIT-0. Adding a `LICENSE` later changes the hash and requires a new version.
+- **Names:** names with **12+ characters** are free (first come); short names are sold at auction. **`bpe`, `tensor` and `nat-lemmas` are too short or close to it** (`nat-lemmas` has 10). Use long names, for example `bend-ml-bpe-tokenizer` and `bend-ml-nat-lemmas`. Names can be withdrawn within 14 days if no version has been linked; they cannot be transferred.
+- **Does something similar already exist?** *Not verified.* The hub page loads the list with JavaScript and the fetch only showed the tab titles. The hub still has to be looked at in a browser (search for `tokenizer`, `bpe`, `tensor`, `autograd`, `matrix`, `nat`) before deciding between contributing and differentiating. Action for Renan.
 
-## Dívidas e riscos registrados
+## Recorded debts and risks
 
-- Nenhuma dívida de prova ainda (nenhum código foi escrito).
-- Risco: `--verdict` indisponível até instalar Lean.
-- Risco: GPU indisponível até instalar CUDA 12.
-- Risco: `Nat` unário pode ser lento para dimensões grandes.
-- Risco: afinidade (uso único) de variáveis complica autograd e tensores.
+- No proof debt yet (no code has been written).
+- Risk: `--verdict` unavailable until Lean is installed.
+- Risk: GPU unavailable until CUDA 12 is installed.
+- Risk: unary `Nat` can be slow for large dimensions.
+- Risk: the affinity (single use) of variables complicates autograd and tensors.
 
-## Recomendação de ajustes ao plano
+## Recommendation of adjustments to the plan
 
-1. **Antes da Fase 1, ação do Renan (≈15 min):** abrir `hub.bend-lang.com` e procurar `bpe`, `tokenizer`, `tensor`, `autograd`, `nat`. Se já houver um tokenizer, decidir entre contribuir e diferenciar.
-2. **Nomes dos pacotes:** trocar `bpe`/`tensor`/`nat-lemmas` por nomes de 12+ caracteres (ver acima). Escolher e reservar cedo.
-3. **Inverter a prioridade do `nat-lemmas`:** ele é pré-requisito real da Fase 2 e também ajuda a Fase 1 (provas sobre `List`). Sugestão: fazer um mini `nat-lemmas` + `list-lemmas` logo no começo da Fase 1, partindo do demo `proof_numerics`. É a menor entrega publicável e dá o primeiro pacote no BendHub cedo (tração).
-4. **Fase 1 (BPE):** bytes são `U32` numa `List<U32>`, não há tipo byte. A lei do roundtrip precisa de uma definição de "tabela bem formada" que a prova use. Começar com a lei mais simples possível (tabela vazia → identidade) e subir.
-5. **Fase 2 (tensor):** representar shape como `List<Nat>` no tipo, mas validar o custo do `Nat` unário e das variáveis afins numa prova de conceito pequena (vetor com tamanho no tipo + `dot`) antes de se comprometer. Se for pesado demais, usar `Nat` só no tipo (apagado em tempo de execução com `-`) e `U32` nos dados.
-6. **Fase 3:** instalar CUDA 12 e testar `pow2!` antes de prometer GPU. Plano B: CPU paralela (`./prog --threads N`), que já é o padrão. MNIST em CPU deve bastar para a demo. GPT-2 em `F32` com 6 GB de VRAM é viável em tamanho (124M × 4 B ≈ 500 MB), mas depende de `File.read_bytes` aguentar o arquivo.
-7. **Instalar elan + Lean 4.34.0** para usar `--verdict`. Entra no critério "pronto para mandar ao Taelin".
+1. **Before Phase 1, an action for Renan (≈15 min):** open `hub.bend-lang.com` and search for `bpe`, `tokenizer`, `tensor`, `autograd`, `nat`. If a tokenizer already exists, decide between contributing and differentiating.
+2. **Package names:** replace `bpe`/`tensor`/`nat-lemmas` with names of 12+ characters (see above). Choose and reserve early.
+3. **Reverse the priority of `nat-lemmas`:** it is a real prerequisite of Phase 2 and also helps Phase 1 (proofs about `List`). Suggestion: build a mini `nat-lemmas` + `list-lemmas` right at the start of Phase 1, starting from the `proof_numerics` demo. It is the smallest publishable deliverable and gives the first BendHub package early (traction).
+4. **Phase 1 (BPE):** bytes are `U32` in a `List<U32>`; there is no byte type. The roundtrip law needs a definition of "well-formed table" that the proof uses. Start with the simplest possible law (empty table → identity) and grow from there.
+5. **Phase 2 (tensor):** represent the shape as `List<Nat>` in the type, but validate the cost of unary `Nat` and of affine variables in a small proof of concept (a vector with its size in the type + `dot`) before committing. If it is too heavy, use `Nat` only in the type (erased at run time with `-`) and `U32` in the data.
+6. **Phase 3:** install CUDA 12 and test `pow2!` before promising a GPU. Plan B: parallel CPU (`./prog --threads N`), which is already the default. MNIST on the CPU should be enough for the demo. GPT-2 in `F32` with 6 GB of VRAM is feasible in size (124M × 4 B ≈ 500 MB), but depends on `File.read_bytes` handling the file.
+7. **Install elan + Lean 4.34.0** to use `--verdict`. It enters the "ready to send to Taelin" criterion.
 
-## Próximos passos sugeridos
+## Suggested next steps
 
-1. Renan: conferir o BendHub no navegador (item 1).
-2. Renan: instalar CUDA 12 (`/usr/local/cuda`) e/ou elan (`--verdict`) se quiser; posso ajudar com os comandos.
-3. `git init` e remote no GitHub (hoje o diretório não é um repositório).
-4. Prova de conceito: vetor com tamanho no tipo, para decidir a representação de shapes.
-5. Começar o `nat-lemmas`.
+1. Renan: check BendHub in the browser (item 1).
+2. Renan: install CUDA 12 (`/usr/local/cuda`) and/or elan (`--verdict`) if desired; I can help with the commands.
+3. `git init` and a GitHub remote (today the directory is not a repository).
+4. Proof of concept: a vector with its size in the type, to decide the shape representation.
+5. Start `nat-lemmas`.
 
 ## v0.1 — nat-lemmas (2026-10-03)
 
-- 15 leis provadas em `nat-lemmas/main.bend` (Nat: soma/produto; List: append/length; `product_append`). `bend nat-lemmas/main.bend` → `ALL PROOFS CHECK`. Nenhum `@unsafe` nem `?TODO`. Nenhuma dívida de prova.
-- **Descoberta:** um `import ... as NL` só expõe os defs do próprio arquivo, não os reexporta. Por isso o pacote publicável é **um arquivo só**, com `law` e prova lado a lado (a separação `LAWS.bend`/`PROOF.bend` fica para projetos de aplicação, não para bibliotecas).
-- **Descoberta:** em `%e : P`, `_` marca onde está o lado direito `b` de `e : {a == b}`; o objetivo vira `P` com `a`. Quando o objetivo tem `a` e não `b`, usar `Equal.sym` antes.
-- **Descoberta:** lemas sobre lista com elementos usados mais de uma vez precisam de `for +xs` e `Con{+h, +t}`.
-- `--verdict` ainda não rodado (falta Lean 4.34.0).
-- **Publicado no BendHub:** `bend-ml-nat-lemmas@0.1.0.0`, hash `0xa7aa06c09e97c6747c12cc64bb5203d9` (2026-10-03). Versões do BendHub têm **quatro números** (`0.1.0.0`). Import: `import bend-ml-nat-lemmas@0.1.0.0/main.bend as NL`. Verificado em pasta limpa.
-- O comentário de uso em `nat-lemmas/main.bend` foi corrigido para `0.1.0.0` depois da publicação; só mudou comentário, mas o hash publicado é o do arquivo anterior.
+- 15 laws proved in `nat-lemmas/main.bend` (Nat: addition/multiplication; List: append/length; `product_append`). `bend nat-lemmas/main.bend` → `ALL PROOFS CHECK`. No `@unsafe` or `?TODO`. No proof debt.
+- **Discovery:** an `import ... as NL` only exposes the defs of the file itself, it does not re-export. That is why the publishable package is **a single file**, with `law` and proof side by side (the `LAWS.bend`/`PROOF.bend` split is for application projects, not for libraries).
+- **Discovery:** in `%e : P`, `_` marks where the right-hand side `b` of `e : {a == b}` is; the goal becomes `P` with `a`. When the goal has `a` and not `b`, use `Equal.sym` first.
+- **Discovery:** list lemmas where elements are used more than once need `for +xs` and `Con{+h, +t}`.
+- `--verdict` not run yet (Lean 4.34.0 missing).
+- **Published on BendHub:** `bend-ml-nat-lemmas@0.1.0.0`, hash `0xa7aa06c09e97c6747c12cc64bb5203d9` (2026-10-03). BendHub versions have **four numbers** (`0.1.0.0`). Import: `import bend-ml-nat-lemmas@0.1.0.0/main.bend as NL`. Verified in a clean folder.
+- The usage comment in `nat-lemmas/main.bend` was fixed to `0.1.0.0` after publication; only a comment changed, but the published hash is that of the previous file.
 
-## Ambiente e v0.2 — PoC de shapes (2026-10-03)
+## Environment and v0.2 — shape PoC (2026-10-03)
 
-- `reference/.venv`: torch 2.14.1+cpu, tiktoken 0.14.0, numpy 2.5.3, safetensors. Lean via elan não instalou direto (falha de DNS no elan), mas `bend --verdict` compilou o próprio kernel e **`nat-lemmas/main.bend --verdict` dá ALL PROOFS CHECK** (primeiro run ~1 min, depois 0,2 s).
-- CUDA: o pacote do Arch é o **CUDA 13.3**; o Bend pede **CUDA 12 em `/usr/local/cuda`**. Não instalei (exige sudo e versão errada). Tudo segue em CPU paralela por enquanto.
-- **Vec(n) por recursão de tipo** (`def Vec(n) -> Data: match n`, como `Word(n)` na Base): funciona e o erro de tamanho é de tipo, mas **estoura a pilha em n ≈ 50 mil** (8192 ok). Serve para dimensões pequenas, não para dados de 38M de floats.
-- **Decisão de representação:** `type Mat<-r, -c> is Type: Mat{data: Array<F32>}`. Dimensões são parâmetros de tipo **apagados**; dados em `Array<F32>` linha a linha (índice `i*c + j`). Dimensão incompatível é erro de tipo (`poc/mat_shape_error.bend`, mensagem em `docs/shape-error-matriz.txt`). Produto linha×coluna de 784 elementos: 0,002 s nativo.
-- Limite honesto: o tamanho do `Array` (potência de 2) **não** é amarrado ao tipo; a invariante `|data| >= r*c` vale por construção pelos construtores do pacote, não por prova. A prova de shapes é sobre a álgebra (`reshape` exige `product` igual, com `nat-lemmas`).
-- Regras do Bend aprendidas: `match` só abre **parâmetros**, então um par devolvido por `Array.get` precisa de função própria ou de ser passado como argumento (padrão de `Array.map.go`); sem recursão mútua; pares casam como `Tuple{a, b}` no `match`; funções precisam estar definidas acima de onde são usadas; tipos com `Array` são `Type` (afins), não `Data`.
+- `reference/.venv`: torch 2.14.1+cpu, tiktoken 0.14.0, numpy 2.5.3, safetensors. Lean via elan did not install directly (a DNS failure in elan), but `bend --verdict` built its own kernel and **`nat-lemmas/main.bend --verdict` gives ALL PROOFS CHECK** (first run ~1 min, then 0.2 s).
+- CUDA: Arch's package is **CUDA 13.3**; Bend asks for **CUDA 12 at `/usr/local/cuda`**. I did not install it (it needs sudo and the version is wrong). Everything stays on parallel CPU for now.
+- **Vec(n) by type recursion** (`def Vec(n) -> Data: match n`, like `Word(n)` in Base): it works and a size error is a type error, but it **overflows the stack at n ≈ 50 thousand** (8192 is fine). It serves small dimensions, not data of 38M floats.
+- **Representation decision:** `type Mat<-r, -c> is Type: Mat{data: Array<F32>}`. Dimensions are **erased** type parameters; data in an `Array<F32>`, row by row (index `i*c + j`). An incompatible dimension is a type error (`poc/mat_shape_error.bend`, message in `docs/shape-error-matrix.txt`). Row×column product of 784 elements: 0.002 s native.
+- Honest limit: the `Array` size (a power of 2) is **not** tied to the type; the invariant `|data| >= r*c` holds by construction through the package's constructors, not by proof. The shape proof is about the algebra (`reshape` requires equal `product`, with `nat-lemmas`).
+- Bend rules learned: `match` only opens **parameters**, so a pair returned by `Array.get` needs its own function or to be passed as an argument (the `Array.map.go` pattern); no mutual recursion; pairs match as `Tuple{a, b}` in `match`; functions must be defined above where they are used; types with `Array` are `Type` (affine), not `Data`.
 
 ## v0.3 — bend-ml-bpe-tokenizer (2026-10-03)
 
-- Publicado: `bend-ml-bpe-tokenizer@0.1.0.0`, hash `0x3333bd5274f4ce66fdf8fe0c26c6b532`. Leis `roundtrip`, `vocab_bound`, `dec_append` provadas e aceitas pelo kernel (`--verdict` ALL PROOFS CHECK). Import verificado em pasta limpa, inclusive usando a lei publicada.
-- **Desenho que tornou a prova viável:** tokens `B{n}`/`M{k}` (sem aritmética de índices), cada regra carrega seu id, a tabela vai da regra mais antiga para a mais nova e o acumulador `done` do `encode.go` evolui exatamente como `List.reverse.go` da Base. A expansão (`exp`) é recursiva sobre a lista de regras (só olha regras mais antigas), sem tabela de vocabulário nem combustível. A condição "tabela bem formada" é só "ids distintos" (`wf`).
-- ~20 lemas auxiliares (`ext_dec`, `mp`, `kp`, `enc_dec`...). Técnicas aprendidas: `match` só em parâmetros ⇒ passar `hit: Bool` calculado pelo chamador e provar `hit == peek(...)`; recursão só estrutural com o argumento que encolhe PRIMEIRO; `%e : P` precisa de `_` no lado direito `b` de `e`, então use `Equal.sym` para reescrever no outro sentido; refutar `True == False` com o motivo `BD(b, t, f)`.
-- Testes: `reference/test_bpe.py` compara `train/encode/decode` em Bend com `reference/bpe_ref.py` em 4 corpora × 4 amostras (inglês, acentos, UTF-8 misto com emoji/CJK, vazio): 0 falhas.
-- O `bpe/LICENSE` publicado não tem a linha `SPDX-License-Identifier` (o instalador mostrou "License: see LICENSE"); `nat-lemmas` tem. Texto MIT idêntico.
-- Pendente do GPT-2: pré-tokenizador por regex e carga do `merges.txt` oficial (tabela de 50 mil regras, ids base em ordem `bytes_to_unicode`).
+- Published: `bend-ml-bpe-tokenizer@0.1.0.0`, hash `0x3333bd5274f4ce66fdf8fe0c26c6b532`. Laws `roundtrip`, `vocab_bound`, `dec_append` proved and accepted by the kernel (`--verdict` ALL PROOFS CHECK). Import verified in a clean folder, including using the published law.
+- **The design that made the proof feasible:** tokens `B{n}`/`M{k}` (no index arithmetic), each rule carries its id, the table goes from the oldest rule to the newest and the `done` accumulator of `encode.go` evolves exactly like Base's `List.reverse.go`. The expansion (`exp`) is recursive over the list of rules (it only looks at older rules), with no vocabulary table and no fuel. The "well-formed table" condition is just "distinct ids" (`wf`).
+- ~20 auxiliary lemmas (`ext_dec`, `mp`, `kp`, `enc_dec`...). Techniques learned: `match` only on parameters ⇒ pass a `hit: Bool` computed by the caller and prove `hit == peek(...)`; only structural recursion, with the shrinking argument FIRST; `%e : P` needs `_` on the right-hand side `b` of `e`, so use `Equal.sym` to rewrite in the other direction; refute `True == False` with the motive `BD(b, t, f)`.
+- Tests: `reference/test_bpe.py` compares `train/encode/decode` in Bend with `reference/bpe_ref.py` on 4 corpora × 4 samples (English, accents, mixed UTF-8 with emoji/CJK, empty): 0 failures.
+- The published `bpe/LICENSE` has no `SPDX-License-Identifier` line (the installer showed "License: see LICENSE"); `nat-lemmas` has it. Identical MIT text.
+- Pending for GPT-2: a regex pre-tokenizer and loading the official `merges.txt` (a table of 50 thousand rules, base ids in `bytes_to_unicode` order).
 
 ## v0.4 — bend-ml-tensor (2026-10-03)
 
-- Publicado: `bend-ml-tensor@0.1.0.0`, hash `0xf9837737d2c3f58ae1d0c5df42255584`. `ALL PROOFS CHECK` e `--verdict` OK; import e erro de shape verificados a partir do BendHub em pasta limpa.
-- **Representação final:** `Vec<-n>` e `Mat<-r,-c>` com dimensões apagadas, dados em `List<&2, F32>` / lista de linhas (copiáveis e paralelizáveis). Medido: 10 M de multiplicações-e-somas em 0,23 s numa thread (~44 M/s). Descartado `Array` (índice log n com `Array.size` a cada acesso) e `Vec(n)` por recursão de tipo (pilha estoura perto de 50 mil).
-- Erro de shape = erro de tipo: `docs/shape-error-bad_matmul.txt` (`esperado Mat<3,5>, recebido Mat<4,5>`) e `docs/shape-error-bad_reshape.txt` (`esperado 12, recebido 15`). Esse é o conteúdo do vídeo.
-- Leis: `reshape_swap` (r·c = c·r) e `reshape_flat` (r·c = 1·(r·c)), provadas com `mul_comm` e `mul_one_l` do nat-lemmas publicado.
-- Testes numéricos: `reference/test_tensor.py` compara com PyTorch: matmul (4 formas), transpose, relu, softmax (inclusive valores ±1000), gelu (tanh), layernorm. Máximo erro ≈ 1e-6, 0 falhas.
-- Regras novas: parâmetro usado também no tipo conta como uso (precisa `+` se for usado de novo); defs precisam vir antes do uso (nada de ordem livre); `match` na ordem dos binders.
+- Published: `bend-ml-tensor@0.1.0.0`, hash `0xf9837737d2c3f58ae1d0c5df42255584`. `ALL PROOFS CHECK` and `--verdict` OK; import and shape error verified from BendHub in a clean folder.
+- **Final representation:** `Vec<-n>` and `Mat<-r,-c>` with erased dimensions, data in `List<&2, F32>` / a list of rows (copyable and parallelizable). Measured: 10 M multiply-adds in 0.23 s on one thread (~44 M/s). Discarded `Array` (log n index with `Array.size` on every access) and `Vec(n)` by type recursion (the stack overflows near 50 thousand).
+- A shape error = a type error: `docs/shape-error-bad_matmul.txt` (`expected Mat<3,5>, got Mat<4,5>`) and `docs/shape-error-bad_reshape.txt` (`expected 12, got 15`). That is the content of the video.
+- Laws: `reshape_swap` (r·c = c·r) and `reshape_flat` (r·c = 1·(r·c)), proved with `mul_comm` and `mul_one_l` from the published nat-lemmas.
+- Numerical tests: `reference/test_tensor.py` compares with PyTorch: matmul (4 shapes), transpose, relu, softmax (including values ±1000), gelu (tanh), layernorm. Maximum error ≈ 1e-6, 0 failures.
+- New rules: a parameter also used in the type counts as a use (it needs `+` if used again); defs must come before their use (no free ordering); `match` in binder order.
 
 ## v0.5 — bend-ml-autograd (2026-10-03)
 
-- Publicado: `bend-ml-autograd@0.1.0.0`, hash `0x174ef0d27bc1c621ddb9961c7f224de1`. `ALL PROOFS CHECK` e `--verdict` OK.
-- **Lei provada `reverse_eq_forward`**: modo reverso == modo direto do autodiff, sobre expressões de `Nat` (constantes, X, soma, produto). Prova por indução do resultado mais forte `reverso(e,g) = g × direto(e)`, usando `mul_comm`, `mul_assoc`, `mul_dist`, `mul_zero`, `mul_one_*` do nat-lemmas publicado e uma `dist_l` derivada (distributividade à esquerda).
-- Autograd de escalares em `F32` (GCst, GVar, GAdd, GMul, GRelu, GTanh, GExp) e camadas com backward tipado (`linear_bwd` devolve `Mat<n,i> & (Mat<i,o> & Vec<o>)`; trocar uma dimensão não compila).
-- Gradient checking: `reference/test_autograd.py` compara com o autograd do PyTorch, 21 verificações (5 expressões × 3 pontos, linear_bwd ×3, relu_bwd, cross-entropy ×2), erro máximo ≈ 5e-7, 0 falhas.
-- Bend: argumentos negativos na linha de comando precisam de `--` (`bend cli.bend -- scalar 1 -1.3 ...`).
+- Published: `bend-ml-autograd@0.1.0.0`, hash `0x174ef0d27bc1c621ddb9961c7f224de1`. `ALL PROOFS CHECK` and `--verdict` OK.
+- **Proved law `reverse_eq_forward`**: autodiff reverse mode == forward mode, over `Nat` expressions (constants, X, sum, product). Proof by induction of the stronger result `reverse(e,g) = g × forward(e)`, using `mul_comm`, `mul_assoc`, `mul_dist`, `mul_zero`, `mul_one_*` from the published nat-lemmas and a derived `dist_l` (left distributivity).
+- Scalar autograd in `F32` (GCst, GVar, GAdd, GMul, GRelu, GTanh, GExp) and layers with typed backward (`linear_bwd` returns `Mat<n,i> & (Mat<i,o> & Vec<o>)`; swapping a dimension does not compile).
+- Gradient checking: `reference/test_autograd.py` compares with PyTorch's autograd, 21 checks (5 expressions × 3 points, linear_bwd ×3, relu_bwd, cross-entropy ×2), maximum error ≈ 5e-7, 0 failures.
+- Bend: negative command-line arguments need `--` (`bend cli.bend -- scalar 1 -1.3 ...`).
 
-## v0.6 — MNIST (em andamento)
+## v0.6 — MNIST (in progress)
 
-- `demos/mnist/train.bend` (MLP 784-128-10, SGD, lotes de 100) e o gêmeo `reference/mnist_torch.py` com os mesmos pesos iniciais (`demos/mnist/data/init/*.txt`) e mesma ordem de lotes.
-- **Validação de corretude:** após 50 passos, Bend: `loss_treino=1.6616005`, `7829/10000`; PyTorch: `loss_treino=1.661600`, `acc_teste=0.7829`. Idênticos.
-- Desempenho (honesto): ~0,84 s por lote de 100 numa thread (≈ 24 M mult-soma/s efetivos). O paralelismo de `x y = f g` escala bem no `pow2` (8× com 16 threads), mas o `matmul` por linhas em listas só chegou a ~1,8× (com ou sem compartilhamento de dados); causa não resolvida. O `bend -o` + `--threads N` é o mecanismo.
-- `tensor@0.1.1.0` acrescenta `Mat.matmul_t` (operando já transposto) para o GPT-2.
+- `demos/mnist/train.bend` (784-128-10 MLP, SGD, batches of 100) and the twin `reference/mnist_torch.py` with the same initial weights (`demos/mnist/data/init/*.txt`) and the same batch order.
+- **Correctness validation:** after 50 steps, Bend: `train_loss=1.6616005`, `7829/10000`; PyTorch: `train_loss=1.661600`, `test_acc=0.7829`. Identical.
+- Performance (honest): ~0.84 s per batch of 100 on one thread (≈ 24 M effective multiply-adds/s). The parallelism of `x y = f g` scales well in `pow2` (8x with 16 threads), but the row-wise list `matmul` only reached ~1.8x (with or without data sharing); cause unresolved. `bend -o` + `--threads N` is the mechanism.
+- `tensor@0.1.1.0` adds `Mat.matmul_t` (an already-transposed operand) for GPT-2.
 
-## v0.6 e v1.0 — MNIST, GPT-2 e entrega (2026-10-03)
+## v0.6 and v1.0 — MNIST, GPT-2 and delivery (2026-10-03)
 
-- **MNIST (1 época completa, 600 lotes de 100, lr 0,1):** Bend perda `0,52047706`, 9129/10000, 544,3 s; PyTorch perda `0,520477`, 9129/10000 (9128 com 1 thread), 0,21 s (16 threads) / 0,30 s (1 thread). Correção idêntica; o Bend é ~1800× mais lento por falta de BLAS e por usar listas. Detalhes e hardware em `demos/mnist/BENCHMARK.md`.
-- **GPT-2 small (124 M) em Bend:** pesos carregados em ~10 s (bytes -> F32 por bitcast `U32{w}` -> `F32{w}`, em blocos de 1 MB); ~3 s por token com KV cache; ids idênticos aos do PyTorch em 22 tokens (3 prompts), logits a menos de 2e-4. `reference/test_gpt2.py`.
-- **Tokenizer do GPT-2 em Bend:** pré-tokenizador da regex sobre bytes + as 50 000 regras via `bend-ml-bpe-tokenizer`; 16/16 textos idênticos ao `tiktoken`. A equivalência "aplicar as regras em ordem == algoritmo por rank do GPT-2" foi confirmada contra o tiktoken real (`reference/gpt2_prep.py`). Limite: bytes >= 128 contam como letra.
-- **Pacotes publicados:** `bend-ml-nat-lemmas@0.1.0.0` (`0xa7aa06c0...`), `bend-ml-bpe-tokenizer@0.1.0.0` (`0x3333bd52...`), `bend-ml-tensor@0.1.0.0` (`0xf9837737...`) e `0.1.1.0` (`0xdbe1000e...`, acrescenta `matmul_t`), `bend-ml-autograd@0.1.0.0` (`0x174ef0d2...`). Todos importam do BendHub numa pasta limpa e as leis são reutilizáveis (`BPE.roundtrip`, `AG.reverse_eq_forward`).
-- `reference/check_all.py --full`: 25/25 verificações ok (provas + kernel, erros de shape esperados, referências Python, tokenizer, GPT-2, MNIST).
+- **MNIST (1 full epoch, 600 batches of 100, lr 0.1):** Bend loss `0.52047706`, 9129/10000, 544.3 s; PyTorch loss `0.520477`, 9129/10000 (9128 with 1 thread), 0.21 s (16 threads) / 0.30 s (1 thread). Identical correctness; Bend is ~1800x slower for lack of BLAS and because it uses lists. Details and hardware in `demos/mnist/BENCHMARK.md`.
+- **GPT-2 small (124 M) in Bend:** weights loaded in ~10 s (bytes -> F32 by the bitcast `U32{w}` -> `F32{w}`, in 1 MB blocks); ~3 s per token with a KV cache; ids identical to PyTorch's over 22 tokens (3 prompts), logits within 2e-4. `reference/test_gpt2.py`.
+- **GPT-2 tokenizer in Bend:** the regex pre-tokenizer over bytes + the 50,000 rules via `bend-ml-bpe-tokenizer`; 16/16 texts identical to `tiktoken`. The equivalence "applying the rules in order == GPT-2's rank-based algorithm" was confirmed against the real tiktoken (`reference/gpt2_prep.py`). Limit: bytes >= 128 count as letters.
+- **Published packages:** `bend-ml-nat-lemmas@0.1.0.0` (`0xa7aa06c0...`), `bend-ml-bpe-tokenizer@0.1.0.0` (`0x3333bd52...`), `bend-ml-tensor@0.1.0.0` (`0xf9837737...`) and `0.1.1.0` (`0xdbe1000e...`, adds `matmul_t`), `bend-ml-autograd@0.1.0.0` (`0x174ef0d2...`). All import from BendHub in a clean folder and the laws are reusable (`BPE.roundtrip`, `AG.reverse_eq_forward`).
+- `reference/check_all.py --full`: 25/25 checks ok (proofs + kernel, expected shape errors, Python references, tokenizer, GPT-2, MNIST).
 
-### Dívidas e limites conhecidos
+### Debts and known limits
 
-- **Nenhuma dívida de prova**: nenhum `@unsafe`, nenhum `?TODO` publicado.
-- **Paralelismo não resolvido:** o `pow2` do guia escala ~8× com 16 threads, mas o `matmul` por linhas sobre listas só chegou a ~1,8× (com ou sem dados compartilhados, em qualquer profundidade). Hipóteses descartadas: laziness (somas estritas nas folhas), sharing (dados privados por tarefa). Não investigado: alocador compartilhado, acesso de memória por ponteiros. Vale reportar no GitHub do Bend.
-- **GPU não usada:** o Bend pede CUDA 12 em `/usr/local/cuda`; o pacote `cuda` do Arch é o 13.3 e a instalação exige sudo. A RTX 4050 (6 GB) ficou fora dos benchmarks.
-- A invariante "linhas com `c` números" de `Mat<r,c>` não está no tipo.
-- O `bpe/LICENSE` publicado não tem a linha SPDX (só o texto MIT).
-- Para o Renan: (1) abrir hub.bend-lang.com e procurar tokenizer/tensor/autograd de terceiros (a lista é carregada por JS e não consegui ler); (2) gravar o vídeo e postar a thread (`docs/launch/`); (3) se quiser GPU, instalar CUDA 12 em `/usr/local/cuda`; (4) o token do `bend login` está em `~/.bend/bender.json` (permissão 600); a chave `bend-ml` foi revogada.
+- **No proof debt**: no `@unsafe`, no `?TODO` published.
+- **Parallelism unresolved:** the guide's `pow2` scales ~8x with 16 threads, but the row-wise `matmul` over lists only reached ~1.8x (with or without shared data, at any depth). Discarded hypotheses: laziness (strict sums at the leaves), sharing (private data per task). Not investigated: shared allocator, pointer-based memory access. Worth reporting on Bend's GitHub.
+- **GPU not used:** Bend asks for CUDA 12 at `/usr/local/cuda`; Arch's `cuda` package is 13.3 and installing it needs sudo. The RTX 4050 (6 GB) stayed out of the benchmarks.
+- The invariant "rows with `c` numbers" of `Mat<r,c>` is not in the type.
+- The published `bpe/LICENSE` has no SPDX line (only the MIT text).
+- For Renan: (1) open hub.bend-lang.com and look for third-party tokenizer/tensor/autograd packages (the list is loaded by JS and I could not read it); (2) record the video and post the thread (`docs/launch/`); (3) if you want the GPU, install CUDA 12 at `/usr/local/cuda`; (4) the `bend login` token is at `~/.bend/bender.json` (permission 600); the `bend-ml` key was revoked.
 
-## v2 — experimentos de desempenho (2026-10-04)
+## v2 — performance experiments (2026-10-04)
 
-Plano em `docs/v2-plan.md`; micro-benchmarks em `bench/` (`timeit.py` mede a mediana de 3 execuções por número de threads).
+Plan in `docs/v2-plan.md`; micro-benchmarks in `bench/` (`timeit.py` measures the median of 3 runs per number of threads).
 
-### Exp. 1-2: listas × `Array<F32>` (100 M multiplicações-e-somas, 1 thread)
+### Exp. 1-2: lists vs `Array<F32>` (100 M multiply-adds, 1 thread)
 
-| | tempo | multiplicações-e-somas/s |
+| | time | multiply-adds/s |
 |---|---|---|
-| listas (`bench/mm_list.bend`, como o `bend-ml-tensor` 0.1.x) | 2,274 s | 44 M |
-| `Array<F32>` com `Array.get` (`bench/mm_array_check.bend`, dados distintos) | **0,046 s** | **2 200 M** |
+| lists (`bench/mm_list.bend`, like `bend-ml-tensor` 0.1.x) | 2.274 s | 44 M |
+| `Array<F32>` with `Array.get` (`bench/mm_array_check.bend`, distinct data) | **0.046 s** | **2,200 M** |
 
-- **Ganho de ~49× só trocando a estrutura de dados.** Resultado conferido com NumPy (`1024010000` para 128001 produtos de 8000,79; o desvio pequeno é arredondamento de `F32`).
-- Conta de bolso para o MNIST: ~18 G de mult-soma por época (3 produtos por lote × 600 lotes). A 2,2 G/s dá ~8 s por época, contra 544 s com listas e 0,3 s do PyTorch com 1 thread. **A distância ao PyTorch cairia de ~1800× para ~30×**, antes de qualquer paralelismo. Isto é uma estimativa, não uma medição do treino completo.
-- Custo do `Array`: é afim (`Type`), então cada leitura devolve o array junto com o elemento, e `Array.get` recalcula `Array.size` (log n). Mesmo assim ganhou muito.
-- A conclusão da v1 ("o Bend é ~1800× mais lento") era um efeito da estrutura de dados, não da linguagem.
+- **A ~49x gain just by changing the data structure.** Result checked against NumPy (`1024010000` for 128001 products of 8000.79; the small deviation is `F32` rounding).
+- Back-of-the-envelope for MNIST: ~18 G multiply-adds per epoch (3 products per batch × 600 batches). At 2.2 G/s that is ~8 s per epoch, against 544 s with lists and 0.3 s for 1-thread PyTorch. **The distance to PyTorch would drop from ~1800x to ~30x**, before any parallelism. This is an estimate, not a measurement of the full training.
+- Cost of `Array`: it is affine (`Type`), so each read returns the array together with the element, and `Array.get` recomputes `Array.size` (log n). It still gained a lot.
+- The v1 conclusion ("Bend is ~1800x slower") was an effect of the data structure, not of the language.
 
-### Exp. 3-5: paralelismo, cache, clone e distância ao PyTorch (2026-10-04)
+### Exp. 3-5: parallelism, cache, clone and distance to PyTorch (2026-10-04)
 
-Todos os números: 1 thread salvo indicação, mediana de 3 execuções, Intel Core Ultra 7 155H (6 P + 8 E + 2 LP-E cores, 22 threads), `bend -o`. Código em `bench/`.
+All numbers: 1 thread unless stated, median of 3 runs, Intel Core Ultra 7 155H (6 P + 8 E + 2 LP-E cores, 22 threads), `bend -o`. Code in `bench/`.
 
-- **Indexar vence percorrer a árvore:** `Array.get` com índice: 2 200 M mult-soma/s; percorrer as duas árvores juntas e reconstruí-las (`bench/tree_dot.bend`): 31 M/s (70× pior). Em Bend, o caminho rápido do `Array` é o indexado.
-- **`Array.clone` é barato** (~17 µs por array de 131 072 elementos, com leitura do resultado forçada). **A hipótese "o clone compartilha nós e as leituras viram atômicas disputadas" foi refutada:** 16 tarefas lendo clones de um mesmo par escalam como 16 tarefas com arrays privados (`bench/share_test.bend`: ~4,1× com 16 threads nos dois casos).
-- **Paralelismo, ordem de grandeza:** com trabalho independente e arrays pequenos (784 elementos), 16 threads dão ~4 a 6× (3,2 G mult-soma: 0,88 s em 1 thread, 0,13 s em 22). No produto 100×784×128 em blocos de linhas (`bench/mm_par.bend`), ~2,1× com 8 threads, igual para 2^d = 8 ou 16 blocos. Não depende de blocagem (`bench/mm_tile.bend`: 1, 8, 16 e 32 blocos de colunas, mesmo tempo) nem do custo dos clones (22% do tempo). O `pow2` do guia chega a 8×, então o limite é do tipo de carga. CPU híbrida: o teto prático é menor que 22×.
-- **O tamanho do `Array` custa:** o mesmo produto com arrays de 2^20 casas em vez de 2^17 ficou ~60% mais lento (1,9 s -> 3,1 s para 4 G mult-soma): a profundidade da árvore entra em cada `get`. Alocar o menor array possível.
-- **Distância ao PyTorch no produto 100×784×128:** PyTorch 1 thread = 0,162 ms (62 G mult-soma/s); 16 threads = 0,047 ms (212 G/s). Bend: listas 44 M/s (**~1400× atrás**), `Array` 1 thread 2,3 G/s (**~27× atrás**), `Array` com blocos paralelos ~4,5 G/s (**~47× atrás do PyTorch paralelo**). O que sobra: código escalar contra AVX/FMA com BLAS.
+- **Indexing beats walking the tree:** `Array.get` by index: 2,200 M multiply-adds/s; walking both trees together and rebuilding them (`bench/tree_dot.bend`): 31 M/s (70x worse). In Bend, the fast path of `Array` is the indexed one.
+- **`Array.clone` is cheap** (~17 µs per array of 131,072 elements, with the result's read forced). **The hypothesis "clone shares nodes and reads become contended atomics" was refuted:** 16 tasks reading clones of one pair scale like 16 tasks with private arrays (`bench/share_test.bend`: ~4.1x with 16 threads in both cases).
+- **Parallelism, order of magnitude:** with independent work and small arrays (784 elements), 16 threads give ~4 to 6x (3.2 G multiply-adds: 0.88 s on 1 thread, 0.13 s on 22). On the 100×784×128 product in blocks of rows (`bench/mm_par.bend`), ~2.1x with 8 threads, the same for 2^d = 8 or 16 blocks. It does not depend on tiling (`bench/mm_tile.bend`: 1, 8, 16 and 32 blocks of columns, the same time) nor on the clone cost (22% of the time). The guide's `pow2` reaches 8x, so the limit is the type of workload. Hybrid CPU: the practical ceiling is below 22x.
+- **The size of the `Array` costs:** the same product with arrays of 2^20 slots instead of 2^17 was ~60% slower (1.9 s -> 3.1 s for 4 G multiply-adds): the tree depth enters every `get`. Allocate the smallest possible array.
+- **Distance to PyTorch on the 100×784×128 product:** PyTorch 1 thread = 0.162 ms (62 G multiply-adds/s); 16 threads = 0.047 ms (212 G/s). Bend: lists 44 M/s (**~1400x behind**), `Array` 1 thread 2.3 G/s (**~27x behind**), `Array` with parallel blocks ~4.5 G/s (**~47x behind parallel PyTorch**). What is left: scalar code against AVX/FMA with BLAS.
 
-### Exp. 6: MNIST completo sobre `Array` (`demos/mnist/fast.bend`, 2026-10-04)
+### Exp. 6: full MNIST over `Array` (`demos/mnist/fast.bend`, 2026-10-04)
 
-Matrizes planas em `Array<F32>`, `gemm` com strides (cobre `X·W`, `H·Wᵀ` e `Xᵀ·dZ` sem transpor), bias/relu/máscara/SGD em lugar por índice, softmax e entropia cruzada por linha com listas de 10, lotes lidos do arquivo a cada passo (`File.read_at`). 1 thread.
+Flat matrices in `Array<F32>`, `gemm` with strides (covers `X·W`, `H·Wᵀ` and `Xᵀ·dZ` without transposing), bias/relu/mask/SGD in place by index, softmax and cross-entropy per row with lists of 10, batches read from the file at each step (`File.read_at`). 1 thread.
 
-| 50 lotes | perda | acertos | tempo |
+| 50 batches | loss | hits | time |
 |---|---|---|---|
-| listas (`train.bend`) | 1,6616005 | 7829 | ~42 s |
-| **`Array` (`fast.bend`)** | **1,6616004** | **7829** | **0,9 s** |
-| PyTorch | 1,661600 | 7829 | 0,02 s |
+| lists (`train.bend`) | 1.6616005 | 7829 | ~42 s |
+| **`Array` (`fast.bend`)** | **1.6616004** | **7829** | **0.9 s** |
+| PyTorch | 1.661600 | 7829 | 0.02 s |
 
-| 1 época (600 lotes) | perda | acertos | tempo |
+| 1 epoch (600 batches) | loss | hits | time |
 |---|---|---|---|
-| listas | 0,52047706 | 9129 | 544,3 s |
-| **`Array`** | **0,5204771** | **9129** | **11,5 s** (47× mais rápido) |
-| PyTorch 1 thread | 0,520477 | 9128 | 0,30 s |
-| PyTorch 16 threads | 0,520477 | 9129 | 0,21 s |
+| lists | 0.52047706 | 9129 | 544.3 s |
+| **`Array`** | **0.5204771** | **9129** | **11.5 s** (47x faster) |
+| PyTorch 1 thread | 0.520477 | 9128 | 0.30 s |
+| PyTorch 16 threads | 0.520477 | 9129 | 0.21 s |
 
-Distância ao PyTorch (1 thread): de ~1800× para **~38×**. Correção preservada (mesma perda e mesmos acertos).
-Os ~19 ms por lote se dividem em ~9 ms de `gemm` (20 M mult-soma a 2,3 G/s) e ~10 ms de todo o resto (monta `X` com 78 400 `set`, lê 78 KB, bias/relu/máscara/SGD sobre ~100 mil elementos com get+set).
+Distance to PyTorch (1 thread): from ~1800x to **~38x**. Correctness preserved (same loss and same hits).
+The ~19 ms per batch split into ~9 ms of `gemm` (20 M multiply-adds at 2.3 G/s) and ~10 ms of everything else (builds `X` with 78,400 `set`s, reads 78 KB, bias/relu/mask/SGD over ~100 thousand elements with get+set).
 
-### Exp. 7: `gemm` paralelo no MNIST (`fast.bend` agora usa 2^3 blocos nos dois produtos grandes)
+### Exp. 7: parallel `gemm` in MNIST (`fast.bend` now uses 2^3 blocks in the two large products)
 
-Blocos de linhas de C, cada um com cópia de A e B (`Array.clone`), resultados em listas escritas em C no fim. Mesma correção (50 lotes: 1,6616004 e 7829; época: 0,5204771 e 9129).
+Blocks of rows of C, each with a copy of A and B (`Array.clone`), results in lists written into C at the end. Same correctness (50 batches: 1.6616004 and 7829; epoch: 0.5204771 and 9129).
 
-| 1 época | tempo |
+| 1 epoch | time |
 |---|---|
-| `Array`, sequencial | 11,5 s |
-| `Array`, gemm paralelo, 2^2 blocos, 8 threads | 7,2 s |
-| `Array`, gemm paralelo, 2^3 blocos, 16 threads | **6,3 s** |
-| `Array`, gemm paralelo, 2^4 blocos, 16 threads | 7,5 s |
+| `Array`, sequential | 11.5 s |
+| `Array`, parallel gemm, 2^2 blocks, 8 threads | 7.2 s |
+| `Array`, parallel gemm, 2^3 blocks, 16 threads | **6.3 s** |
+| `Array`, parallel gemm, 2^4 blocks, 16 threads | 7.5 s |
 
-Distância ao PyTorch: 6,3 s contra 0,21 s (16 threads, ~30×) e 0,30 s (1 thread, ~21×). O que sobra é a parte sequencial (carga de dados ~2 s por época; bias/relu/máscara/SGD sobre ~100 mil elementos): lei de Amdahl.
+Distance to PyTorch: 6.3 s against 0.21 s (16 threads, ~30x) and 0.30 s (1 thread, ~21x). What is left is the sequential part (data loading ~2 s per epoch; bias/relu/mask/SGD over ~100 thousand elements): Amdahl's law.
 
-### Exp. 8: pacote `bend-ml-tensor-array` e MNIST com a API tipada (2026-10-04)
+### Exp. 8: the `bend-ml-tensor-array` package and MNIST with the typed API (2026-10-04)
 
-- Publicado: `bend-ml-tensor-array@0.1.0.0` (MIT, `--verdict` ok, sem `@unsafe`). `Mat<r,c>` sobre `Array<F32>` plano; `matmul`, `matmul_nt`, `matmul_tn` com blocos paralelos; bias, relu, `relu_bwd`, SGD, soma de colunas, `softmax_ce`, `count_correct`. 39 verificações contra o PyTorch (`reference/test_tensor_array.py`, erro máximo ≈ 1,4e-6). Importa do BendHub numa pasta limpa.
-- **Erro de shape também no gradiente:** `tensor-array/tests/bad_grad.bend` (`dW` pedido como 128×784 em vez de 784×128) não compila (`docs/shape-error-array-*.txt`).
-- `demos/mnist/fast.bend` agora usa só a API tipada (importando do BendHub): 50 lotes 1,6616004 / 7829; **1 época 0,5204771 / 9129 em 7,6 s** (a versão com kernels crus levava 6,3 s: o custo extra são as conversões lista <-> Array dos wrappers `of_list`/`scale255`, ainda não otimizadas).
-- Regras do Bend aprendidas: `Mat` é `Type` (afim), então `Maybe<&1, Mat<...>>` e não `&2`; um registro `MMul{a, b, c}` por operação resolve o "devolver o que leu"; um padrão aninhado de `&`/`Tuple` em `match` falha ("annotated term (cannot infer)"), use registros com um `type` próprio.
+- Published: `bend-ml-tensor-array@0.1.0.0` (MIT, `--verdict` ok, no `@unsafe`). `Mat<r,c>` over a flat `Array<F32>`; `matmul`, `matmul_nt`, `matmul_tn` with parallel blocks; bias, relu, `relu_bwd`, SGD, column sums, `softmax_ce`, `count_correct`. 39 checks against PyTorch (`reference/test_tensor_array.py`, maximum error ≈ 1.4e-6). Imports from BendHub in a clean folder.
+- **A shape error in the gradient too:** `tensor-array/tests/bad_grad.bend` (`dW` requested as 128×784 instead of 784×128) does not compile (`docs/shape-error-array-*.txt`).
+- `demos/mnist/fast.bend` now uses only the typed API (importing from BendHub): 50 batches 1.6616004 / 7829; **1 epoch 0.5204771 / 9129 in 7.6 s** (the raw-kernels version took 6.3 s: the extra cost is the list <-> Array conversions in the `of_list`/`scale255` wrappers, not yet optimized).
+- Bend rules learned: `Mat` is `Type` (affine), so `Maybe<&1, Mat<...>>` and not `&2`; one record `MMul{a, b, c}` per operation solves "return what it read"; a nested `&`/`Tuple` pattern in `match` fails ("annotated term (cannot infer)"), use records with their own `type`.
 
-### Exp. 9: GPT-2 sobre `Array` e por que paralelizar com cópias não compensa em matriz·vetor (2026-10-04)
+### Exp. 9: GPT-2 over `Array` and why parallelizing with copies does not pay off in matrix · vector (2026-10-04)
 
-`demos/gpt2/fast.bend`: os produtos matriz·vetor (`matmul_nt` com `n = 1`: qkv, projeção, MLP e logits; 124 M mult-soma por token) sobre `bend-ml-tensor-array`; atenção, LayerNorm e GELU continuam em listas. Ids e logits idênticos aos do PyTorch (`reference/test_gpt2.py`, 22 tokens, |Δlogit| ≤ 2e-4).
+`demos/gpt2/fast.bend`: the matrix · vector products (`matmul_nt` with `n = 1`: qkv, projection, MLP and logits; 124 M multiply-adds per token) over `bend-ml-tensor-array`; attention, LayerNorm and GELU stay in lists. Ids and logits identical to PyTorch's (`reference/test_gpt2.py`, 22 tokens, |Δlogit| ≤ 2e-4).
 
-| GPT-2 small, "The capital of France is", 8 tokens | por token | total |
+| GPT-2 small, "The capital of France is", 8 tokens | per token | total |
 |---|---|---|
-| listas (`gpt2.bend`) | ~3 s | 49,8 s (10 s de carga + 8 tokens) |
-| `Array`, produtos em 2^3 blocos de colunas (`par = 3`) | ~1,1 s | 22 s |
-| `Array`, sequencial (`par = 0`) | **~0,1 s** | **11,1 s** (9 s de carga + 1,2 s para os 8 tokens) |
-| PyTorch (CPU, sem KV cache): forward de 11 tokens, 16 threads / 1 thread | 21 ms / 55 ms | 1,3 s no `gpt2_ref.py` (inclui ~1 s de carga dos pesos) |
+| lists (`gpt2.bend`) | ~3 s | 49.8 s (10 s of loading + 8 tokens) |
+| `Array`, products in 2^3 blocks of columns (`par = 3`) | ~1.1 s | 22 s |
+| `Array`, sequential (`par = 0`) | **~0.1 s** | **11.1 s** (9 s of loading + 1.2 s for the 8 tokens) |
+| PyTorch (CPU, no KV cache): forward pass of 11 tokens, 16 threads / 1 thread | 21 ms / 55 ms | 1.3 s in `gpt2_ref.py` (includes ~1 s of weight loading) |
 
-- **Sequencial vence o paralelo por 10×.** Isolei com `bench/mv.bend` (768×2304, 100 repetições): sequencial 0,76 ms por produto (2,3 G mult-soma/s); `par = 3` 10 ms por produto, **igual com 1, 8 ou 16 threads**. A causa é custo, não contenção: cada nó da árvore de tarefas faz `Array.clone` de **toda** a matriz de pesos (28 clones por chamada); clonar custa ~0,1 ns por elemento e, em matriz·vetor, cada peso só é lido uma vez (~0,4 ns), então copiar P vezes custa mais que calcular. Em produto matriz·matriz (MNIST: cada peso é lido 100 vezes) a cópia é desprezível e o paralelismo ganha.
-- Solução futura (não feita): partir a matriz de pesos **sem copiar**, destruturando `ANode{xs, ys}` em subárvores e dando uma a cada tarefa. Exige linhas alinhadas a potência de 2 (preenchimento com zeros, ~1,3 a 1,8× de memória).
-- Distância ao PyTorch: de ~150× por token (v1: 3 s contra 21 ms) para **~5×** (v2: ~0,1 s contra 21 ms, 16 threads) e ~2× contra o PyTorch de 1 thread (55 ms). **Correção:** uma versão anterior desta nota estimava o PyTorch em ~0,15 s por token; era o tempo total dividido por 8 (inclui carregar pesos), não o *forward*. O total do Bend ainda é dominado pela carga dos pesos (9 s contra ~1 s).
-- Memória: o processo chega a ~10 GB durante a carga (árvores de nós, não vetores contíguos).
+- **Sequential beats parallel by 10x.** Isolated with `bench/mv.bend` (768×2304, 100 repetitions): sequential 0.76 ms per product (2.3 G multiply-adds/s); `par = 3` 10 ms per product, **the same with 1, 8 or 16 threads**. The cause is cost, not contention: each node of the task tree does an `Array.clone` of the **whole** weight matrix (28 clones per call); cloning costs ~0.1 ns per element and, in matrix · vector, each weight is read only once (~0.4 ns), so copying P times costs more than computing. In matrix · matrix products (MNIST: each weight is read 100 times) the copy is negligible and parallelism wins.
+- Future solution (not done): split the weight matrix **without copying**, destructuring `ANode{xs, ys}` into subtrees and giving one to each task. It requires rows aligned to a power of 2 (zero padding, ~1.3 to 1.8x memory).
+- Distance to PyTorch: from ~150x per token (v1: 3 s against 21 ms) to **~5x** (v2: ~0.1 s against 21 ms, 16 threads) and ~2x against 1-thread PyTorch (55 ms). **Correction:** an earlier version of this note estimated PyTorch at ~0.15 s per token; that was the total time divided by 8 (it includes loading weights), not the *forward pass*. Bend's total is still dominated by weight loading (9 s against ~1 s).
+- Memory: the process reaches ~10 GB while loading (trees of nodes, not contiguous vectors).
 
-### MNIST final com a API tipada (3 execuções, 16 threads; `demos/mnist/fast.bend`, `bend-ml-tensor-array@0.1.1.0`)
+### Final MNIST with the typed API (3 runs, 16 threads; `demos/mnist/fast.bend`, `bend-ml-tensor-array@0.1.1.0`)
 
-| | 1 época | 3 épocas (perda / acertos) |
+| | 1 epoch | 3 epochs (loss / hits) |
 |---|---|---|
-| v1, listas | 544,3 s | |
-| v2, `Array` tipado, 16 threads | **6,6 s** (6,6 / 6,7 / 6,6) | 0,5204771 / 9129; 0,27043572 / 9298; 0,2156194 / 9418 |
-| v2, `Array` tipado, 1 thread | 18,1 s | |
-| PyTorch (16 threads) | 0,19 a 0,21 s | 0,520477 / 9129; 0,270433 / 9298; 0,215613 / 9418 |
+| v1, lists | 544.3 s | |
+| v2, typed `Array`, 16 threads | **6.6 s** (6.6 / 6.7 / 6.6) | 0.5204771 / 9129; 0.27043572 / 9298; 0.2156194 / 9418 |
+| v2, typed `Array`, 1 thread | 18.1 s | |
+| PyTorch (16 threads) | 0.19 to 0.21 s | 0.520477 / 9129; 0.270433 / 9298; 0.215613 / 9418 |
 
-Ganho de ~82× sobre a v1; distância ao PyTorch (16 threads) ~33×, (1 thread, 0,30 s) ~22×. Mesmas perdas e acertos nas três épocas.
+A ~82x gain over v1; distance to PyTorch (16 threads) ~33x, (1 thread, 0.30 s) ~22x. The same losses and hits across the three epochs.
 
-### Eixo 2 (garantias) e fecho da v2 (2026-10-04)
+### Axis 2 (guarantees) and closing v2 (2026-10-04)
 
-- **`bend-ml-bpe-tokenizer@0.1.1.0`** (publicado): `train_wf` (a tabela de `train` é sempre bem formada, por indução sobre `train.go` com o invariante "todos os ids já usados são menores que o próximo", usando 4 lemas de `Nat`: `lt_succ`, `lt_ne`, `lt_up`, e de lista: `below_has`, `below_up`, `below_cons`, `below_fresh`) e `roundtrip_trained` (consequência direta: roundtrip para qualquer tabela treinada, sem hipótese). `--verdict` ok. Importado do BendHub numa pasta limpa, com a lei aplicada.
-- O README do `bpe` declarava "train não tem prova"; agora tem.
-- Pacotes na v2: nat-lemmas 0.1.0.0, bpe 0.1.1.0, tensor 0.1.1.0, **tensor-array 0.1.1.0 (novo)**, autograd 0.1.0.0. `reference/check_all.py`: 27/27 (rápido) e 32/32 (`--full`).
-- Pendências para o Renan: (1) revisar o tom da thread e gravar o vídeo (`docs/launch/`); (2) se quiser a GPU, instalar o CUDA 12 em `/usr/local/cuda` e eu meço o `!`; (3) o ganho paralelo em matriz·vetor exige particionar o `Array` sem copiar (ideia na exp. 9) — vale um relato ao time do Bend: `Array.clone` é O(n) e `Array.fork` é `@unsafe`.
+- **`bend-ml-bpe-tokenizer@0.1.1.0`** (published): `train_wf` (the table from `train` is always well formed, by induction over `train.go` with the invariant "all ids already used are smaller than the next one", using 4 `Nat` lemmas: `lt_succ`, `lt_ne`, `lt_up`, and list lemmas: `below_has`, `below_up`, `below_cons`, `below_fresh`) and `roundtrip_trained` (a direct consequence: roundtrip for any trained table, no hypothesis). `--verdict` ok. Imported from BendHub in a clean folder, with the law applied.
+- The `bpe` README used to say "train has no proof"; now it does.
+- Packages in v2: nat-lemmas 0.1.0.0, bpe 0.1.1.0, tensor 0.1.1.0, **tensor-array 0.1.1.0 (new)**, autograd 0.1.0.0. `reference/check_all.py`: 27/27 (quick) and 32/32 (`--full`).
+- Pending for Renan: (1) review the tone of the thread and record the video (`docs/launch/`); (2) if you want the GPU, install CUDA 12 at `/usr/local/cuda` and I will measure `!`; (3) the parallel gain in matrix · vector requires partitioning the `Array` without copying (idea in exp. 9) — worth a report to the Bend team: `Array.clone` is O(n) and `Array.fork` is `@unsafe`.
+- **Finding for the GPU attempt:** the Bend binary honors the `CUDA_HOME` environment variable (default `/usr/local/cuda`) and only needs `include/nvrtc.h` (plus `cuda.h`) and `lib64/libnvrtc` from that directory, then links with `-lcuda -lnvrtc`. A user-local CUDA 12 toolkit could therefore be tried without sudo. Not done.
