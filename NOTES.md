@@ -244,3 +244,10 @@ Blocos de linhas de C, cada um com cópia de A e B (`Array.clone`), resultados e
 | `Array`, gemm paralelo, 2^4 blocos, 16 threads | 7,5 s |
 
 Distância ao PyTorch: 6,3 s contra 0,21 s (16 threads, ~30×) e 0,30 s (1 thread, ~21×). O que sobra é a parte sequencial (carga de dados ~2 s por época; bias/relu/máscara/SGD sobre ~100 mil elementos): lei de Amdahl.
+
+### Exp. 8: pacote `bend-ml-tensor-array` e MNIST com a API tipada (2026-10-04)
+
+- Publicado: `bend-ml-tensor-array@0.1.0.0` (MIT, `--verdict` ok, sem `@unsafe`). `Mat<r,c>` sobre `Array<F32>` plano; `matmul`, `matmul_nt`, `matmul_tn` com blocos paralelos; bias, relu, `relu_bwd`, SGD, soma de colunas, `softmax_ce`, `count_correct`. 39 verificações contra o PyTorch (`reference/test_tensor_array.py`, erro máximo ≈ 1,4e-6). Importa do BendHub numa pasta limpa.
+- **Erro de shape também no gradiente:** `tensor-array/tests/bad_grad.bend` (`dW` pedido como 128×784 em vez de 784×128) não compila (`docs/shape-error-array-*.txt`).
+- `demos/mnist/fast.bend` agora usa só a API tipada (importando do BendHub): 50 lotes 1,6616004 / 7829; **1 época 0,5204771 / 9129 em 7,6 s** (a versão com kernels crus levava 6,3 s: o custo extra são as conversões lista <-> Array dos wrappers `of_list`/`scale255`, ainda não otimizadas).
+- Regras do Bend aprendidas: `Mat` é `Type` (afim), então `Maybe<&1, Mat<...>>` e não `&2`; um registro `MMul{a, b, c}` por operação resolve o "devolver o que leu"; um padrão aninhado de `&`/`Tuple` em `match` falha ("annotated term (cannot infer)"), use registros com um `type` próprio.
