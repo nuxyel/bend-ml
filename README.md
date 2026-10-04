@@ -52,7 +52,7 @@ v1 used linked lists for the matrices and measured ~1800x PyTorch on MNIST. v2 m
 - **Reviewing the claims:** [`docs/AUDIT.md`](docs/AUDIT.md) lists the trust base and a checklist; `reference/list_laws.py` prints every law statement.
 - **Proved by the kernel** (`bend X.bend --verdict`): the laws above, in five packages. No `@unsafe`, no `?TODO`, in any of them.
 - **By the type**: the shapes of `matmul`, of each layer gradient (`dW: Mat<i,o>`) and `reshape` with a proof. The whole MNIST training step is checked this way.
-- **Tested, not proved**: all `F32` numerics (it is not a real number; it rounds). Gradient checking and comparison with PyTorch live in `reference/`. The tokenizer is exact on ASCII; bytes ≥ 128 count as letters in the GPT-2 pre-tokenizer.
+- **Tested, not proved**: all `F32` numerics (it is not a real number; it rounds). Gradient checking and comparison with PyTorch live in `reference/`. The GPT-2 tokenizer is checked against `tiktoken` on ASCII, accented text, symbols, emoji, CJK and random Unicode.
 
 ## Quick start
 
@@ -83,7 +83,7 @@ Data and weights preparation: [`reference/`](reference) (`gpt2_prep.py`, `mnist_
 - **Memory:** the GPT-2 weights become trees of nodes (~10 GB while loading, 9 s).
 - Only `Nat`, `U32` and `F32`; no `F64`.
 - `Mat<r,c>` does not carry the invariant "the `Array` has capacity ≥ r*c" in its type: the constructors guarantee it, but it is not a fact of the type.
-- The GPT-2 pre-tokenizer treats every byte ≥ 128 as a letter (exact for accented letters and other alphabets).
+- The GPT-2 pre-tokenizer classifies code points with a table generated from Unicode (`\s`, `\p{L}`, `\p{N}`) up to U+1FFFF; code points above that, and invalid UTF-8 bytes, count as letters.
 
 ## Structure
 

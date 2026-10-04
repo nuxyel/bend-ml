@@ -1,12 +1,15 @@
 # GPT-2 tokenizer in Bend: pre-tokenizer (the GPT-2 regex over bytes) + the 50,000
 # merge rules, applied with the bend-ml-bpe-tokenizer package (proved roundtrip).
 #
-# Known limit: the pre-tokenizer classifies ASCII bytes exactly; every byte >= 128
-# (multibyte UTF-8) counts as a LETTER. That matches the regex for accented letters and
-# other alphabets, but does not split Unicode symbols that are not letters (em dash, emoji).
+# The pre-tokenizer decodes UTF-8 and classifies every code point like the regex does
+# (\s, \p{L}, \p{N}); the classes of code points >= 128 come from unicode.bend, which
+# reference/gen_unicode_table.py generates with the `regex` module. Known limits: code points
+# above U+1FFFF count as letters, and so do CJK ideographs and Hangul (they are letters in
+# Unicode, so this is exact); invalid UTF-8 bytes count as letters.
 
 import Base
 import bend-ml-bpe-tokenizer@0.1.2.0/main.bend as BPE
+import ./unicode.bend as U
 
 # ---- reading files ----
 
@@ -137,9 +140,12 @@ def gids(+perm: List<&2, Nat>, xs: List<&2, BPE.Tk>) -> List<&2, Nat>:
     case Con{h, t}:
       gid(perm, h) <> gids(perm, t)
 
-# ---- pre-tokenizer: the GPT-2 regex over bytes ----
+# ---- pre-tokenizer: the GPT-2 regex over UTF-8 ----
 #   's|'t|'re|'ve|'m|'ll|'d | ?\p{L}+ | ?\p{N}+ | ?[^\s\p{L}\p{N}]+ | \s+(?!\S) | \s+
-# classes: 0 letter (ASCII or byte >= 128), 1 digit, 2 other, 3 whitespace, 4 end of list
+# The text is first TAGGED: every byte b becomes b + 256*class + 2048*continuation, where
+# the class is the one of its code point (0 letter, 1 digit, 2 other, 3 whitespace; 4 means
+# end of list) and continuation marks the 2nd, 3rd and 4th byte of a multibyte character.
+# The pre-tokenizer then works on the classes; the tags are removed before the BPE.
 
 def sel(b: Bool, x: Nat, y: Nat) -> Nat:
   match b:
@@ -151,8 +157,98 @@ def sel(b: Bool, x: Nat, y: Nat) -> Nat:
 def in_range(+c: U32, +lo: U32, +hi: U32) -> Bool:
   Bool.and(U32.is_le(lo, c), U32.is_le(c, hi))
 
+# class of an ASCII byte
+def class_ascii(+c: U32) -> Nat:
+  sel(Bool.or(in_range(c, 65, 90), in_range(c, 97, 122)), 0n, sel(in_range(c, 48, 57), 1n, sel(Bool.or(Bool.or(U32.is_eq(c, 32), in_range(c, 9, 13)), in_range(c, 28, 31)), 3n, 2n)))
+
+# class of a code point >= 128: the first range of the sorted table that does not end before it
+def after_h(+cp: U32, t: List<&2, U32>) -> Bool:
+  match t:
+    case Con{lo, Con{+hi, rest}}:
+      U32.is_lt(hi, cp)
+    case _:
+      False{}
+
+def inside_h(+cp: U32, t: List<&2, U32>) -> Bool:
+  match t:
+    case Con{+lo, Con{+hi, rest}}:
+      in_range(cp, lo, hi)
+    case _:
+      False{}
+
+def cls_go(+cp: U32, tbl: List<&2, U32>, aft: Bool, ins: Bool) -> Nat:
+  match tbl aft ins:
+    case Con{lo, Con{hi, Con{c, +rest}}} True{} _:
+      cls_go(cp, rest, after_h(cp, rest), inside_h(cp, rest))
+    case Con{lo, Con{hi, Con{+c, rest}}} False{} True{}:
+      U32.to_nat(c)
+    case _ _ _:
+      0n
+
+def cls_cp(+tbl: List<&2, U32>, +cp: U32) -> Nat:
+  cls_go(cp, tbl, after_h(cp, tbl), inside_h(cp, tbl))
+
+def class_cp(+tbl: List<&2, U32>, +cp: U32) -> Nat:
+  sel(U32.is_lt(cp, 128), class_ascii(cp), cls_cp(tbl, cp))
+
+# length of the UTF-8 character that starts with byte c (1 for stray or invalid bytes)
+def clen(+c: U32) -> Nat:
+  sel(U32.is_lt(c, 192), 1n, sel(U32.is_lt(c, 224), 2n, sel(U32.is_lt(c, 240), 3n, sel(U32.is_lt(c, 248), 4n, 1n))))
+
+def byte_at(xs: List<&2, U32>, i: Nat) -> U32:
+  match xs i:
+    case Con{h, t} 0n:
+      h
+    case Con{h, t} 1n+p:
+      byte_at(t, p)
+    case Nil{} _:
+      0
+
+def cont_bits(+x: U32) -> U32:
+  U32.mod(x, 64)
+
+# the code point of the character of n bytes at the start of xs
+def cp_of(+n: Nat, +xs: List<&2, U32>) -> U32:
+  match n:
+    case 2n:
+      U32.add(U32.mul(U32.mod(byte_at(xs, 0n), 32), 64), cont_bits(byte_at(xs, 1n)))
+    case 3n:
+      U32.add(U32.add(U32.mul(U32.mod(byte_at(xs, 0n), 16), 4096), U32.mul(cont_bits(byte_at(xs, 1n)), 64)), cont_bits(byte_at(xs, 2n)))
+    case 4n:
+      U32.add(U32.add(U32.add(U32.mul(U32.mod(byte_at(xs, 0n), 8), 262144), U32.mul(cont_bits(byte_at(xs, 1n)), 4096)), U32.mul(cont_bits(byte_at(xs, 2n)), 64)), cont_bits(byte_at(xs, 3n)))
+    case _:
+      byte_at(xs, 0n)
+
+def tagged(+b: U32, +cls: Nat, +cont: Bool) -> U32:
+  U32.add(U32.add(b, U32.mul(U32.from_nat(cls), 256)), U32.mul(U32.from_nat(sel(cont, 1n, 0n)), 2048))
+
+# tags the first n bytes of xs (the 1st is not a continuation), then continues with `rest`
+def emit(n: Nat, +cls: Nat, +cont: Bool, xs: List<&2, U32>, rest: List<&2, U32>) -> List<&2, U32>:
+  match n xs:
+    case 1n+p Con{b, t}:
+      tagged(b, cls, cont) <> emit(p, cls, True{}, t, rest)
+    case _ _:
+      rest
+
+def n_of(+xs: List<&2, U32>) -> Nat:
+  clen(byte_at(xs, 0n))
+
+def cls_head(+tbl: List<&2, U32>, +xs: List<&2, U32>) -> Nat:
+  class_cp(tbl, cp_of(n_of(xs), xs))
+
+# fuel >= number of bytes left; n and cls describe the character at the start of xs
+def tag(fuel: Nat, +tbl: List<&2, U32>, +xs: List<&2, U32>, +n: Nat, +cls: Nat) -> List<&2, U32>:
+  match fuel xs:
+    case 1n+p Con{b, t}:
+      emit(n, cls, False{}, xs, tag(p, tbl, List.drop(&2, U32, xs, n), n_of(List.drop(&2, U32, xs, n)), cls_head(tbl, List.drop(&2, U32, xs, n))))
+    case _ _:
+      Nil{}
+
+def tag_all(+tbl: List<&2, U32>, +xs: List<&2, U32>) -> List<&2, U32>:
+  tag(List.length(&2, U32, xs), tbl, xs, n_of(xs), cls_head(tbl, xs))
+
 def class_of(+c: U32) -> Nat:
-  sel(U32.is_le(128, c), 0n, sel(Bool.or(in_range(c, 65, 90), in_range(c, 97, 122)), 0n, sel(in_range(c, 48, 57), 1n, sel(Bool.or(U32.is_eq(c, 32), in_range(c, 9, 13)), 3n, 2n))))
+  U32.to_nat(U32.mod(U32.div(c, 256), 8))
 
 def head_class(xs: List<&2, U32>) -> Nat:
   match xs:
@@ -166,7 +262,7 @@ def head_u32(xs: List<&2, U32>) -> U32:
     case Nil{}:
       0
     case Con{c, t}:
-      c
+      U32.mod(c, 256)
 
 def tail_l(xs: List<&2, U32>) -> List<&2, U32>:
   match xs:
@@ -202,19 +298,27 @@ def prepend(c: U32, p: List<&2, U32> & List<&2, U32>) -> List<&2, U32> & List<&2
 
 # whitespace: \s+(?!\S) leaves the last space for the next token if something follows
 
-def ws4(long: Bool, +run: List<&2, U32>, +rest: List<&2, U32>, +n: Nat) -> List<&2, U32> & List<&2, U32>:
+# number of bytes of the last character of xs (1 + trailing continuation bytes)
+def lcl(xs: List<&2, U32>, cur: Nat) -> Nat:
+  match xs:
+    case Nil{}:
+      cur
+    case Con{+h, t}:
+      lcl(t, sel(U32.is_eq(U32.div(h, 2048), 1), Nat.add(1n, cur), 1n))
+
+def ws4(long: Bool, +run: List<&2, U32>, +rest: List<&2, U32>, +n: Nat, +m: Nat) -> List<&2, U32> & List<&2, U32>:
   match long:
     case False{}:
       (run, rest)
     case True{}:
-      (List.take(&2, U32, run, Nat.sub(n, 1n)), List.append(&2, U32, List.drop(&2, U32, run, Nat.sub(n, 1n)), rest))
+      (List.take(&2, U32, run, Nat.sub(n, m)), List.append(&2, U32, List.drop(&2, U32, run, Nat.sub(n, m)), rest))
 
 def ws3(+run: List<&2, U32>, +rest: List<&2, U32>, ends: Bool, +n: Nat) -> List<&2, U32> & List<&2, U32>:
   match ends:
     case True{}:
       (run, rest)
     case False{}:
-      ws4(Nat.is_lt(1n, n), run, rest, n)
+      ws4(Nat.is_lt(lcl(run, 0n), n), run, rest, n, lcl(run, 0n))
 
 def ws2(p: List<&2, U32> & List<&2, U32>) -> List<&2, U32> & List<&2, U32>:
   match p:
@@ -245,7 +349,7 @@ def next_token(+xs: List<&2, U32>) -> List<&2, U32> & List<&2, U32>:
     case Nil{}:
       (Nil{}, Nil{})
     case Con{+c, t}:
-      nt(kind_of(contr_len(xs), class_of(c), U32.is_eq(c, 32), head_class(t)), xs, contr_len(xs))
+      nt(kind_of(contr_len(xs), class_of(c), U32.is_eq(U32.mod(c, 256), 32), head_class(t)), xs, contr_len(xs))
 
 # splits the text into words; `fuel` >= number of tokens; pr = next_token(xs)
 
@@ -270,7 +374,7 @@ def nats_of(xs: List<&2, U32>) -> List<&2, Nat>:
     case Nil{}:
       Nil{}
     case Con{+h, t}:
-      U32.to_nat(h) <> nats_of(t)
+      U32.to_nat(U32.mod(h, 256)) <> nats_of(t)
 
 def encode_words(+table: List<&2, BPE.Rule>, +perm: List<&2, Nat>, ws: List<&2, List<&2, U32>>) -> List<&2, Nat>:
   match ws:
@@ -279,8 +383,8 @@ def encode_words(+table: List<&2, BPE.Rule>, +perm: List<&2, Nat>, ws: List<&2, 
     case Con{w, t}:
       List.append(&2, Nat, gids(perm, BPE.encode(table, BPE.lift(nats_of(w)))), encode_words(table, perm, t))
 
-def encode_text(+table: List<&2, BPE.Rule>, +perm: List<&2, Nat>, bs: List<&2, U32>) -> List<&2, Nat>:
-  encode_words(table, perm, pretok(bs))
+def encode_text(+table: List<&2, BPE.Rule>, +perm: List<&2, Nat>, +bs: List<&2, U32>) -> List<&2, Nat>:
+  encode_words(table, perm, pretok(tag_all(U.non_letters(), bs)))
 
 # ---- test CLI: ids of the text in a file ----
 

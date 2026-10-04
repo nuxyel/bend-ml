@@ -32,6 +32,23 @@ CASES = [
     "Привет мир, как дела? Это тест токенизатора.",
     "你好，世界！这是一个测试。 こんにちは世界",
     "mixed English и русский 中文 español português in one line",
+    "Wait — what? That’s “quoted” text… isn’t it?",
+    "Price: €25, £30, ¥500, ₹99 and 100%",
+    "arrows → ← ↔ ⇒ and math ∑ ∫ ≠ ≤ ≥ ∞ ± × ÷",
+    "┌──────┐\n│ box  │\n└──────┘",
+    "emoji 😀🎉 and flags 🇧🇷 and 👨‍👩‍👧 family ❤️ ok",
+    "non\u00a0breaking\u00a0space and ideographic\u3000space\u3000\u3000end",
+    "trailing nbsp\u00a0\u00a0",
+    "tab\t\u2003em space\u2003\u2003x",
+    "日本語、テスト。「引用」（括弧）！？ 中文，标点：全角ＡＢＣ１２３",
+    "cafe\u0301 vs café, naïve, über, Привет, мир! γειά σου, שלום, مرحبا",
+    "x² + y³ = z¹⁰, ½ ¼, ①②③, ٣٤٥ ४५६",
+    "«guillemets» ¿qué? ¡hola! §3 ¶ © ® ™ ° µ",
+    "bullet • dot · ellipsis … dagger † ‡ per mille ‰",
+    "snake_case and CamelCase, 3.14159 and 1,000,000 and 0xFF",
+    "it's we've they'll I'd you're can't 'quoted'",
+    "mixed 🙂text🙂 with—dashes–and_underscores",
+    "\u200bzero width\u200b joiner\u200d here",
     "x" * 300,
     "ab" * 150,
     "word " * 120,
@@ -42,7 +59,24 @@ CASES = [
 ]
 
 
+def random_unicode(rng, n):
+    """Random text mixing ASCII, spaces and code points from every plane the table covers."""
+    pools = [(32, 126), (32, 32), (0xA0, 0x24F), (0x300, 0x36F), (0x370, 0x5FF), (0x2000, 0x2BFF),
+             (0x3000, 0x30FF), (0xFF00, 0xFFEF), (0x1F300, 0x1FAFF), (0x4E00, 0x4F00)]
+    out = []
+    for _ in range(n):
+        lo, hi = rng.choice(pools)
+        cp = rng.randint(lo, hi)
+        if 0xD800 <= cp <= 0xDFFF:
+            continue
+        out.append(chr(cp))
+    return "".join(out)
+
+
 def main():
+    import random
+    rng = random.Random(int(os.environ.get("FUZZ_SEED", "7")))
+    CASES.extend(random_unicode(rng, rng.randint(1, 40)) for _ in range(int(os.environ.get("FUZZ_CASES", "30"))))
     enc = tiktoken.get_encoding("gpt2")
     failures = 0
     with tempfile.TemporaryDirectory() as d:
