@@ -3,7 +3,18 @@ import os, re, subprocess, sys
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PY = os.path.join(ROOT, "reference/.venv/bin/python")
 EXE = sys.argv[1]
-CASES = [("The capital of France is", 8), ("Machine learning is", 8), ("1, 2, 3, 4,", 6)]
+CASES = [
+    ("The capital of France is", 8),
+    ("Machine learning is", 8),
+    ("1, 2, 3, 4,", 6),
+    ("def fibonacci(n):", 12),
+    ("Once upon a time", 32),                      # a longer generation: exercises the KV cache
+    ("The quick brown fox jumps over the lazy dog. The", 10),
+    ("Q: What is 2 + 2?\nA:", 8),
+    ("Paris is the capital of", 6),
+    ("In 1969, humans first", 10),
+    ("import numpy as np\n\n", 10),
+]
 TOL = 5e-2  # the logits have magnitude ~100; F32 accumulated over 12 layers
 
 
