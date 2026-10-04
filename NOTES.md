@@ -153,3 +153,18 @@ Demos relevantes para nós: `proof_numerics` (prova de `add_comm`, `add_assoc`, 
 - Leis: `reshape_swap` (r·c = c·r) e `reshape_flat` (r·c = 1·(r·c)), provadas com `mul_comm` e `mul_one_l` do nat-lemmas publicado.
 - Testes numéricos: `reference/test_tensor.py` compara com PyTorch: matmul (4 formas), transpose, relu, softmax (inclusive valores ±1000), gelu (tanh), layernorm. Máximo erro ≈ 1e-6, 0 falhas.
 - Regras novas: parâmetro usado também no tipo conta como uso (precisa `+` se for usado de novo); defs precisam vir antes do uso (nada de ordem livre); `match` na ordem dos binders.
+
+## v0.5 — bend-ml-autograd (2026-10-03)
+
+- Publicado: `bend-ml-autograd@0.1.0.0`, hash `0x174ef0d27bc1c621ddb9961c7f224de1`. `ALL PROOFS CHECK` e `--verdict` OK.
+- **Lei provada `reverse_eq_forward`**: modo reverso == modo direto do autodiff, sobre expressões de `Nat` (constantes, X, soma, produto). Prova por indução do resultado mais forte `reverso(e,g) = g × direto(e)`, usando `mul_comm`, `mul_assoc`, `mul_dist`, `mul_zero`, `mul_one_*` do nat-lemmas publicado e uma `dist_l` derivada (distributividade à esquerda).
+- Autograd de escalares em `F32` (GCst, GVar, GAdd, GMul, GRelu, GTanh, GExp) e camadas com backward tipado (`linear_bwd` devolve `Mat<n,i> & (Mat<i,o> & Vec<o>)`; trocar uma dimensão não compila).
+- Gradient checking: `reference/test_autograd.py` compara com o autograd do PyTorch, 21 verificações (5 expressões × 3 pontos, linear_bwd ×3, relu_bwd, cross-entropy ×2), erro máximo ≈ 5e-7, 0 falhas.
+- Bend: argumentos negativos na linha de comando precisam de `--` (`bend cli.bend -- scalar 1 -1.3 ...`).
+
+## v0.6 — MNIST (em andamento)
+
+- `demos/mnist/train.bend` (MLP 784-128-10, SGD, lotes de 100) e o gêmeo `reference/mnist_torch.py` com os mesmos pesos iniciais (`demos/mnist/data/init/*.txt`) e mesma ordem de lotes.
+- **Validação de corretude:** após 50 passos, Bend: `loss_treino=1.6616005`, `7829/10000`; PyTorch: `loss_treino=1.661600`, `acc_teste=0.7829`. Idênticos.
+- Desempenho (honesto): ~0,84 s por lote de 100 numa thread (≈ 24 M mult-soma/s efetivos). O paralelismo de `x y = f g` escala bem no `pow2` (8× com 16 threads), mas o `matmul` por linhas em listas só chegou a ~1,8× (com ou sem compartilhamento de dados); causa não resolvida. O `bend -o` + `--threads N` é o mecanismo.
+- `tensor@0.1.1.0` acrescenta `Mat.matmul_t` (operando já transposto) para o GPT-2.
