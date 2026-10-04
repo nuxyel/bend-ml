@@ -1,6 +1,6 @@
 # bend-ml-nat-lemmas: Nat and List lemmas, proved, that Bend's Base does not have.
 #
-#   import bend-ml-nat-lemmas@0.1.0.0/main.bend as NL
+#   import bend-ml-nat-lemmas@0.1.1.0/main.bend as NL
 #   NL.add_comm(a, b)   NL.mul_assoc(a, b, c)   NL.product_append(xs, ys) ...
 #
 # Each `law` states a fact; the `def` right below it is the proof, checked by the kernel.
