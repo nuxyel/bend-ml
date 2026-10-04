@@ -1,11 +1,11 @@
 # bend-ml
 
-**Machine learning em [Bend 2](https://bend-lang.com), onde um erro de shape é um erro de tipo.**
+**Machine learning in [Bend 2](https://bend-lang.com), where a shape error is a type error.**
 
-Cinco pacotes publicados no BendHub, uma MLP no MNIST e o GPT-2 small (124 M) inteiros em Bend, com as provas verificadas pelo kernel do Bend e os números conferidos contra PyTorch e `tiktoken`. Versão do Bend: **2.0.35**.
+Five packages published on BendHub, an MNIST MLP and GPT-2 small (124 M), all written in Bend, with proofs verified by Bend's kernel and numbers checked against PyTorch and `tiktoken`. Bend version: **2.0.35**.
 
 ```python
-# (2x3) · (4x5): não compila
+# (2x3) · (4x5): does not compile
 def bad() -> TA.MMul<2n, 3n, 5n>:
   TA.Mat.matmul(2n, 3n, 5n, 0n, TA.Mat.zeros(2n, 3n), TA.Mat.zeros(4n, 5n))
 ```
@@ -15,73 +15,73 @@ Error:
 - observed : TA.Mat<4n, 5n>
 ```
 
-## Pacotes no BendHub
+## Packages on BendHub
 
-| Pacote | Versão | O que é | LAWS provadas |
+| Package | Version | What it is | Proved LAWS |
 |---|---|---|---|
-| [`bend-ml-nat-lemmas`](nat-lemmas) | 0.1.0.0 | Lemas de `Nat` e `List` que a Base não tem | `add_comm`, `add_assoc`, `mul_comm`, `mul_assoc`, `mul_dist`, `append_assoc`, `length_append`, `product_append`... (15) |
-| [`bend-ml-bpe-tokenizer`](bpe) | 0.1.1.0 | Tokenizer BPE byte-level (estilo GPT-2) | **roundtrip** `decode(encode(s)) = s`, `vocab_bound`, `dec_append`, **`train_wf`** (o `train` sempre gera tabela bem formada) e **`roundtrip_trained`** (roundtrip para qualquer tabela treinada, sem hipótese) |
-| [`bend-ml-tensor`](tensor) | 0.1.1.0 | `Vec<n>` e `Mat<r,c>` com shape no tipo, sobre listas | `reshape_swap`, `reshape_flat`; `reshape` só compila com a prova de que o nº de elementos não muda |
-| [`bend-ml-tensor-array`](tensor-array) | 0.1.1.0 | **Novo na v2.** `Mat<r,c>` sobre `Array<F32>` plano, mesma garantia de shape, **~50× mais rápido** | produtos `matmul`, `matmul_nt`, `matmul_tn` (a forma de `dW = Xᵀ·dY` é conferida pelo tipo), blocos paralelos |
-| [`bend-ml-autograd`](autograd) | 0.1.0.0 | Diferenciação automática e camadas com backward tipado | **`reverse_eq_forward`**: o modo reverso do autodiff dá o mesmo que o modo direto |
+| [`bend-ml-nat-lemmas`](nat-lemmas) | 0.1.1.0 | `Nat` and `List` lemmas that Base does not have | `add_comm`, `add_assoc`, `mul_comm`, `mul_assoc`, `mul_dist`, `append_assoc`, `length_append`, `product_append`... (15) |
+| [`bend-ml-bpe-tokenizer`](bpe) | 0.1.2.0 | Byte-level BPE tokenizer (GPT-2 style) | **roundtrip** `decode(encode(s)) = s`, `vocab_bound`, `dec_append`, **`train_wf`** (`train` always produces a well-formed table) and **`roundtrip_trained`** (roundtrip for any trained table, no hypothesis) |
+| [`bend-ml-tensor`](tensor) | 0.1.2.0 | `Vec<n>` and `Mat<r,c>` with the shape in the type, over lists | `reshape_swap`, `reshape_flat`; `reshape` only compiles with a proof that the number of elements does not change |
+| [`bend-ml-tensor-array`](tensor-array) | 0.1.2.0 | **New in v2.** `Mat<r,c>` over a flat `Array<F32>`, the same shape guarantee, **~50x faster** | the products `matmul`, `matmul_nt`, `matmul_tn` (the shape of `dW = Xᵀ·dY` is checked by the type), parallel blocks |
+| [`bend-ml-autograd`](autograd) | 0.1.1.0 | Automatic differentiation and layers with typed backward | **`reverse_eq_forward`**: the reverse mode of autodiff gives the same result as the forward mode |
 
 ```python
-import bend-ml-tensor-array@0.1.1.0/main.bend as TA
-import bend-ml-bpe-tokenizer@0.1.1.0/main.bend as BPE
+import bend-ml-tensor-array@0.1.2.0/main.bend as TA
+import bend-ml-bpe-tokenizer@0.1.2.0/main.bend as BPE
 ```
 
 ## Demos (v2)
 
-| Demo | Resultado |
+| Demo | Result |
 |---|---|
-| [MNIST](demos/mnist) (MLP 784-128-10) | **6,6 s por época** (v1: 544 s). Perda e acertos **idênticos** ao PyTorch com os mesmos pesos e lotes: 0,5204771 / 9129, depois 0,27043572 / 9298, depois 0,2156194 / 9418. O PyTorch leva 0,2 a 0,3 s por época ([benchmark honesto](demos/mnist/BENCHMARK.md)). |
-| [GPT-2 small](demos/gpt2) (124 M) | **~0,1 s por token** (v1: 3 s). Gera os **mesmos tokens** que o PyTorch (22 tokens, 3 prompts), logits a menos de 2e-4. O PyTorch faz o forward em 21 ms (16 threads) ou 55 ms (1 thread); carregar os pesos leva 9 s no Bend ([detalhes](demos/gpt2/BENCHMARK.md)). Tokenizer idêntico ao `tiktoken` em 16/16 textos. |
+| [MNIST](demos/mnist) (784-128-10 MLP) | **6.6 s per epoch** (v1: 544 s). Loss and hits **identical** to PyTorch with the same weights and batches: 0.5204771 / 9129, then 0.27043572 / 9298, then 0.2156194 / 9418. PyTorch takes 0.2 to 0.3 s per epoch ([honest benchmark](demos/mnist/BENCHMARK.md)). |
+| [GPT-2 small](demos/gpt2) (124 M) | **~0.1 s per token** (v1: 3 s). It generates the **same tokens** as PyTorch (22 tokens, 3 prompts), logits within 2e-4. PyTorch does the forward pass in 21 ms (16 threads) or 55 ms (1 thread); loading the weights takes 9 s in Bend ([details](demos/gpt2/BENCHMARK.md)). Tokenizer identical to `tiktoken` on 16/16 texts. |
 
 ```
 $ ./gpt2_fast "The capital of France is" 8
   id 262  logit -100.24986 ...
-texto: The capital of France is the capital of the French Republic, and
+text: The capital of France is the capital of the French Republic, and
 ```
 
-### O que mudou da v1 para a v2
+### What changed from v1 to v2
 
-A v1 usava listas encadeadas para as matrizes e media ~1800× o PyTorch no MNIST. A v2 mediu cada hipótese (`NOTES.md`, exp. 1 a 9): trocar listas por `Array` plano deu **~49× num thread**, produtos em blocos paralelos mais ~1,8×, e no GPT-2 achei que **paralelizar matriz·vetor copiando a matriz custa 10× mais que calcular**, então ele roda sequencial. Distância ao PyTorch agora: MNIST ~22 a 33×, GPT-2 ~2 a 5× por token.
+v1 used linked lists for the matrices and measured ~1800x PyTorch on MNIST. v2 measured each hypothesis (`NOTES.md`, experiments 1 to 9): swapping lists for a flat `Array` gave **~49x on one thread**, products in parallel blocks gave ~1.8x more, and in GPT-2 I found that **parallelizing matrix · vector by copying the matrix costs 10x more than computing**, so it runs sequentially. Distance to PyTorch now: MNIST ~22 to 33x, GPT-2 ~2 to 5x per token.
 
-## O que é provado e o que é testado
+## What is proved and what is tested
 
-- **Provado pelo kernel** (`bend X.bend --verdict`): as leis acima, em cinco pacotes. Sem `@unsafe`, sem `?TODO`, em nenhum.
-- **Pelo tipo**: shapes de `matmul`, de cada gradiente de camada (`dW: Mat<i,o>`) e `reshape` com prova. O passo de treino do MNIST inteiro é checado assim.
-- **Testado, não provado**: toda a numérica em `F32` (não é um número real; arredonda). Gradient checking e comparação com PyTorch em `reference/`. O tokenizer em ASCII é exato; bytes ≥ 128 contam como letra no pré-tokenizador do GPT-2.
+- **Proved by the kernel** (`bend X.bend --verdict`): the laws above, in five packages. No `@unsafe`, no `?TODO`, in any of them.
+- **By the type**: the shapes of `matmul`, of each layer gradient (`dW: Mat<i,o>`) and `reshape` with a proof. The whole MNIST training step is checked this way.
+- **Tested, not proved**: all `F32` numerics (it is not a real number; it rounds). Gradient checking and comparison with PyTorch live in `reference/`. The tokenizer is exact on ASCII; bytes ≥ 128 count as letters in the GPT-2 pre-tokenizer.
 
-## Verificar tudo
+## Verify everything
 
 ```bash
 export PATH="$HOME/.bend/bin:$PATH"
-reference/.venv/bin/python reference/check_all.py          # 27 verificações, ~30 s
-reference/.venv/bin/python reference/check_all.py --full   # + GPT-2 e MNIST (32 verificações, ~1,5 min)
+reference/.venv/bin/python reference/check_all.py          # 27 checks, ~30 s
+reference/.venv/bin/python reference/check_all.py --full   # + GPT-2 and MNIST (32 checks, ~1.5 min)
 ```
 
-Preparação dos dados e pesos: [`reference/`](reference) (`gpt2_prep.py`, `mnist_torch.py`) e os README de cada demo.
+Data and weights preparation: [`reference/`](reference) (`gpt2_prep.py`, `mnist_torch.py`) and the README of each demo.
 
-## Limites
+## Limits
 
-- **Desempenho:** o Bend 2.0.35 gera código escalar, sem BLAS nem SIMD: no mesmo produto de matrizes o PyTorch faz 62 G mult-soma/s em 1 thread e o Bend com `Array` ~2,3 G/s (~27×). O paralelismo escala ~2 a 4× nesta CPU híbrida (P+E cores). GPU não usada: o Bend pede CUDA 12 e o Arch traz o 13.
-- **Memória:** os pesos do GPT-2 viram árvores de nós (~10 GB durante a carga, 9 s).
-- Só `Nat`, `U32` e `F32`; sem `F64`.
-- `Mat<r,c>` não carrega no tipo a invariante "o `Array` tem capacidade ≥ r*c": os construtores garantem, mas não é um fato do tipo.
-- O pré-tokenizador do GPT-2 trata todo byte ≥ 128 como letra (exato para letras acentuadas e de outros alfabetos).
+- **Performance:** Bend 2.0.35 generates scalar code, with no BLAS or SIMD: on the same matrix product PyTorch does 62 G multiply-adds/s on 1 thread and Bend with `Array` ~2.3 G/s (~27x). Parallelism scales ~2 to 4x on this hybrid CPU (P+E cores). GPU not used: Bend asks for CUDA 12 and Arch ships 13.
+- **Memory:** the GPT-2 weights become trees of nodes (~10 GB while loading, 9 s).
+- Only `Nat`, `U32` and `F32`; no `F64`.
+- `Mat<r,c>` does not carry the invariant "the `Array` has capacity ≥ r*c" in its type: the constructors guarantee it, but it is not a fact of the type.
+- The GPT-2 pre-tokenizer treats every byte ≥ 128 as a letter (exact for accented letters and other alphabets).
 
-## Estrutura
+## Structure
 
 ```
-nat-lemmas/  bpe/  tensor/  tensor-array/  autograd/   # pacotes (main.bend + README + LICENSE)
-demos/mnist  demos/gpt2                 # demos com README e BENCHMARK
-reference/                              # PyTorch, tiktoken e o check_all.py
-poc/  bench/                            # provas de conceito (v0.2) e micro-benchmarks da v2
-docs/                                   # mensagens de erro de shape e material de lançamento
-NOTES.md                                # decisões, descobertas e dívidas
+nat-lemmas/  bpe/  tensor/  tensor-array/  autograd/   # packages (main.bend + README + LICENSE)
+demos/mnist  demos/gpt2                 # demos with README and BENCHMARK
+reference/                              # PyTorch, tiktoken and check_all.py
+poc/  bench/                            # proofs of concept (v0.2) and v2 micro-benchmarks
+docs/                                   # shape-error messages and launch material
+NOTES.md                                # decisions, findings and debts
 ```
 
-## Licença
+## License
 
 [MIT](LICENSE).
