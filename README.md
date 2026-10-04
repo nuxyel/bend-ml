@@ -22,11 +22,11 @@ Error:
 | [`bend-ml-nat-lemmas`](nat-lemmas) | 0.1.1.0 | `Nat` and `List` lemmas that Base does not have | `add_comm`, `add_assoc`, `mul_comm`, `mul_assoc`, `mul_dist`, `append_assoc`, `length_append`, `product_append`... (15) |
 | [`bend-ml-bpe-tokenizer`](bpe) | 0.1.2.0 | Byte-level BPE tokenizer (GPT-2 style) | **roundtrip** `decode(encode(s)) = s`, `vocab_bound`, `dec_append`, **`train_wf`** (`train` always produces a well-formed table) and **`roundtrip_trained`** (roundtrip for any trained table, no hypothesis) |
 | [`bend-ml-tensor`](tensor) | 0.1.2.0 | `Vec<n>` and `Mat<r,c>` with the shape in the type, over lists | `reshape_swap`, `reshape_flat`; `reshape` only compiles with a proof that the number of elements does not change |
-| [`bend-ml-tensor-array`](tensor-array) | 0.1.2.0 | **New in v2.** `Mat<r,c>` over a flat `Array<F32>`, the same shape guarantee, **~50x faster** | the products `matmul`, `matmul_nt`, `matmul_tn` (the shape of `dW = Xᵀ·dY` is checked by the type), parallel blocks |
+| [`bend-ml-tensor-array`](tensor-array) | 0.1.3.0 | **New in v2.** `Mat<r,c>` over a flat `Array<F32>`, the same shape guarantee, **~50x faster** | the products `matmul`, `matmul_nt`, `matmul_tn` (the shape of `dW = Xᵀ·dY` is checked by the type), parallel blocks |
 | [`bend-ml-autograd`](autograd) | 0.1.1.0 | Automatic differentiation and layers with typed backward | **`reverse_eq_forward`**: the reverse mode of autodiff gives the same result as the forward mode |
 
 ```python
-import bend-ml-tensor-array@0.1.2.0/main.bend as TA
+import bend-ml-tensor-array@0.1.3.0/main.bend as TA
 import bend-ml-bpe-tokenizer@0.1.2.0/main.bend as BPE
 ```
 
@@ -56,7 +56,7 @@ v1 used linked lists for the matrices and measured ~1800x PyTorch on MNIST. v2 m
 
 ## Quick start
 
-Requirements: Linux x86_64 (or WSL), clang >= 14, Python >= 3.12, `curl`, ~3 GB of disk and 16 GB of RAM for the GPT-2 check.
+Requirements: Linux x86_64 (or WSL), clang >= 14, Python >= 3.12, `curl`, ~3 GB of disk and 8 GB of RAM for the GPT-2 check.
 
 ```bash
 git clone https://github.com/nuxyel/bend-ml.git && cd bend-ml
@@ -80,7 +80,7 @@ Data and weights preparation: [`reference/`](reference) (`gpt2_prep.py`, `mnist_
 ## Limits
 
 - **Performance:** Bend 2.0.35 generates scalar code, with no BLAS or SIMD: on the same matrix product PyTorch does 62 G multiply-adds/s on 1 thread and Bend with `Array` ~2.3 G/s (~27x). Parallelism scales ~2 to 4x on this hybrid CPU (P+E cores). The GPU was tried (a user-local CUDA 12 makes `!` work on the RTX 4050, see `docs/gpu-setup.md`) and it is 3.8x faster than the CPU on compute-bound flat loops, but 3x to 18x slower on our memory-bound matrix kernels, so the benchmarks use the CPU.
-- **Memory:** the GPT-2 weights become trees of nodes (~10 GB while loading, 9 s).
+- **Memory:** the GPT-2 weights become trees of nodes. Loading streams 1 MB blocks straight into the arrays: peak resident memory is ~1.5 GB (the process reserves ~10 GB of address space), loading takes ~10 s.
 - Only `Nat`, `U32` and `F32`; no `F64`.
 - `Mat<r,c>` does not carry the invariant "the `Array` has capacity ≥ r*c" in its type: the constructors guarantee it, but it is not a fact of the type.
 - The GPT-2 pre-tokenizer classifies code points with a table generated from Unicode (`\s`, `\p{L}`, `\p{N}`) up to U+1FFFF; code points above that, and invalid UTF-8 bytes, count as letters.
