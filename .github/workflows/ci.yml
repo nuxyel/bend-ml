@@ -1,0 +1,55 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: "17 5 * * 1"   # weekly, to catch changes in BendHub packages or in the toolchain
+
+jobs:
+  check:
+    name: proofs, kernel, tests, MNIST and GPT-2
+    runs-on: ubuntu-latest      # public repo: 4 vCPU, 16 GB RAM, 14 GB disk
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+
+      - name: Cache the Bend and Lean toolchains
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.bend
+            ~/.elan
+          key: toolchain-${{ runner.os }}-${{ hashFiles('scripts/setup.sh') }}
+
+      - name: Cache the MNIST and GPT-2 data
+        uses: actions/cache@v4
+        with:
+          path: |
+            demos/mnist/data
+            demos/gpt2/data
+          key: data-${{ hashFiles('scripts/setup.sh', 'reference/gpt2_prep.py', 'reference/mnist_torch.py') }}
+
+      - name: Set up (Bend 2.0.35, Lean 4.34.0, Python venv, data)
+        run: scripts/setup.sh
+
+      - name: Quick checks (proofs, kernel, shape errors, PyTorch and tiktoken comparisons)
+        run: make check
+
+      - name: Full checks (adds MNIST and GPT-2)
+        run: |
+          make check-full 2>&1 | tee check-full.log
+          free -g
+
+      - name: Keep the log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: check-full-log
+          path: check-full.log
