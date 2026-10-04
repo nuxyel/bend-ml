@@ -27,7 +27,7 @@ def run(nome, cmd, ok_if=None, timeout=3600):
 
 def main():
     # 1. provas: checker e kernel auditado, em cada pacote
-    for pkg in ["nat-lemmas", "bpe", "tensor", "autograd"]:
+    for pkg in ["nat-lemmas", "bpe", "tensor", "tensor-array", "autograd"]:
         f = f"{pkg}/main.bend"
         run(f"{f}: ALL PROOFS CHECK", [BEND, f], lambda o, c: "ALL PROOFS CHECK" in o and "FAIL" not in o)
         run(f"{f} --verdict (kernel em Lean)", [BEND, f, "--verdict"], lambda o, c: o.strip().endswith("ALL PROOFS CHECK"))
@@ -37,13 +37,15 @@ def main():
         print(f"{'ok  ' if limpo else 'ERRO'} {f}: sem @unsafe nem ?TODO")
 
     # 2. erros de shape que DEVEM falhar ao checar
-    for f, msg in [("tensor/tests/bad_matmul.bend", "expected"), ("tensor/tests/bad_reshape.bend", "expected")]:
+    for f, msg in [("tensor/tests/bad_matmul.bend", "expected"), ("tensor/tests/bad_reshape.bend", "expected"), ("tensor-array/tests/bad_matmul.bend", "expected"), ("tensor-array/tests/bad_grad.bend", "expected")]:
         run(f"{f} deve ser erro de tipo", [BEND, f], lambda o, c, m=msg: "SOME PROOFS FAIL" in o and m in o)
     run("tensor/tests/ok.bend compila e roda", [BEND, "tensor/tests/ok.bend"], lambda o, c: "18 18 18 18" in o)
+    run("tensor-array/tests/ok.bend compila e roda", [BEND, "tensor-array/tests/ok.bend"], lambda o, c: o.strip() == "8n")
 
     # 3. testes contra as referências em Python
     run("bpe vs referência Python (train/encode/decode)", [PY, "reference/test_bpe.py"])
     run("tensor vs PyTorch", [PY, "reference/test_tensor.py"])
+    run("tensor-array vs PyTorch", [PY, "reference/test_tensor_array.py"])
     run("autograd vs PyTorch (gradient checking)", [PY, "reference/test_autograd.py"])
 
     # 4. tokenizer do GPT-2 vs tiktoken
@@ -60,11 +62,11 @@ def main():
     if FULL:
         with tempfile.TemporaryDirectory() as d:
             exe = os.path.join(d, "gpt2")
-            run("compilar GPT-2", [BEND, "demos/gpt2/gpt2.bend", "-o", exe])
-            run("GPT-2 em Bend vs PyTorch (3 prompts)", [PY, "reference/test_gpt2.py", exe])
+            run("compilar GPT-2 (Array)", [BEND, "demos/gpt2/fast.bend", "-o", exe])
+            run("GPT-2 (Array) em Bend vs PyTorch (3 prompts)", [PY, "reference/test_gpt2.py", exe])
             mn = os.path.join(d, "mnist")
-            run("compilar MNIST", [BEND, "demos/mnist/train.bend", "-o", mn])
-            out = run("MNIST em Bend, 50 lotes", [mn, "1", "50", "0.1"], lambda o, c: "acertos_teste=7829/10000" in o)
+            run("compilar MNIST (Array)", [BEND, "demos/mnist/fast.bend", "-o", mn])
+            out = run("MNIST (Array) em Bend, 50 lotes", [mn, "1", "50", "0.1"], lambda o, c: "acertos_teste=7829/10000" in o)
             run("MNIST em PyTorch, 50 lotes", [PY, "reference/mnist_torch.py", "--epochs", "1", "--max-batches", "50"], lambda o, c: "acc_teste=0.7829" in o)
 
     falhas = resultados.count(False)
