@@ -1,24 +1,24 @@
-# bend-ml-tensor-array: tensores sobre Array<F32> plano, com a shape no tipo.
+# bend-ml-tensor-array: tensors over a flat Array<F32>, with the shape in the type.
 #
 #   import bend-ml-tensor-array@0.1.0.0/main.bend as TA
 #
-# Mat<r, c> guarda r*c números num Array<F32> linha a linha (índice i*c + j). As
-# dimensões são parâmetros de tipo apagados: a mesma garantia do bend-ml-tensor
-# (produto com dimensões erradas não compila), mas ~50x mais rápido que listas:
-# Array.get/set por índice, e produtos em blocos de linhas em paralelo.
+# Mat<r, c> stores r*c numbers in an Array<F32>, row by row (index i*c + j). The
+# dimensions are erased type parameters: the same guarantee as bend-ml-tensor
+# (a product with wrong dimensions does not compile), but ~50x faster than lists:
+# Array.get/set by index, and products in parallel blocks of rows.
 #
-# Um Array é afim (um só dono): toda operação que lê um operando o devolve junto
-# com o resultado (como Array.get faz), em registros MM, AR, ... Use Mat.clone
-# quando precisar de duas cópias.
+# An Array is affine (a single owner): every operation that reads an operand returns it
+# together with the result (as Array.get does), in records MM, AR, ... Use Mat.clone
+# when you need two copies.
 #
-# O que NÃO é provado: a invariante "o Array tem capacidade >= r*c" vale porque
-# os construtores (Mat.zeros, Mat.of_list) alocam o tamanho certo; e F32 é
-# validado por testes contra o PyTorch (reference/test_tensor_array.py), não por prova.
+# What is NOT proved: the invariant "the Array has capacity >= r*c" holds because
+# the constructors (Mat.zeros, Mat.of_list) allocate the right size; and F32 is
+# validated by tests against PyTorch (reference/test_tensor_array.py), not by proof.
 
 import Base
 
 # ---------------------------------------------------------------------
-# tipos de apoio
+# helper types
 # ---------------------------------------------------------------------
 
 type R is Type:
@@ -27,7 +27,7 @@ type R is Type:
 type G is Type:
   G{a: Array<F32>, b: Array<F32>, c: Array<F32>}
 
-# menor d com 2^d >= n (n >= 2)
+# smallest d with 2^d >= n (n >= 2)
 
 def dotg(k: Nat, +ia: U32, +ib: U32, +sa: U32, +sb: U32, acc: F32, ra: Array<F32> & F32, rb: Array<F32> & F32) -> R:
   match k ra rb:
@@ -36,7 +36,7 @@ def dotg(k: Nat, +ia: U32, +ib: U32, +sa: U32, +sb: U32, acc: F32, ra: Array<F32
     case 1n+p Tuple{a, +x} Tuple{b, +y}:
       dotg(p, (ia + sa : U32), (ib + sb : U32), sa, sb, (acc + (x * y : F32) : F32), Array.get(F32, a, (ia + sa : U32)), Array.get(F32, b, (ib + sb : U32)))
 
-# a linha i de C, colunas j.. ; r é o produto da coluna atual (já calculado)
+# row i of C, columns j.. ; r is the product of the current column (already computed)
 
 def gcols(mleft: Nat, +kn: Nat, +ia0: U32, +ib0: U32, +sa: U32, +sb: U32, +bcol: U32, +cidx: U32, c: Array<F32>, r: R) -> G:
   match mleft r:
@@ -52,15 +52,15 @@ def grows(nleft: Nat, +mm1: Nat, +kn: Nat, +i: U32, +arow: U32, +sa: U32, +sb: U
     case 1n+p G{a, b, c}:
       grows(p, mm1, kn, (i + 1 : U32), arow, sa, sb, bcol, mu, gcols(mm1, kn, (i * arow : U32), 0, sa, sb, bcol, (i * mu : U32), c, dotg(kn, (i * arow : U32), 0, sa, sb, 0.0, Array.get(F32, a, (i * arow : U32)), Array.get(F32, b, 0))))
 
-# C (n x m) = A · B con k passos; c é o array de saída (com capacidade n*m)
+# C (n x m) = A · B with k steps; c is the output array (with capacity n*m)
 
 def gemm(+n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
   grows(n, Nat.sub(m, 1n), k, 0, arow, sa, sb, bcol, U32.from_nat(m), G{a, b, c})
 
 
 # ---------------------------------------------------------------------
-# gemm paralelo: 2^d blocos de linhas de C, cada um com a sua cópia de A e B,
-# devolvendo listas que são escritas em C no fim
+# parallel gemm: 2^d blocks of rows of C, each with its own copy of A and B,
+# returning lists that are written into C at the end
 # ---------------------------------------------------------------------
 
 type S3 is Type:
@@ -103,7 +103,7 @@ def write_l(xs: List<&2, F32>, +idx: U32, c: Array<F32>) -> Array<F32>:
     case Con{h, t}:
       write_l(t, (idx + 1 : U32), Array.set(F32, c, idx, h))
 
-# c[idx..] += lista
+# c[idx..] += list
 
 def gp3(a: Array<F32>, b: Array<F32>, c: Array<F32>, xs: List<&2, F32>) -> G:
   G{a, b, write_l(xs, 0, c)}
@@ -113,15 +113,15 @@ def gp2(d: Nat, +n: Nat, +mm1: Nat, +kn: Nat, +arow: U32, +sa: U32, +sb: U32, +b
     case Tuple{a1, a2} Tuple{b1, b2}:
       gp3(a1, b1, c, lpar(d, n, mm1, kn, 0, arow, sa, sb, bcol, Array.clone(F32, a2), Array.clone(F32, b2)))
 
-# C (n x m) = A · B, com 2^d blocos de linhas em paralelo; devolve A, B (intactos) e C
+# C (n x m) = A · B, with 2^d blocks of rows in parallel; returns A, B (intact) and C
 
 def gemm_par(d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
   gp2(d, n, Nat.sub(m, 1n), k, arow, sa, sb, bcol, c, Array.clone(F32, a), Array.clone(F32, b))
 
 
 # ---------------------------------------------------------------------
-# gemm paralelo por COLUNAS, para n = 1 (matriz · vetor): cada bloco calcula um
-# intervalo de colunas de C, com a sua cópia dos operandos
+# parallel gemm by COLUMNS, for n = 1 (matrix · vector): each block computes a
+# range of columns of C, with its own copy of the operands
 # ---------------------------------------------------------------------
 
 def cblock_fin(st: S3) -> List<&2, F32>:
@@ -129,7 +129,7 @@ def cblock_fin(st: S3) -> List<&2, F32>:
     case S3{a, b, out}:
       List.reverse(&2, F32, out)
 
-# cnt colunas a partir de j0 (cnt >= 1); a linha 0 de A fica em ia0
+# cnt columns starting at j0 (cnt >= 1); row 0 of A is at ia0
 
 def cblock_go(cnt1: Nat, +kn: Nat, +ia0: U32, +j0: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>) -> List<&2, F32>:
   cblock_fin(lcols(cnt1, kn, ia0, (j0 * bcol : U32), sa, sb, bcol, Nil{}, dotg(kn, ia0, (j0 * bcol : U32), sa, sb, 0.0, Array.get(F32, a, ia0), Array.get(F32, b, (j0 * bcol : U32)))))
@@ -154,24 +154,24 @@ def cp2(d: Nat, +m: Nat, +kn: Nat, +sa: U32, +sb: U32, +bcol: U32, c: Array<F32>
     case Tuple{a1, a2} Tuple{b1, b2}:
       gp3(a1, b1, c, cpar(d, m, kn, 0, 0, sa, sb, bcol, Array.clone(F32, a2), Array.clone(F32, b2)))
 
-# C (1 x m) = A (1 x k) · B, com 2^d blocos de colunas em paralelo
+# C (1 x m) = A (1 x k) · B, with 2^d blocks of columns in parallel
 
 def gemm_par_cols(d: Nat, +m: Nat, +k: Nat, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
   cp2(d, m, k, sa, sb, bcol, c, Array.clone(F32, a), Array.clone(F32, b))
 
 # ---------------------------------------------------------------------
-# operações elementwise (em lugar, por índice)
+# element-wise operations (in place, by index)
 # ---------------------------------------------------------------------
 
 def depth(n: Nat) -> Nat:
   Nat.add(U32.log2(U32.from_nat(Nat.sub(n, 1n))), 1n)
 
 # ---------------------------------------------------------------------
-# gemm: C[i][j] = soma_p A[i*arow + p*sa] * B[p*sb + j*bcol]
-# (nn: arow=K, sa=1, sb=M, bcol=1 | nt: B guardada m x k: sb=1, bcol=K | tn: A guardada k x n: arow=1, sa=N)
+# gemm: C[i][j] = sum_p A[i*arow + p*sa] * B[p*sb + j*bcol]
+# (nn: arow=K, sa=1, sb=M, bcol=1 | nt: B stored m x k: sb=1, bcol=K | tn: A stored k x n: arow=1, sa=N)
 # ---------------------------------------------------------------------
 
-# acc += A[ia + t*sa] * B[ib + t*sb] por k passos; ra, rb já trazem o primeiro par
+# acc += A[ia + t*sa] * B[ib + t*sb] for k steps; ra, rb already carry the first pair
 
 type P2 is Type:
   P2{a: Array<F32>, b: Array<F32>}
@@ -179,7 +179,7 @@ type P2 is Type:
 type AL is Type:
   AL{c: Array<F32>, l: List<&2, F32>}
 
-# lista de m elementos a partir de idx (lê com Array.get, devolvendo o array)
+# list of m elements starting at idx (reads with Array.get, returning the array)
 
 def read_l(mleft: Nat, +idx: U32, acc: List<&2, F32>, rc: Array<F32> & F32) -> AL:
   match mleft rc:
@@ -188,7 +188,7 @@ def read_l(mleft: Nat, +idx: U32, acc: List<&2, F32>, rc: Array<F32> & F32) -> A
     case 1n+p Tuple{c, +v}:
       read_l(p, (idx + 1 : U32), v <> acc, Array.get(F32, c, (idx + 1 : U32)))
 
-# escreve a lista a partir de idx
+# writes the list starting at idx
 
 def addl(xs: List<&2, F32>, +idx: U32, rc: Array<F32> & F32) -> Array<F32>:
   match xs rc:
@@ -197,7 +197,7 @@ def addl(xs: List<&2, F32>, +idx: U32, rc: Array<F32> & F32) -> Array<F32>:
     case Con{+h, t} Tuple{c, +v}:
       addl(t, (idx + 1 : U32), Array.get(F32, Array.set(F32, c, idx, (v + h : F32)), (idx + 1 : U32)))
 
-# soma bias (lista de m) a cada uma das n linhas de c (n x m)
+# adds a bias (a list of m) to each of the n rows of c (n x m)
 
 def bias_rows(nleft: Nat, +i: U32, +mu: U32, +bl: List<&2, F32>, c: Array<F32>) -> Array<F32>:
   match nleft:
@@ -206,7 +206,7 @@ def bias_rows(nleft: Nat, +i: U32, +mu: U32, +bl: List<&2, F32>, c: Array<F32>) 
     case 1n+p:
       bias_rows(p, (i + 1 : U32), mu, bl, addl(bl, (i * mu : U32), Array.get(F32, c, (i * mu : U32))))
 
-# relu em lugar nos primeiros n elementos
+# in-place relu on the first n elements
 
 def relu_l(nleft: Nat, +t: U32, rc: Array<F32> & F32) -> Array<F32>:
   match nleft rc:
@@ -225,7 +225,7 @@ def pos2(b: Bool) -> F32:
 def pos(+y: F32) -> F32:
   pos2(F32.is_gt(y, 0.0))
 
-# d[t] *= (h[t] > 0): gradiente da relu; devolve os dois arrays
+# d[t] *= (h[t] > 0): the relu gradient; returns both arrays
 
 def mask_l(nleft: Nat, +t: U32, rd: Array<F32> & F32, rh: Array<F32> & F32) -> P2:
   match nleft rd rh:
@@ -287,7 +287,7 @@ def sgd_l(nleft: Nat, +t: U32, +lr: F32, rw: Array<F32> & F32, rd: Array<F32> & 
       sgd_l(p, (t + 1 : U32), lr, Array.get(F32, Array.set(F32, w, t, (x - (lr * y : F32) : F32)), (t + 1 : U32)), Array.get(F32, d, (t + 1 : U32)))
 
 # ---------------------------------------------------------------------
-# softmax + entropia cruzada por linha (listas de 10 elementos: custo desprezível)
+# softmax + cross-entropy per row (lists of 10 elements: negligible cost)
 # ---------------------------------------------------------------------
 
 def pick(ps: List<&2, F32>, n: Nat) -> F32:
@@ -326,12 +326,12 @@ def ce_row(al: AL, +label: Nat, +nf: F32, +idx: U32, loss: F32) -> L2:
     case AL{c, l}:
       ce_row2(softmax(l), label, nf, idx, loss, c)
 
-# percorre as linhas de z2 (n x m): r traz a perda acumulada e o array; ao fim, o array virou o gradiente
+# walks the rows of z2 (n x m): r carries the accumulated loss and the array; at the end the array has become the gradient
 
 type Mat<-r: Nat, -c: Nat> is Type:
   Mat{d: Array<F32>}
 
-# menor d com 2^d >= n (n >= 2); n < 2 vale 0
+# smallest d with 2^d >= n (n >= 2); n < 2 gives 0
 
 def ce_rows(labels: List<&2, Nat>, +mm1: Nat, +mu: U32, +nf: F32, +i: U32, r: L2) -> L2:
   match labels r:
@@ -340,7 +340,7 @@ def ce_rows(labels: List<&2, Nat>, +mm1: Nat, +mu: U32, +nf: F32, +i: U32, r: L2
     case Con{+y, t} L2{loss, c}:
       ce_rows(t, mm1, mu, nf, (i + 1 : U32), ce_row(read_l(mm1, (i * mu : U32), Nil{}, Array.get(F32, c, (i * mu : U32))), y, nf, (i * mu : U32), loss))
 
-# ---- apoio: acertos por linha ----
+# ---- helper: hits per row ----
 
 type CR is Type:
   CR{c: Array<F32>, n: Nat}
@@ -389,7 +389,7 @@ def count_rows(labels: List<&2, Nat>, +mm1: Nat, +mu: U32, +i: U32, r: CR) -> CR
 
 
 # =====================================================================
-# API tipada: Mat<r, c> (as dimensões entram no tipo)
+# Typed API: Mat<r, c> (the dimensions enter the type)
 # =====================================================================
 
 def cap_depth2(small: Bool, n: Nat) -> Nat:
@@ -402,7 +402,7 @@ def cap_depth2(small: Bool, n: Nat) -> Nat:
 def cap_depth(+n: Nat) -> Nat:
   cap_depth2(Nat.is_lt(n, 2n), n)
 
-# r x c de zeros, com a capacidade exata (potência de 2 mínima)
+# r x c of zeros, with the exact capacity (smallest power of 2)
 
 def Mat.zeros(+r: Nat, +c: Nat) -> Mat<r, c>:
   Mat{Array.new(F32, cap_depth(Nat.mul(r, c)), 0.0)}
@@ -433,15 +433,15 @@ def Mat.of_list2(-r: Nat, -c: Nat, +rr: Nat, +cc: Nat, ok: Bool, xs: List<&2, F3
     case False{}:
       None{}
 
-# Mat<r, c> a partir de r*c números em ordem de linha; None se o tamanho não bate
+# Mat<r, c> from r*c numbers in row order; None if the size does not match
 
 def Mat.of_list(+r: Nat, +c: Nat, +xs: List<&2, F32>) -> Maybe<&1, Mat<r, c>>:
   Mat.of_list2(r, c, r, c, len_is(xs, Nat.mul(r, c)), xs)
 
-# lê os n primeiros números, devolvendo a matriz
+# reads the first n numbers, returning the matrix
 
-# Mat<r, c> sem checar o tamanho da lista (uma lista curta deixa o resto em zero, uma longa é cortada
-# pela capacidade): só para quando o tamanho é conhecido por construção. Prefira Mat.of_list.
+# Mat<r, c> without checking the list size (a short list leaves the rest at zero, a long one is cut
+# by the capacity): only for when the size is known by construction. Prefer Mat.of_list.
 
 def Mat.from_list(+r: Nat, +c: Nat, xs: List<&2, F32>) -> Mat<r, c>:
   Mat{fill_list(xs, 0, Array.new(F32, cap_depth(Nat.mul(r, c)), 0.0))}
@@ -454,7 +454,7 @@ def Mat.to_list2(-r: Nat, -c: Nat, al: AL) -> ML<r, c>:
     case AL{d, l}:
       ML{Mat{d}, l}
 
-# duas cópias independentes
+# two independent copies
 
 def Mat.to_list(+r: Nat, +c: Nat, m: Mat<r, c>) -> ML<r, c>:
   match m:
@@ -469,7 +469,7 @@ def Mat.clone2(-r: Nat, -c: Nat, p: Array<F32> & Array<F32>) -> MM2<r, c>:
     case Tuple{x, y}:
       MM2{Mat{x}, Mat{y}}
 
-# ---- produtos: C (n x m) = A · B, com 2^par blocos de linhas em paralelo ----
+# ---- products: C (n x m) = A · B, with 2^par blocks of rows in parallel ----
 
 # C = A(n x k) · B(k x m)
 
@@ -481,12 +481,12 @@ def Mat.clone(-r: Nat, -c: Nat, m: Mat<r, c>) -> MM2<r, c>:
 type MMul<-n: Nat, -k: Nat, -m: Nat> is Type:
   MMul{a: Mat<n, k>, b: Mat<k, m>, c: Mat<n, m>}
 
-# C = A(n x k) · Bᵀ, com B guardada m x k
+# C = A(n x k) · Bᵀ, with B stored m x k
 
 type MMulNT<-n: Nat, -k: Nat, -m: Nat> is Type:
   MMulNT{a: Mat<n, k>, b: Mat<m, k>, c: Mat<n, m>}
 
-# C = Aᵀ · B, com A guardada k x n
+# C = Aᵀ · B, with A stored k x n
 
 type MMulTN<-n: Nat, -k: Nat, -m: Nat> is Type:
   MMulTN{a: Mat<k, n>, b: Mat<k, m>, c: Mat<n, m>}
@@ -526,7 +526,7 @@ def mmul_tn_fin(-n: Nat, -k: Nat, -m: Nat, g: G) -> MMulTN<n, k, m>:
 def mm_a(+n: Nat, +k: Nat, +m: Nat, d: Nat, a: Array<F32>, b: Array<F32>) -> MMul<n, k, m>:
   mmul_fin(n, k, m, gemm_any(d, n, m, k, U32.from_nat(k), 1, U32.from_nat(m), 1, a, b, Array.new(F32, cap_depth(Nat.mul(n, m)), 0.0)))
 
-# C = A · B   (n x k) · (k x m); par = log2 do número de blocos paralelos (0 = sequencial)
+# C = A · B   (n x k) · (k x m); par = log2 of the number of parallel blocks (0 = sequential)
 
 def Mat.matmul(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: Mat<n, k>, b: Mat<k, m>) -> MMul<n, k, m>:
   match a b:
@@ -536,7 +536,7 @@ def Mat.matmul(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: Mat<n, k>, b: Mat<k, m>) 
 def mm_nt(+n: Nat, +k: Nat, +m: Nat, d: Nat, a: Array<F32>, b: Array<F32>) -> MMulNT<n, k, m>:
   mmul_nt_fin(n, k, m, gemm_any(d, n, m, k, U32.from_nat(k), 1, 1, U32.from_nat(k), a, b, Array.new(F32, cap_depth(Nat.mul(n, m)), 0.0)))
 
-# C = A · Bᵀ   (n x k) · (m x k)ᵀ: para pesos guardados com uma linha por saída
+# C = A · Bᵀ   (n x k) · (m x k)ᵀ: for weights stored with one row per output
 
 def Mat.matmul_nt(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: Mat<n, k>, b: Mat<m, k>) -> MMulNT<n, k, m>:
   match a b:
@@ -546,16 +546,16 @@ def Mat.matmul_nt(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: Mat<n, k>, b: Mat<m, k
 def mm_tn(+n: Nat, +k: Nat, +m: Nat, d: Nat, a: Array<F32>, b: Array<F32>) -> MMulTN<n, k, m>:
   mmul_tn_fin(n, k, m, gemm_any(d, n, m, k, 1, U32.from_nat(n), U32.from_nat(m), 1, a, b, Array.new(F32, cap_depth(Nat.mul(n, m)), 0.0)))
 
-# C = Aᵀ · B   (k x n)ᵀ · (k x m): gradiente de pesos, X^T · dY
+# C = Aᵀ · B   (k x n)ᵀ · (k x m): weight gradient, X^T · dY
 
 def Mat.matmul_tn(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: Mat<k, n>, b: Mat<k, m>) -> MMulTN<n, k, m>:
   match a b:
     case Mat{x} Mat{y}:
       mm_tn(n, k, m, par, x, y)
 
-# ---- operações elementwise e do treino ----
+# ---- element-wise and training operations ----
 
-# soma o bias (uma linha, m números) a cada linha de C (n x m)
+# adds the bias (one row, m numbers) to each row of C (n x m)
 
 type MBias<-n: Nat, -m: Nat> is Type:
   MBias{c: Mat<n, m>, b: Mat<1n, m>}
@@ -570,7 +570,7 @@ def Mat.add_row(+n: Nat, +m: Nat, c: Mat<n, m>, b: Mat<1n, m>) -> MBias<n, m>:
     case Mat{cd} Mat{bd}:
       add_row2(n, m, n, m, cd, read_l(Nat.sub(m, 1n), 0, Nil{}, Array.get(F32, bd, 0)))
 
-# par de matrizes do mesmo formato (o resultado de uma operação que lê dois operandos)
+# pair of matrices of the same shape (the result of an operation that reads two operands)
 
 type MPair<-r: Nat, -c: Nat> is Type:
   MPair{a: Mat<r, c>, b: Mat<r, c>}
@@ -588,28 +588,28 @@ def Mat.relu(+r: Nat, +c: Nat, a: Mat<r, c>) -> Mat<r, c>:
     case Mat{d}:
       relu_fin(r, c, relu_l(Nat.mul(r, c), 0, Array.get(F32, d, 0)))
 
-# (dy * (h > 0), h): gradiente que atravessa a relu
+# (dy * (h > 0), h): the gradient that passes through the relu
 
 def Mat.relu_bwd(+r: Nat, +c: Nat, dy: Mat<r, c>, h: Mat<r, c>) -> MPair<r, c>:
   match dy h:
     case Mat{d} Mat{x}:
       mpair_fin(r, c, mask_l(Nat.mul(r, c), 0, Array.get(F32, d, 0), Array.get(F32, x, 0)))
 
-# (w - lr * dw, dw): um passo de SGD
+# (w - lr * dw, dw): one SGD step
 
 def Mat.sgd(+r: Nat, +c: Nat, +lr: F32, w: Mat<r, c>, dw: Mat<r, c>) -> MPair<r, c>:
   match w dw:
     case Mat{x} Mat{y}:
       mpair_fin(r, c, sgd_l(Nat.mul(r, c), 0, lr, Array.get(F32, x, 0), Array.get(F32, y, 0)))
 
-# (a + b, b): soma elementwise (a - (-1)*b é exatamente a + b)
+# (a + b, b): element-wise sum (a - (-1)*b is exactly a + b)
 
 def Mat.add(+r: Nat, +c: Nat, a: Mat<r, c>, b: Mat<r, c>) -> MPair<r, c>:
   match a b:
     case Mat{x} Mat{y}:
       mpair_fin(r, c, sgd_l(Nat.mul(r, c), 0, (0.0 - 1.0 : F32), Array.get(F32, x, 0), Array.get(F32, y, 0)))
 
-# soma de cada coluna (n x m -> 1 x m), devolvendo a matriz
+# sum of each column (n x m -> 1 x m), returning the matrix
 
 type MColSum<-n: Nat, -m: Nat> is Type:
   MColSum{a: Mat<n, m>, s: Mat<1n, m>}
@@ -624,8 +624,8 @@ def Mat.col_sums(+n: Nat, +m: Nat, a: Mat<n, m>) -> MColSum<n, m>:
     case Mat{d}:
       colsum_fin(n, m, gemm(1n, m, n, 0, 1, U32.from_nat(m), 1, Array.new(F32, cap_depth(n), 1.0), d, Array.new(F32, cap_depth(m), 0.0)))
 
-# entropia cruzada média e seu gradiente nos logits: (softmax - one-hot) / n.
-# labels tem uma entrada por linha (n); o gradiente substitui os logits.
+# mean cross-entropy and its gradient on the logits: (softmax - one-hot) / n.
+# labels has one entry per row (n); the gradient replaces the logits.
 
 type MCE<-n: Nat, -c: Nat> is Type:
   MCE{loss: F32, grad: Mat<n, c>}
@@ -640,7 +640,7 @@ def Mat.softmax_ce(+n: Nat, +c: Nat, z: Mat<n, c>, labels: List<&2, Nat>) -> MCE
     case Mat{d}:
       ce_fin(n, c, F32.from_nat(n), ce_rows(labels, Nat.sub(c, 1n), U32.from_nat(c), F32.from_nat(n), 0, L2{0.0, d}))
 
-# acertos de argmax por linha contra labels
+# argmax hits per row against labels
 
 type MHits<-n: Nat, -c: Nat> is Type:
   MHits{z: Mat<n, c>, hits: Nat}
@@ -655,7 +655,7 @@ def Mat.count_correct(+n: Nat, +c: Nat, z: Mat<n, c>, labels: List<&2, Nat>) -> 
     case Mat{d}:
       hits_fin(n, c, count_rows(labels, Nat.sub(c, 1n), U32.from_nat(c), 0, CR{d, 0n}))
 
-# uma linha como lista (devolvendo a matriz) e o contrário
+# a row as a list (returning the matrix) and the other way around
 
 type MRow<-r: Nat, -c: Nat> is Type:
   MRow{m: Mat<r, c>, row: List<&2, F32>}
