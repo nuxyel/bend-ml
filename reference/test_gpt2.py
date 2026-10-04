@@ -4,6 +4,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PY = os.path.join(ROOT, "reference/.venv/bin/python")
 EXE = sys.argv[1]
 CASES = [
+    ("Wait — the café costs €5 😀 and", 6),
     ("The capital of France is", 8),
     ("Machine learning is", 8),
     ("1, 2, 3, 4,", 6),
@@ -28,7 +29,7 @@ def main():
         r_txt = re.search(r"^text (.*)", ref, re.M).group(1)
         b_ids = [int(x) for x in re.findall(r"id (\d+) +logit", bend)]
         b_lg = [float(x) for x in re.findall(r"logit (-?[\d.]+)", bend)]
-        b_txt = re.search(r"^text: (.*)", bend, re.M).group(1)
+        b_txt = re.search(r"^text: (.*)", bend, re.M | re.S).group(1).rstrip("\n")  # the text may span several lines
         ids_ok = b_ids == r_ids
         lg_ok = len(b_lg) == len(r_lg) and max(abs(a - b) for a, b in zip(b_lg, r_lg)) < TOL
         txt_ok = repr(b_txt) == r_txt
