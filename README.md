@@ -65,7 +65,7 @@ Data and weights preparation: [`reference/`](reference) (`gpt2_prep.py`, `mnist_
 
 ## Limits
 
-- **Performance:** Bend 2.0.35 generates scalar code, with no BLAS or SIMD: on the same matrix product PyTorch does 62 G multiply-adds/s on 1 thread and Bend with `Array` ~2.3 G/s (~27x). Parallelism scales ~2 to 4x on this hybrid CPU (P+E cores). The GPU was tried (a user-local CUDA 12 makes `!` work on the RTX 4050, see `docs/gpu-setup.md`) but is 3x to 18x slower than the parallel CPU on every kernel measured, so the benchmarks use the CPU.
+- **Performance:** Bend 2.0.35 generates scalar code, with no BLAS or SIMD: on the same matrix product PyTorch does 62 G multiply-adds/s on 1 thread and Bend with `Array` ~2.3 G/s (~27x). Parallelism scales ~2 to 4x on this hybrid CPU (P+E cores). The GPU was tried (a user-local CUDA 12 makes `!` work on the RTX 4050, see `docs/gpu-setup.md`) and it is 3.8x faster than the CPU on compute-bound flat loops, but 3x to 18x slower on our memory-bound matrix kernels, so the benchmarks use the CPU.
 - **Memory:** the GPT-2 weights become trees of nodes (~10 GB while loading, 9 s).
 - Only `Nat`, `U32` and `F32`; no `F64`.
 - `Mat<r,c>` does not carry the invariant "the `Array` has capacity ≥ r*c" in its type: the constructors guarantee it, but it is not a fact of the type.

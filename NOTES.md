@@ -319,4 +319,13 @@ Commit history: rewritten on 2026-10-04 to remove the `Co-Authored-By` trailers,
 | dot products on lists, 1024 tasks, k = 30,000 | 178.6 s | 24.3 s | 7.3x slower |
 
   There is no crossover as the work grows: the ratio is flat. The shared-`Array` matrix product (`bench/mm_par.bend` with `par!`) aborts on the GPU with `memory fault`, while it runs on the CPU. The guide itself says GPU work shines on uniform numeric kernels (mandelbrot, n-body) and that data is "managed" memory that faults across PCIe on first touch; our kernels are long sequential loops over heap structures, which is the opposite.
-- **Conclusion:** with Bend 2.0.35, `!` on the RTX 4050 does not help this project; the parallel CPU is the faster target. The hybrid-CPU numbers in the benchmarks stand. A GPU-friendly formulation would need flat loops over data that already lives in the lanes (as in the guide's shader demo), which is a different design from `Array`-backed matrices.
+- **First conclusion was too hasty.** Those runs used 32 to 1,024 tasks, but the guide says a `!` call should fan out to ~16,384 leaves (one per lane) and end in *flat* loops (scalars only, tail calls). With a flat numeric kernel and 2^14 leaves (`/tmp/flat.bend`: `spin` over `F32`), the GPU **does win**, and the gap grows with the work per lane (the ~0.2 s fixed cost is NVRTC compilation and start-up):
+
+| 16,384 leaves, flat `F32` loop | GPU | CPU (22 threads) |
+|---|---|---|
+| 20,000 iterations each (0.33 G total) | 0.217 s | 0.054 s |
+| 200,000 iterations each (3.3 G total) | 0.254 s | 0.300 s |
+| 2,000,000 iterations each (33 G total) | **0.479 s** | 1.808 s (GPU **3.8x faster**) |
+
+- **What loses is memory-bound work.** 16,384 dot products of 784 elements over lists built before the `!`: GPU 0.79 s vs CPU 0.23 s (whole program, including building the data). Repeating the `!` over the same data (so it is already on the device) costs ~0.05 s per repetition on the GPU against ~0.034 s on the CPU, i.e. still no gain: each list or `Array` element is a dependent pointer load, and Bend's heap is "managed" memory (pages migrate across PCIe on first touch). Our tensor kernels are exactly that shape, so the arithmetic advantage of the GPU never shows.
+- **Conclusion:** the GPU path is not broken (compute-bound flat loops run 3.8x faster than the 22-thread CPU), but with matrices stored as lists or `Array` trees, the matrix products are memory-bound and the CPU is the faster target in Bend 2.0.35. The benchmarks in this repository therefore use the CPU. A GPU-friendly matrix product would need data laid out so each lane streams scalars (as in the guide's shader demo), which is a different design from the `Array`-backed `Mat`.
