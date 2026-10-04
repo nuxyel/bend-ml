@@ -1,26 +1,31 @@
-# GPT-2 small (124M) em Bend
+# GPT-2 small (124M) in Bend
 
-Inferência do GPT-2 small escrita em Bend: pré-tokenizador, tokenizer BPE com as 50 000 regras oficiais (pacote `bend-ml-bpe-tokenizer`, roundtrip provado), 12 camadas de transformador com cache de chaves/valores, e geração gulosa. As matrizes usam `bend-ml-tensor`, com a shape no tipo.
+Inference of GPT-2 small written in Bend: pre-tokenizer, BPE tokenizer with the 50,000 official rules (the `bend-ml-bpe-tokenizer` package, roundtrip proved), 12 transformer layers with a key/value cache, and greedy generation. The matrices use `bend-ml-tensor-array`, with the shape in the type.
 
-## Rodar (da raiz do repositório)
+Two implementations, with identical output:
+
+- `fast.bend` (v2): matrix · vector products over a flat `Array`. **~0.1 s per token.**
+- `gpt2.bend` (v1): matrices as lists, kept as the baseline. ~3 s per token.
+
+## Run (from the repository root)
 
 ```bash
-reference/.venv/bin/python reference/gpt2_prep.py          # baixa nada; converte demos/gpt2/data/model.safetensors
-reference/.venv/bin/python reference/gpt2_prep.py --split  # pesos por tensor (Conv1D já transposto)
+reference/.venv/bin/python reference/gpt2_prep.py          # downloads nothing; converts demos/gpt2/data/model.safetensors
+reference/.venv/bin/python reference/gpt2_prep.py --split  # per-tensor weights (Conv1D already transposed)
 
-bend demos/gpt2/gpt2.bend -o /tmp/gpt2
-/tmp/gpt2 "The capital of France is" 8
+bend demos/gpt2/fast.bend -o /tmp/gpt2_fast
+/tmp/gpt2_fast "The capital of France is" 8
 ```
 
-Os pesos (`model.safetensors`), `vocab.json` e `merges.txt` vêm de <https://huggingface.co/openai-community/gpt2>; ficam em `demos/gpt2/data/` (fora do git).
+The weights (`model.safetensors`), `vocab.json` and `merges.txt` come from <https://huggingface.co/openai-community/gpt2>; they go in `demos/gpt2/data/` (outside git).
 
-## Verificação
+## Verification
 
-- **Tokenizer**: `reference/test_gpt2_tok.py` compara com o `tiktoken` em 16 textos (ASCII, contrações, números, espaços e quebras de linha, acentos, cirílico, CJK): 16 de 16 idênticos.
-- **Modelo**: `reference/gpt2_ref.py` roda o mesmo modelo em PyTorch com os mesmos pesos; os ids gerados e os logits são comparados com os do Bend (ver `BENCHMARK.md`).
+- **Tokenizer**: `reference/test_gpt2_tok.py` compares with `tiktoken` on 16 texts (ASCII, contractions, numbers, spaces and newlines, accents, Cyrillic, CJK): 16 out of 16 identical.
+- **Model**: `reference/test_gpt2.py` runs the same model in PyTorch with the same weights; the generated ids and the logits are compared with Bend's (see `BENCHMARK.md`).
 
-## Limites conhecidos
+## Known limits
 
-- O pré-tokenizador trata todo byte >= 128 como letra. Isso casa com a regex do GPT-2 para letras acentuadas e de outros alfabetos, mas não separa símbolos Unicode que não são letras.
-- Só geração gulosa (sem temperatura nem amostragem).
-- Memória: os 124 M de pesos ficam em listas de `F32` (~2 GB).
+- The pre-tokenizer treats every byte >= 128 as a letter. That matches GPT-2's regex for accented letters and other alphabets, but does not split Unicode symbols that are not letters.
+- Greedy generation only (no temperature or sampling).
+- Memory: the 124 M weights live in trees of nodes (~10 GB during loading with `fast.bend`).
