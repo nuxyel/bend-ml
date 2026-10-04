@@ -1,4 +1,4 @@
-"""bend-ml-tensor-array (tensor-array/cli.bend) contra PyTorch/NumPy."""
+"""bend-ml-tensor-array (tensor-array/cli.bend) against PyTorch/NumPy."""
 import os, subprocess, sys, tempfile
 import numpy as np
 import torch
@@ -15,29 +15,29 @@ def bend(*args):
                        capture_output=True, text=True, env=ENV)
     out = r.stdout.strip()
     if r.returncode != 0 or not out or out[0].isalpha():
-        raise RuntimeError(f"bend falhou: {out[:200]} {r.stderr[:200]}")
+        raise RuntimeError(f"bend failed: {out[:200]} {r.stderr[:200]}")
     return np.array([float(x) for x in out.split()], dtype=np.float32)
 
 
 def main():
     rng = np.random.default_rng(3)
-    falhas = 0
+    failures = 0
     with tempfile.TemporaryDirectory() as d:
         def w(name, a):
             p = os.path.join(d, name)
             np.savetxt(p, np.asarray(a, dtype=np.float32).reshape(1, -1), fmt="%.9g")
             return p
 
-        def check(nome, got, want):
-            nonlocal falhas
+        def check(name, got, want):
+            nonlocal failures
             want = np.asarray(want, dtype=np.float32).reshape(-1)
             ok = got.shape == want.shape and np.allclose(got, want, rtol=RTOL, atol=ATOL)
             err = float(np.max(np.abs(got - want))) if got.shape == want.shape else float("nan")
-            print(f"{'ok  ' if ok else 'ERRO'} {nome}  (max |erro| = {err:.2e})")
+            print(f"{'ok  ' if ok else 'ERROR'} {name}  (max |error| = {err:.2e})")
             if not ok:
-                falhas += 1
+                failures += 1
 
-        # matmul nas três variações de layout e com 0, 1 e 3 níveis de paralelismo
+        # matmul in the three layouts and with 0, 1 and 3 levels of parallelism
         for (n, k, m) in [(2, 3, 4), (5, 7, 3), (1, 6, 1), (9, 5, 11), (16, 20, 8), (1, 8, 13), (1, 40, 100), (1, 3, 5)]:
             A = rng.standard_normal((n, k)).astype(np.float32)
             B = rng.standard_normal((k, m)).astype(np.float32)
@@ -66,8 +66,8 @@ def main():
             hits = int((L.detach().argmax(1) == y).sum())
             check(f"count_correct n={n} c={c}", bend("hits", n, c, w("l", L.detach().numpy()), w("y", y.numpy().astype(np.float32))), [hits])
 
-    print("FALHAS:", falhas)
-    sys.exit(1 if falhas else 0)
+    print("FAILURES:", failures)
+    sys.exit(1 if failures else 0)
 
 
 if __name__ == "__main__":
