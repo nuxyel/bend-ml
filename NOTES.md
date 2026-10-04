@@ -144,3 +144,12 @@ Demos relevantes para nós: `proof_numerics` (prova de `add_comm`, `add_assoc`, 
 - Testes: `reference/test_bpe.py` compara `train/encode/decode` em Bend com `reference/bpe_ref.py` em 4 corpora × 4 amostras (inglês, acentos, UTF-8 misto com emoji/CJK, vazio): 0 falhas.
 - O `bpe/LICENSE` publicado não tem a linha `SPDX-License-Identifier` (o instalador mostrou "License: see LICENSE"); `nat-lemmas` tem. Texto MIT idêntico.
 - Pendente do GPT-2: pré-tokenizador por regex e carga do `merges.txt` oficial (tabela de 50 mil regras, ids base em ordem `bytes_to_unicode`).
+
+## v0.4 — bend-ml-tensor (2026-10-03)
+
+- Publicado: `bend-ml-tensor@0.1.0.0`, hash `0xf9837737d2c3f58ae1d0c5df42255584`. `ALL PROOFS CHECK` e `--verdict` OK; import e erro de shape verificados a partir do BendHub em pasta limpa.
+- **Representação final:** `Vec<-n>` e `Mat<-r,-c>` com dimensões apagadas, dados em `List<&2, F32>` / lista de linhas (copiáveis e paralelizáveis). Medido: 10 M de multiplicações-e-somas em 0,23 s numa thread (~44 M/s). Descartado `Array` (índice log n com `Array.size` a cada acesso) e `Vec(n)` por recursão de tipo (pilha estoura perto de 50 mil).
+- Erro de shape = erro de tipo: `docs/shape-error-bad_matmul.txt` (`esperado Mat<3,5>, recebido Mat<4,5>`) e `docs/shape-error-bad_reshape.txt` (`esperado 12, recebido 15`). Esse é o conteúdo do vídeo.
+- Leis: `reshape_swap` (r·c = c·r) e `reshape_flat` (r·c = 1·(r·c)), provadas com `mul_comm` e `mul_one_l` do nat-lemmas publicado.
+- Testes numéricos: `reference/test_tensor.py` compara com PyTorch: matmul (4 formas), transpose, relu, softmax (inclusive valores ±1000), gelu (tanh), layernorm. Máximo erro ≈ 1e-6, 0 falhas.
+- Regras novas: parâmetro usado também no tipo conta como uso (precisa `+` se for usado de novo); defs precisam vir antes do uso (nada de ordem livre); `match` na ordem dos binders.
