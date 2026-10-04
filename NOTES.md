@@ -126,3 +126,12 @@ Demos relevantes para nós: `proof_numerics` (prova de `add_comm`, `add_assoc`, 
 - `--verdict` ainda não rodado (falta Lean 4.34.0).
 - **Publicado no BendHub:** `bend-ml-nat-lemmas@0.1.0.0`, hash `0xa7aa06c09e97c6747c12cc64bb5203d9` (2026-10-03). Versões do BendHub têm **quatro números** (`0.1.0.0`). Import: `import bend-ml-nat-lemmas@0.1.0.0/main.bend as NL`. Verificado em pasta limpa.
 - O comentário de uso em `nat-lemmas/main.bend` foi corrigido para `0.1.0.0` depois da publicação; só mudou comentário, mas o hash publicado é o do arquivo anterior.
+
+## Ambiente e v0.2 — PoC de shapes (2026-10-03)
+
+- `reference/.venv`: torch 2.14.1+cpu, tiktoken 0.14.0, numpy 2.5.3, safetensors. Lean via elan não instalou direto (falha de DNS no elan), mas `bend --verdict` compilou o próprio kernel e **`nat-lemmas/main.bend --verdict` dá ALL PROOFS CHECK** (primeiro run ~1 min, depois 0,2 s).
+- CUDA: o pacote do Arch é o **CUDA 13.3**; o Bend pede **CUDA 12 em `/usr/local/cuda`**. Não instalei (exige sudo e versão errada). Tudo segue em CPU paralela por enquanto.
+- **Vec(n) por recursão de tipo** (`def Vec(n) -> Data: match n`, como `Word(n)` na Base): funciona e o erro de tamanho é de tipo, mas **estoura a pilha em n ≈ 50 mil** (8192 ok). Serve para dimensões pequenas, não para dados de 38M de floats.
+- **Decisão de representação:** `type Mat<-r, -c> is Type: Mat{data: Array<F32>}`. Dimensões são parâmetros de tipo **apagados**; dados em `Array<F32>` linha a linha (índice `i*c + j`). Dimensão incompatível é erro de tipo (`poc/mat_shape_error.bend`, mensagem em `docs/shape-error-matriz.txt`). Produto linha×coluna de 784 elementos: 0,002 s nativo.
+- Limite honesto: o tamanho do `Array` (potência de 2) **não** é amarrado ao tipo; a invariante `|data| >= r*c` vale por construção pelos construtores do pacote, não por prova. A prova de shapes é sobre a álgebra (`reshape` exige `product` igual, com `nat-lemmas`).
+- Regras do Bend aprendidas: `match` só abre **parâmetros**, então um par devolvido por `Array.get` precisa de função própria ou de ser passado como argumento (padrão de `Array.map.go`); sem recursão mútua; pares casam como `Tuple{a, b}` no `match`; funções precisam estar definidas acima de onde são usadas; tipos com `Array` são `Type` (afins), não `Data`.
