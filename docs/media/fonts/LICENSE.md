@@ -1,9 +1,18 @@
-Copyright 2020 The JetBrains Mono Project Authors (https://github.com/JetBrains/JetBrainsMono)
+The files in this folder are a subset of iA Writer Mono S (https://github.com/iaolo/iA-Fonts), renamed "Bend ML Mono" because the SIL Open Font License does not allow a modified font to keep the Reserved Font Names "iA Writer" and "Plex". The original license follows.
+
+# iA Writer Typeface
+
+Copyright © 2018 Information Architects Inc. with Reserved Font Name "iA Writer"
+
+# Based on IBM Plex Typeface
+
+Copyright © 2017 IBM Corp. with Reserved Font Name "Plex"
+
+# License
 
 This Font Software is licensed under the SIL Open Font License, Version 1.1.
 This license is copied below, and is also available with a FAQ at:
-https://scripts.sil.org/OFL
-
+http://scripts.sil.org/OFL
 
 -----------------------------------------------------------
 SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007

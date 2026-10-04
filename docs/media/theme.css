@@ -1,22 +1,21 @@
-@font-face { font-family: "JB"; font-weight: 400; src: url("fonts/JetBrainsMono-Regular.woff2") format("woff2"); }
-@font-face { font-family: "JB"; font-weight: 700; src: url("fonts/JetBrainsMono-Bold.woff2") format("woff2"); }
+/* bend-ml visual identity. The tokens are Bend's own, read from bend-lang.com, so the
+   project looks like part of the ecosystem: warm paper, one monospace family, a violet accent. */
+@font-face { font-family: "Bend ML Mono"; font-weight: 400; src: url("fonts/BendMLMono-Regular.woff2") format("woff2"); }
+@font-face { font-family: "Bend ML Mono"; font-weight: 700; src: url("fonts/BendMLMono-Bold.woff2") format("woff2"); }
 :root {
-  --bg: #0b0f14; --panel: #121820; --panel2: #18202a; --border: #2a3441;
-  --fg: #e6edf3; --dim: #7d8a99; --red: #ff6b6b; --green: #3ddc84; --blue: #5aa9ff;
-  --amber: #f0b429; --purple: #b794f6; --cyan: #4dd0e1;
+  --bg: #f2eee7; --bg2: #e9e4db; --line: #e4dfd5;
+  --b1: #a9a59d; --b00: #87847d; --b01: #69665f; --b02: #4d4a44; --ink: #2f2d29;
+  --vio: #8b83b5; --grn: #7e9a5e; --red: #c46a60; --ora: #c4845c; --bar: #cdc7bc;
+  --mono: "Bend ML Mono", ui-monospace, Menlo, "SF Mono", Consolas, "Liberation Mono", monospace;
 }
 * { box-sizing: border-box; margin: 0; padding: 0; }
-html, body { background: transparent; font-family: "JB", monospace; color: var(--fg); }
-.term { background: var(--panel); border: 1px solid var(--border); border-radius: 14px; overflow: hidden;
-  box-shadow: 0 18px 48px rgba(0,0,0,.45); }
-.term .bar { display: flex; align-items: center; gap: 8px; height: 38px; padding: 0 14px; background: var(--panel2);
-  border-bottom: 1px solid var(--border); }
-.term .dot { width: 12px; height: 12px; border-radius: 50%; }
-.term .title { margin-left: 10px; color: var(--dim); font-size: 14px; }
-.term .body { padding: 18px 22px 20px; font-size: 18px; line-height: 1.5; white-space: pre; }
-.term .prompt { color: var(--green); font-weight: 700; }
-.term .cmd { color: var(--fg); font-weight: 700; }
-.c-red { color: var(--red); } .c-green { color: var(--green); } .c-blue { color: var(--blue); }
-.c-amber { color: var(--amber); } .c-dim { color: var(--dim); } .c-purple { color: var(--purple); }
-.c-cyan { color: var(--cyan); } .b { font-weight: 700; }
-.hl { background: rgba(240,180,41,.13); display: inline-block; width: 100%; }
+html, body { background: var(--bg); color: var(--b01); font-family: var(--mono); }
+.card { background: var(--bg); border-radius: 14px; padding: 34px 38px; }
+.lbl { color: var(--b1); font-size: 15px; margin: 0 0 8px 2px; }
+.lbl .p { color: var(--vio); }
+.blk { background: var(--bg2); border-radius: 4px; padding: 16px 20px; font-size: 18px; line-height: 1.6; color: var(--b01); white-space: pre; }
+.cap { text-align: center; color: var(--b00); font-size: 15px; margin-top: 14px; }
+.cursor { display: inline-block; width: .52em; height: .92em; background: var(--vio); vertical-align: -.08em; margin-left: .12em; }
+.k { color: var(--grn); } .v { color: var(--vio); } .o { color: var(--ora); } .c { color: var(--b1); }
+.r { color: var(--red); } .g { color: var(--grn); } .i { color: var(--b02); } .b { font-weight: 700; }
+.mark { background: rgba(196,106,96,.10); border-radius: 3px; }
