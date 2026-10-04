@@ -1,0 +1,10 @@
+# Python dependencies of the reference implementations and tests.
+# Tested versions (2026-10-04): numpy 2.5.3, torch 2.14.1+cpu, tiktoken 0.14.0,
+# safetensors 0.8.0, regex 2026.9.29, requests 2.34.2, on Python 3.14.7.
+--extra-index-url https://download.pytorch.org/whl/cpu
+numpy>=2.0
+torch>=2.6
+tiktoken>=0.9
+safetensors>=0.5
+regex>=2024.11
+requests>=2.32
