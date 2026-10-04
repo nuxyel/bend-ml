@@ -1,6 +1,6 @@
-# Rascunho da thread no X (em inglês)
+# X thread draft
 
-Revise o tom antes de postar. Todos os números abaixo estão em `NOTES.md` e nos BENCHMARK.md.
+Review the tone before posting. Every number below is in `NOTES.md` and the BENCHMARK.md files.
 
 ---
 
