@@ -56,6 +56,14 @@ def main():
             ok = got == want
             if not ok: failures += 1
             print(f"{'ok  ' if ok else 'ERROR'} {dt:5.2f}s {s[:48]!r}" + ("" if ok else f"\n   bend={got}\n   tiktoken={want}"))
+        # a malformed merges file must be refused, not tokenized
+        txt = os.path.join(d, "t.txt"); open(txt, "wb").write(b"hello world")
+        for name, merges in [("odd count", "104 101 256"), ("forward reference", "104 101 300 108"), ("unknown id", "104 101 99999 108")]:
+            mp = os.path.join(d, "bad.txt"); open(mp, "w").write(merges)
+            r = subprocess.run([EXE, mp, f"{D}/perm.txt", txt], capture_output=True, text=True)
+            ok = r.stdout.strip() == "invalid merges table"
+            if not ok: failures += 1
+            print(f"{'ok  ' if ok else 'ERROR'} malformed merges refused: {name}")
     print("FAILURES:", failures)
     sys.exit(1 if failures else 0)
 

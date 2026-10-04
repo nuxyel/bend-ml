@@ -86,6 +86,22 @@ def rules.go(ns: List<&2, Nat>, +k: Nat) -> List<&2, BPE.Rule>:
         case Con{+b, u}:
           BPE.Rule{k, id_tok(a), id_tok(b)} <> rules.go(u, 1n+k)
 
+# ---- runtime check of the merges table read from a file ----
+# rules.go gives the rules the sequential ids 0, 1, 2..., so BPE.wf (distinct ids) holds
+# by construction; what a malformed file can still break is the shape of the table.
+# It must have an even number of ids, and rule k may only refer to ids that exist
+# before it (bytes < 256, or merges 256..256+k-1). The check is linear in the table size.
+def ids_ok(ns: List<&2, Nat>, +k: Nat) -> Bool:
+  match ns:
+    case Nil{}:
+      True{}
+    case Con{+a, t}:
+      match t:
+        case Nil{}:
+          False{}
+        case Con{+b, u}:
+          Bool.and(Bool.and(Nat.is_lt(a, Nat.add(256n, k)), Nat.is_lt(b, Nat.add(256n, k))), ids_ok(u, 1n+k))
+
 def toks_of_ids(ns: List<&2, Nat>) -> List<&2, BPE.Tk>:
   match ns:
     case Nil{}:
@@ -275,8 +291,15 @@ def show_nats(xs: List<&2, Nat>) -> String:
     case Con{h, t}:
       Nat.show(h) ++ " " ++ show_nats(t)
 
+def go_ok(ok: Bool, +ns: List<&2, Nat>, +pm: List<&2, U32>, tx: List<&2, U32>) -> IO(Unit):
+  match ok:
+    case True{}:
+      IO.print(show_nats(encode_text(rules.go(ns, 0n), nums(pm), tx)))
+    case False{}:
+      IO.print("invalid merges table")
+
 def go(+m: List<&2, U32>, +pm: List<&2, U32>, tx: List<&2, U32>) -> IO(Unit):
-  IO.print(show_nats(encode_text(rules.go(nums(m), 0n), nums(pm), tx)))
+  go_ok(ids_ok(nums(m), 0n), nums(m), pm, tx)
 
 def run3(a: String, b: String, c: String) -> IO(Unit):
   do IO<Unit>:

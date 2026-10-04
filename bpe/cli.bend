@@ -89,6 +89,23 @@ def rules.go(ns: List<&2, Nat>, +k: Nat) -> List<&2, BPE.Rule>:
         case Con{+b, u}:
           BPE.Rule{k, id_tok(a), id_tok(b)} <> rules.go(u, 1n+k)
 
+# ---- runtime check of a merges table read from a file ----
+# The table must have an even number of ids and rule k may only refer to ids that
+# exist before it (bytes < 256, or merges 256..256+k-1); BPE.wf must also hold.
+def ids_ok(ns: List<&2, Nat>, +k: Nat) -> Bool:
+  match ns:
+    case Nil{}:
+      True{}
+    case Con{+a, t}:
+      match t:
+        case Nil{}:
+          False{}
+        case Con{+b, u}:
+          Bool.and(Bool.and(Nat.is_lt(a, Nat.add(256n, k)), Nat.is_lt(b, Nat.add(256n, k))), ids_ok(u, 1n+k))
+
+def table_ok(+ns: List<&2, Nat>) -> Bool:
+  Bool.and(ids_ok(ns, 0n), BPE.wf(rules.go(ns, 0n)))
+
 def toks_of_ids(ns: List<&2, Nat>) -> List<&2, BPE.Tk>:
   match ns:
     case Nil{}:
@@ -122,11 +139,25 @@ def rule_ids(rs: List<&2, BPE.Rule>) -> List<&2, Nat>:
 def do_train(n: Nat, bs: List<&2, U32>) -> IO(Unit):
   IO.print(show_nats(rule_ids(BPE.train(n, 0n, toks_of_bytes(bs)))))
 
+def enc_ok(ok: Bool, +ns: List<&2, Nat>, bs: List<&2, U32>) -> IO(Unit):
+  match ok:
+    case True{}:
+      IO.print(show_nats(ids_of(BPE.encode(rules.go(ns, 0n), toks_of_bytes(bs)))))
+    case False{}:
+      IO.print("invalid merges table")
+
+def dec_ok(ok: Bool, +ns: List<&2, Nat>, ids: List<&2, U32>) -> IO(Unit):
+  match ok:
+    case True{}:
+      IO.print(show_nats(BPE.decode(rules.go(ns, 0n), toks_of_ids(nums(ids)))))
+    case False{}:
+      IO.print("invalid merges table")
+
 def do_encode(+ms: List<&2, U32>, bs: List<&2, U32>) -> IO(Unit):
-  IO.print(show_nats(ids_of(BPE.encode(rules.go(nums(ms), 0n), toks_of_bytes(bs)))))
+  enc_ok(table_ok(nums(ms)), nums(ms), bs)
 
 def do_decode(+ms: List<&2, U32>, ids: List<&2, U32>) -> IO(Unit):
-  IO.print(show_nats(BPE.decode(rules.go(nums(ms), 0n), toks_of_ids(nums(ids)))))
+  dec_ok(table_ok(nums(ms)), nums(ms), ids)
 
 def train_n(mn: Maybe<&2, Nat>, bs: List<&2, U32>) -> IO(Unit):
   match mn:

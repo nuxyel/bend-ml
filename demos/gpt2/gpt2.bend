@@ -398,6 +398,22 @@ def start2(+model: Model, +table: List<&2, BPE.Rule>, +perm: List<&2, Nat>, +ids
 def generate(model: Model, +mb: List<&2, U32>, +pb: List<&2, U32>, prompt: String, n: Nat) -> IO(Unit):
   start2(model, K.rules.go(K.nums(mb), 0n), K.nums(pb), K.encode_text(K.rules.go(K.nums(mb), 0n), K.nums(pb), utf8_of(String.to_list(prompt))), n)
 
+# refuse to run on a malformed merges table (checked before the weights are loaded)
+def run3(ok: Bool, +mb: List<&2, U32>, +pb: List<&2, U32>, prompt: String, n: Nat) -> IO(Unit):
+  match ok:
+    case True{}:
+      do IO<Unit>:
+        t0 : Nat <- IO.now()
+        model : Model <- load_model()
+        t1 : Nat <- IO.now()
+        IO.print("weights loaded in " ++ Nat.show(Nat.div(Nat.sub(t1, t0), 1000n)) ++ "s")
+        generate(model, mb, pb, prompt, n)
+    case False{}:
+      IO.print("invalid merges table")
+
+def run2(+mb: List<&2, U32>, +pb: List<&2, U32>, prompt: String, n: Nat) -> IO(Unit):
+  run3(K.ids_ok(K.nums(mb), 0n), mb, pb, prompt, n)
+
 def run1(prompt: String, mn: Maybe<&2, Nat>) -> IO(Unit):
   match mn:
     case None{}:
@@ -406,11 +422,7 @@ def run1(prompt: String, mn: Maybe<&2, Nat>) -> IO(Unit):
       do IO<Unit>:
         mb : List<&2, U32> <- K.read_bytes("demos/gpt2/data/merges_num.txt")
         pb : List<&2, U32> <- K.read_bytes("demos/gpt2/data/perm.txt")
-        t0 : Nat <- IO.now()
-        model : Model <- load_model()
-        t1 : Nat <- IO.now()
-        IO.print("weights loaded in " ++ Nat.show(Nat.div(Nat.sub(t1, t0), 1000n)) ++ "s")
-        generate(model, mb, pb, prompt, n)
+        run2(mb, pb, prompt, n)
 
 def dispatch(args: List<String>) -> IO(Unit):
   match args:

@@ -56,6 +56,15 @@ def main():
             print(f"{'ok ' if ok_train else 'ERROR'} {name}: train ({len(ref_table)} rules)")
             if not ok_train:
                 failures += 1
+        # a malformed merges table must be refused, not used
+        for name, merges in [("odd count", "97 98 256"), ("forward reference", "97 98 300 99"), ("unknown id", "97 98 99999 99")]:
+            for mode, arg in [("encode", b"abc"), ("decode", b"97 98 ")]:
+                r = subprocess.run([BEND, os.path.join(ROOT, "bpe/cli.bend"), mode, w("bad.merges", merges), w("arg.txt", arg)],
+                                   capture_output=True, text=True, env=ENV)
+                ok = r.stdout.strip() == "invalid merges table"
+                if not ok:
+                    failures += 1
+                print(f"{'ok ' if ok else 'ERROR'} malformed merges refused: {name} ({mode})")
     print("FAILURES:", failures)
     sys.exit(1 if failures else 0)
 
