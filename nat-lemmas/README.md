@@ -1,53 +1,57 @@
 # bend-ml-nat-lemmas
 
-Lemas provados de `Nat` e `List` que a Base do Bend 2 ainda não tem. Servem de alicerce para o resto do bend-ml (shapes de tensores, tokenizer).
+Proved lemmas about `Nat` and `List` that Bend 2's Base does not have yet. They are the foundation for the rest of bend-ml (tensor shapes, the tokenizer).
 
 - Bend: **2.0.35**
-- Licença: MIT
-- Sem `@unsafe`, sem `?TODO`: `bend nat-lemmas/main.bend` imprime `ALL PROOFS CHECK`.
+- License: MIT
+- No `@unsafe`, no `?TODO`: `bend nat-lemmas/main.bend` prints `ALL PROOFS CHECK`, and `bend nat-lemmas/main.bend --verdict` re-checks it with the Lean-proved kernel.
 
-## Uso
+## Usage
 
 ```python
 import Base
-import bend-ml-nat-lemmas@0.1.0.0/main.bend as NL
+import bend-ml-nat-lemmas@0.1.1.0/main.bend as NL
 
 def comm(a: Nat, +b: Nat) -> {Nat.add(a, b) == Nat.add(b, a) : Nat}:
   NL.add_comm(a, b)
 ```
 
-Um parâmetro leva `+` quando pode ser usado mais de uma vez (regra de variáveis afins do Bend).
+A parameter carries `+` when it may be used more than once (Bend's affine-variable rule).
 
-## LAWS provadas (em português)
+## Proved LAWS (in plain language)
 
-| Lei | O que afirma |
+| Law | What it states |
 |---|---|
 | `add_zero` | `a + 0 = a` |
 | `add_succ` | `1 + (a + b) = a + (1 + b)` |
-| `add_comm` | `a + b = b + a` (a soma é comutativa) |
-| `add_assoc` | `a + (b + c) = (a + b) + c` (a soma é associativa) |
+| `add_comm` | `a + b = b + a` (addition is commutative) |
+| `add_assoc` | `a + (b + c) = (a + b) + c` (addition is associative) |
 | `mul_zero` | `a * 0 = 0` |
 | `mul_succ` | `a * (1 + b) = a + a * b` |
-| `mul_comm` | `a * b = b * a` (o produto é comutativo) |
-| `mul_dist` | `a*c + b*c = (a + b)*c` (distributividade) |
-| `mul_assoc` | `a * (b * c) = (a * b) * c` (o produto é associativo) |
-| `mul_one_l`, `mul_one_r` | `1 * a = a` e `a * 1 = a` |
+| `mul_comm` | `a * b = b * a` (multiplication is commutative) |
+| `mul_dist` | `a*c + b*c = (a + b)*c` (distributivity) |
+| `mul_assoc` | `a * (b * c) = (a * b) * c` (multiplication is associative) |
+| `mul_one_l`, `mul_one_r` | `1 * a = a` and `a * 1 = a` |
 | `append_nil` | `xs ++ [] = xs` |
 | `append_assoc` | `(xs ++ ys) ++ zs = xs ++ (ys ++ zs)` |
-| `length_append` | `tamanho(xs ++ ys) = tamanho(xs) + tamanho(ys)` |
-| `product_append` | `produto(xs ++ ys) = produto(xs) * produto(ys)` |
+| `length_append` | `length(xs ++ ys) = length(xs) + length(ys)` |
+| `product_append` | `product(xs ++ ys) = product(xs) * product(ys)` |
 
-`product(xs)` multiplica os elementos de uma lista de `Nat` (lista vazia vale 1). É o número de elementos de um tensor cuja shape é `xs`; por isso `product_append` é a base do `reshape` com prova.
+`product(xs)` multiplies the elements of a list of `Nat` (the empty list is 1). It is the number of elements of a tensor whose shape is `xs`, which is why `product_append` is the basis of `reshape` with a proof.
 
-## Como ler uma prova
+## How to read a proof
 
-Em Bend, uma prova é uma função cujo tipo é a afirmação. `match` faz análise de casos; a chamada recursiva é a hipótese de indução; `%e : P` reescreve o objetivo usando a igualdade `e`; `{==}` fecha quando os dois lados já são o mesmo termo. Os comentários em `main.bend` explicam cada passo.
+In Bend, a proof is a function whose type is the statement. `match` does case analysis; the recursive call is the induction hypothesis; `%e : P` rewrites the goal using the equality `e`; `{==}` closes the goal when both sides are already the same term. The comments in `main.bend` explain each step.
 
-## Créditos
+## Credits
 
-As provas de `add_*` e `mul_*` seguem o demo oficial `proof_numerics` do Bend, adaptadas para `Nat.add` e `Nat.mul` da Base.
+The proofs of `add_*` and `mul_*` follow Bend's official `proof_numerics` demo, adapted to Base's `Nat.add` and `Nat.mul`.
 
-## Limites conhecidos
+## Known limits
 
-- Ainda não rodei `bend --verdict` (reverificação pelo kernel provado em Lean): o Lean 4.34.0 não está instalado na máquina de desenvolvimento.
-- Lemas de `reverse`, `take`/`drop` e de ordem (`<=`) ficam para versões futuras.
+- Lemmas about `reverse`, `take`/`drop` and ordering (`<=`) are left for future versions.
+
+## Versions
+
+- `0.1.1.0`: the same laws, with English comments and README.
+- `0.1.0.0`: first publication.
