@@ -1,4 +1,4 @@
-"""Tokenizer do GPT-2 em Bend (demos/gpt2/tok.bend) contra o tiktoken."""
+"""GPT-2 tokenizer in Bend (demos/gpt2/tok.bend) against tiktoken."""
 import os, subprocess, sys, tempfile, time
 import tiktoken
 
@@ -28,7 +28,7 @@ CASES = [
 
 def main():
     enc = tiktoken.get_encoding("gpt2")
-    falhas = 0
+    failures = 0
     with tempfile.TemporaryDirectory() as d:
         for s in CASES:
             p = os.path.join(d, "t.txt"); open(p, "wb").write(s.encode("utf-8"))
@@ -38,9 +38,9 @@ def main():
             got = [int(x) for x in r.stdout.split()] if r.stdout.strip() and r.stdout.strip()[0].isdigit() else []
             want = enc.encode(s)
             ok = got == want
-            if not ok: falhas += 1
-            print(f"{'ok  ' if ok else 'ERRO'} {dt:5.2f}s {s[:48]!r}" + ("" if ok else f"\n   bend={got}\n   tiktoken={want}"))
-    print("FALHAS:", falhas)
-    sys.exit(1 if falhas else 0)
+            if not ok: failures += 1
+            print(f"{'ok  ' if ok else 'ERROR'} {dt:5.2f}s {s[:48]!r}" + ("" if ok else f"\n   bend={got}\n   tiktoken={want}"))
+    print("FAILURES:", failures)
+    sys.exit(1 if failures else 0)
 
 main()
