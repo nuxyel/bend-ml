@@ -1,7 +1,7 @@
 import Base
 import ./main.bend as BPE
 
-# ---- leitura de arquivos ----
+# ---- reading files ----
 def rb_done(m: File & Result<&1, &1, U32 & String, List<&2, U32>>) -> IO(List<&2, U32>):
   (f, r) = m
   do IO<List<&2, U32>>:
@@ -15,7 +15,7 @@ def read_bytes(path: String) -> IO(List<&2, U32>):
     m : File & Result<&1, &1, U32 & String, List<&2, U32>> <- File.read_bytes(f, 400000000)
     rb_done(m)
 
-# ---- conversões U32/Nat <-> tokens ----
+# ---- U32/Nat <-> token conversions ----
 def toks_of_bytes(bs: List<&2, U32>) -> List<&2, BPE.Tk>:
   match bs:
     case Nil{}:
@@ -40,7 +40,7 @@ def id_tok2(small: Bool, +n: Nat) -> BPE.Tk:
 def id_tok(+n: Nat) -> BPE.Tk:
   id_tok2(Nat.is_lt(n, 256n), n)
 
-# ---- inteiros em texto: qualquer byte que não é dígito separa ----
+# ---- integers in text: any byte that is not a digit separates ----
 def digit2(lo: Bool, hi: Bool, +code: U32) -> Maybe<&2, Nat>:
   match lo hi:
     case True{} True{}:
@@ -77,7 +77,7 @@ def nums.go(xs: List<&2, U32>, d: Maybe<&2, Nat>, +cur: Nat, have: Bool, acc: Li
 def nums(+xs: List<&2, U32>) -> List<&2, Nat>:
   nums.go(xs, head_digit(xs), 0n, False{}, Nil{})
 
-# pares de ids viram regras com id sequencial
+# pairs of ids become rules with sequential ids
 def rules.go(ns: List<&2, Nat>, +k: Nat) -> List<&2, BPE.Rule>:
   match ns:
     case Nil{}:
@@ -96,7 +96,7 @@ def toks_of_ids(ns: List<&2, Nat>) -> List<&2, BPE.Tk>:
     case Con{n, t}:
       id_tok(n) <> toks_of_ids(t)
 
-# ---- saída ----
+# ---- output ----
 def show_nats(xs: List<&2, Nat>) -> String:
   match xs:
     case Nil{}:
@@ -118,7 +118,7 @@ def rule_ids(rs: List<&2, BPE.Rule>) -> List<&2, Nat>:
     case Con{BPE.Rule{i, +a, +b}, t}:
       tok_id(a) <> tok_id(b) <> rule_ids(t)
 
-# ---- modos ----
+# ---- modes ----
 def do_train(n: Nat, bs: List<&2, U32>) -> IO(Unit):
   IO.print(show_nats(rule_ids(BPE.train(n, 0n, toks_of_bytes(bs)))))
 
@@ -131,7 +131,7 @@ def do_decode(+ms: List<&2, U32>, ids: List<&2, U32>) -> IO(Unit):
 def train_n(mn: Maybe<&2, Nat>, bs: List<&2, U32>) -> IO(Unit):
   match mn:
     case None{}:
-      IO.print("N invalido")
+      IO.print("invalid N")
     case Some{n}:
       do_train(n, bs)
 
@@ -161,14 +161,14 @@ def dispatch2(is_train: Bool, is_enc: Bool, is_dec: Bool, a: String, b: String) 
     case False{} False{} True{}:
       mode_decode(a, b)
     case False{} False{} False{}:
-      IO.print("uso: cli train N corpus | encode merges texto | decode merges ids")
+      IO.print("usage: cli train N corpus | encode merges text | decode merges ids")
 
 def dispatch(args: List<String>) -> IO(Unit):
   match args:
     case Con{prog, Con{+mode, Con{a, Con{b, Nil{}}}}}:
       dispatch2(String.eq(mode, "train"), String.eq(mode, "encode"), String.eq(mode, "decode"), a, b)
     case _:
-      IO.print("uso: cli train N corpus | encode merges texto | decode merges ids")
+      IO.print("usage: cli train N corpus | encode merges text | decode merges ids")
 
 def main() -> IO(Unit):
   do IO<Unit>:
