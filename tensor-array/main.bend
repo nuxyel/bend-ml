@@ -27,8 +27,6 @@ type R is Type:
 type G is Type:
   G{a: Array<F32>, b: Array<F32>, c: Array<F32>}
 
-# smallest d with 2^d >= n (n >= 2)
-
 def dotg(k: Nat, +ia: U32, +ib: U32, +sa: U32, +sb: U32, acc: F32, ra: Array<F32> & F32, rb: Array<F32> & F32) -> R:
   match k ra rb:
     case 0n Tuple{a, x} Tuple{b, y}:
@@ -162,9 +160,6 @@ def gemm_par_cols(d: Nat, +m: Nat, +k: Nat, +sa: U32, +sb: U32, +bcol: U32, a: A
 # ---------------------------------------------------------------------
 # element-wise operations (in place, by index)
 # ---------------------------------------------------------------------
-
-def depth(n: Nat) -> Nat:
-  Nat.add(U32.log2(U32.from_nat(Nat.sub(n, 1n))), 1n)
 
 # ---------------------------------------------------------------------
 # gemm: C[i][j] = sum_p A[i*arow + p*sa] * B[p*sb + j*bcol]
@@ -331,8 +326,6 @@ def ce_row(al: AL, +label: Nat, +nf: F32, +idx: U32, loss: F32) -> L2:
 type Mat<-r: Nat, -c: Nat> is Type:
   Mat{d: Array<F32>}
 
-# smallest d with 2^d >= n (n >= 2); n < 2 gives 0
-
 def ce_rows(labels: List<&2, Nat>, +mm1: Nat, +mu: U32, +nf: F32, +i: U32, r: L2) -> L2:
   match labels r:
     case Nil{} L2{loss, c}:
@@ -392,15 +385,175 @@ def count_rows(labels: List<&2, Nat>, +mm1: Nat, +mu: U32, +i: U32, r: CR) -> CR
 # Typed API: Mat<r, c> (the dimensions enter the type)
 # =====================================================================
 
-def cap_depth2(small: Bool, n: Nat) -> Nat:
-  match small:
-    case True{}:
-      0n
-    case False{}:
-      depth(n)
+# =====================================================================
+# Array capacity: a PROVED depth for the number of slots
+# =====================================================================
+#
+# cap_depth(n) is the d such that an Array with 2^d slots holds n elements. It is computed by
+# structural recursion on n (not with U32.log2) so that the law cap_ok below can prove
+# `n <= 2^cap_depth(n)`. What stays trusted is only that Array.new(T, d, v) allocates 2^d slots.
 
-def cap_depth(+n: Nat) -> Nat:
-  cap_depth2(Nat.is_lt(n, 2n), n)
+# a type chosen by a Bool: rewriting through it refutes True == False
+def BD(b: Bool, t: Type, f: Type) -> Type:
+  match b:
+    case True{}:
+      t
+    case False{}:
+      f
+
+# a <= b, by direct recursion
+def leb(a: Nat, b: Nat) -> Bool:
+  match a b:
+    case 0n _:
+      True{}
+    case 1n+p 0n:
+      False{}
+    case 1n+p 1n+q:
+      leb(p, q)
+
+def pow2(d: Nat) -> Nat:
+  match d:
+    case 0n:
+      1n
+    case 1n++q:
+      Nat.add(pow2(q), pow2(q))
+
+# smallest power of two >= n, by structural recursion on n: returns (depth, 2^depth)
+def cap_pick(ok: Bool, d: Nat, +p: Nat) -> Nat & Nat:
+  match ok:
+    case True{}:
+      (d, p)
+    case False{}:
+      (1n+d, Nat.add(p, p))
+
+def cap_step(r: Nat & Nat, +n: Nat) -> Nat & Nat:
+  match r:
+    case Tuple{+d, +p}:
+      cap_pick(leb(n, p), d, p)
+
+def cap_pair(n: Nat) -> Nat & Nat:
+  match n:
+    case 0n:
+      (0n, 1n)
+    case 1n++m:
+      cap_step(cap_pair(m), 1n+m)
+
+def fst_nat(r: Nat & Nat) -> Nat:
+  match r:
+    case Tuple{d, p}:
+      d
+
+def snd_nat(r: Nat & Nat) -> Nat:
+  match r:
+    case Tuple{d, p}:
+      p
+
+# the depth d such that an Array with 2^d slots holds n elements
+def cap_depth(n: Nat) -> Nat:
+  fst_nat(cap_pair(n))
+
+# ---- lemmas ----
+
+# a <= b  ->  a <= 1 + b
+def leb_succ(a: Nat, b: Nat, e: {True{} == leb(a, b) : Bool}) -> {True{} == leb(a, 1n+b) : Bool}:
+  match a b:
+    case 0n _:
+      {==}
+    case 1n+p 0n:
+      %e : BD(_, Unit, {True{} == leb(1n+p, 1n) : Bool})
+      Unit{}
+    case 1n+p 1n+q:
+      leb_succ(p, q, e)
+
+# a <= b  ->  a <= c + b
+def leb_up_l(+a: Nat, +b: Nat, c: Nat, +e: {True{} == leb(a, b) : Bool}) -> {True{} == leb(a, Nat.add(c, b)) : Bool}:
+  match c:
+    case 0n:
+      e
+    case 1n++c2:
+      leb_succ(a, Nat.add(c2, b), leb_up_l(a, b, c2, e))
+
+# a <= b  ->  a <= b + c
+def leb_up(a: Nat, b: Nat, c: Nat, e: {True{} == leb(a, b) : Bool}) -> {True{} == leb(a, Nat.add(b, c)) : Bool}:
+  match a b:
+    case 0n _:
+      {==}
+    case 1n+p 0n:
+      %e : BD(_, Unit, {True{} == leb(1n+p, Nat.add(0n, c)) : Bool})
+      Unit{}
+    case 1n+p 1n+q:
+      leb_up(p, q, c, e)
+
+# a <= b  and  c <= d  ->  a + c <= b + d
+def leb_add(a: Nat, b: Nat, c: Nat, d: Nat, e1: {True{} == leb(a, b) : Bool}, e2: {True{} == leb(c, d) : Bool}) -> {True{} == leb(Nat.add(a, c), Nat.add(b, d)) : Bool}:
+  match a b:
+    case 0n _:
+      leb_up_l(c, d, b, e2)
+    case 1n+p 0n:
+      %e1 : BD(_, Unit, {True{} == leb(Nat.add(1n+p, c), Nat.add(0n, d)) : Bool})
+      Unit{}
+    case 1n+p 1n+q:
+      leb_add(p, q, c, d, e1, e2)
+
+# 1 <= 2^d
+def pow2_pos(d: Nat) -> {True{} == leb(1n, pow2(d)) : Bool}:
+  match d:
+    case 0n:
+      {==}
+    case 1n++q:
+      leb_up(1n, pow2(q), pow2(q), pow2_pos(q))
+
+# 1 <= p when p = 2^d
+def pos_p(d: Nat, p: Nat, i1: {p == pow2(d) : Nat}) -> {True{} == leb(1n, p) : Bool}:
+  %Equal.sym(Nat, p, pow2(d), i1) : {True{} == leb(1n, _) : Bool}
+  pow2_pos(d)
+
+# p + p == 2^(1+d) when p == 2^d
+def step_eq(d: Nat, p: Nat, i1: {p == pow2(d) : Nat}) -> {Nat.add(p, p) == pow2(1n+d) : Nat}:
+  %i1 : {Nat.add(p, p) == Nat.add(_, _) : Nat}
+  {==}
+
+# one step: given the invariant for m, the invariant for 1+m holds whichever way the comparison goes
+def step_ok(ok: Bool, +d: Nat, +p: Nat, +m: Nat, +e: {ok == leb(1n+m, p) : Bool}, +i1: {p == pow2(d) : Nat}, +i2: {True{} == leb(m, p) : Bool}) -> {snd_nat(cap_pick(ok, d, p)) == pow2(fst_nat(cap_pick(ok, d, p))) : Nat} & {True{} == leb(1n+m, snd_nat(cap_pick(ok, d, p))) : Bool}:
+  match ok:
+    case True{}:
+      (i1, e)
+    case False{}:
+      (step_eq(d, p, i1), leb_add(1n, p, m, p, pos_p(d, p, i1), i2))
+
+
+# the invariant for cap_step on a pair, opened
+def step_pair_ok(+m: Nat, r: Nat & Nat, i1: {snd_nat(r) == pow2(fst_nat(r)) : Nat}, i2: {True{} == leb(m, snd_nat(r)) : Bool}) -> {snd_nat(cap_step(r, 1n+m)) == pow2(fst_nat(cap_step(r, 1n+m))) : Nat} & {True{} == leb(1n+m, snd_nat(cap_step(r, 1n+m))) : Bool}:
+  match r:
+    case Tuple{+d, +p}:
+      step_ok(leb(1n+m, p), d, p, m, {==}, i1, i2)
+
+def cap_succ(+m: Nat, ih: {snd_nat(cap_pair(m)) == pow2(fst_nat(cap_pair(m))) : Nat} & {True{} == leb(m, snd_nat(cap_pair(m))) : Bool}) -> {snd_nat(cap_pair(1n+m)) == pow2(fst_nat(cap_pair(1n+m))) : Nat} & {True{} == leb(1n+m, snd_nat(cap_pair(1n+m))) : Bool}:
+  match ih:
+    case Tuple{i1, i2}:
+      step_pair_ok(m, cap_pair(m), i1, i2)
+
+# the invariant of cap_pair: the second component is 2^(first) and is >= n
+def cap_inv(n: Nat) -> {snd_nat(cap_pair(n)) == pow2(fst_nat(cap_pair(n))) : Nat} & {True{} == leb(n, snd_nat(cap_pair(n))) : Bool}:
+  match n:
+    case 0n:
+      ({==}, {==})
+    case 1n++m:
+      cap_succ(m, cap_inv(m))
+
+def cap_final(n: Nat, pr: {snd_nat(cap_pair(n)) == pow2(fst_nat(cap_pair(n))) : Nat} & {True{} == leb(n, snd_nat(cap_pair(n))) : Bool}) -> {True{} == leb(n, pow2(cap_depth(n))) : Bool}:
+  match pr:
+    case Tuple{i1, i2}:
+      %i1 : {True{} == leb(n, _) : Bool}
+      i2
+
+# LAW (cap_ok): an Array with 2^cap_depth(n) slots always has room for n elements.
+law cap_ok:
+  for +n: Nat
+  {True{} == leb(n, pow2(cap_depth(n))) : Bool}
+
+def cap_ok(n):
+  cap_final(n, cap_inv(n))
 
 # r x c of zeros, with the exact capacity (smallest power of 2)
 
@@ -674,3 +827,37 @@ def Mat.write_row(-r: Nat, +c: Nat, m: Mat<r, c>, +i: U32, xs: List<&2, F32>) ->
   match m:
     case Mat{d}:
       Mat{write_l(xs, (i * U32.from_nat(c) : U32), d)}
+
+# ---- variants that check the number of labels ----
+
+# does the list of labels have exactly n entries (one per row)?
+def labels_len_is(xs: List<&2, Nat>, n: Nat) -> Bool:
+  match xs n:
+    case Nil{} 0n:
+      True{}
+    case Con{h, t} 1n+p:
+      labels_len_is(t, p)
+    case _ _:
+      False{}
+
+def ce_checked(ok: Bool, +n: Nat, +c: Nat, z: Mat<n, c>, labels: List<&2, Nat>) -> Maybe<&1, MCE<n, c>>:
+  match ok:
+    case True{}:
+      Some{Mat.softmax_ce(n, c, z, labels)}
+    case False{}:
+      None{}
+
+# like Mat.softmax_ce, but returns None unless labels has exactly n entries
+def Mat.softmax_ce_checked(+n: Nat, +c: Nat, z: Mat<n, c>, +labels: List<&2, Nat>) -> Maybe<&1, MCE<n, c>>:
+  ce_checked(labels_len_is(labels, n), n, c, z, labels)
+
+def hits_checked(ok: Bool, +n: Nat, +c: Nat, z: Mat<n, c>, labels: List<&2, Nat>) -> Maybe<&1, MHits<n, c>>:
+  match ok:
+    case True{}:
+      Some{Mat.count_correct(n, c, z, labels)}
+    case False{}:
+      None{}
+
+# like Mat.count_correct, but returns None unless labels has exactly n entries
+def Mat.count_correct_checked(+n: Nat, +c: Nat, z: Mat<n, c>, +labels: List<&2, Nat>) -> Maybe<&1, MHits<n, c>>:
+  hits_checked(labels_len_is(labels, n), n, c, z, labels)

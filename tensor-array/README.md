@@ -60,12 +60,13 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 
 ## What is NOT proved
 
-- The invariant "the `Array` capacity is `>= r*c`" holds because the constructors (`zeros`, `fill`, `of_list`) allocate the right size; it is not a fact in the type.
-- `softmax_ce` and `count_correct` expect `labels` with `n` entries (one per row); this is not checked by the type.
+- The capacity arithmetic is proved (`cap_ok`: `2^cap_depth(n) >= n`), but that `Array.new(d)` really allocates `2^d` slots is a property of the runtime and stays trusted. The invariant "the `Array` capacity is `>= r*c`" is not carried in the type of `Mat`; the constructors (`zeros`, `fill`, `of_list`) establish it.
+- `softmax_ce` and `count_correct` expect `labels` with `n` entries (one per row); the type does not check it. Use `softmax_ce_checked` and `count_correct_checked`, which return `None` when `length(labels) != n`.
 - `F32` numerics are validated by tests against PyTorch, not by proof.
 
 ## Versions
 
+- `0.1.3.0`: `cap_depth` is now defined by `Nat` recursion and proved (`law cap_ok`); adds `Mat.softmax_ce_checked` and `Mat.count_correct_checked`.
 - `0.1.2.0`: the same API, with English comments and README.
 - `0.1.1.0`: column split for `n = 1` (matrix · vector) and `Mat.from_list`.
 - `0.1.0.0`: first publication.
