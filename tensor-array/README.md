@@ -4,11 +4,11 @@ Tensores em Bend 2 sobre `Array<F32>` plano, **com a shape no tipo**: a mesma ga
 
 - Bend: **2.0.35** · Licença: MIT.
 - `bend tensor-array/main.bend` e `--verdict` → `ALL PROOFS CHECK` (sem `@unsafe`, sem `?TODO`).
-- Testes contra o PyTorch: `reference/test_tensor_array.py` (39 verificações, erro máximo ≈ 1,4e-6).
+- Testes contra o PyTorch: `reference/test_tensor_array.py` (52 verificações, erro máximo ≈ 1,4e-6).
 
 ```python
 import Base
-import bend-ml-tensor-array@0.1.0.0/main.bend as TA
+import bend-ml-tensor-array@0.1.1.0/main.bend as TA
 
 def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 128n>:
   TA.Mat.matmul(100n, 784n, 128n, 3n, a, w)   # 3n = 2^3 = 8 blocos paralelos
@@ -18,13 +18,13 @@ def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 12
 
 - `Mat<r, c>` guarda `r*c` números num `Array<F32>` linha a linha (índice `i*c + j`). As dimensões são parâmetros de tipo **apagados**.
 - Um `Array` é afim (um só dono), então **toda operação devolve também o que leu**: `Mat.matmul(a, b)` devolve `MMul{a, b, c}`. Use `Mat.clone` quando precisar de duas cópias.
-- `par` (nos produtos) é o log2 do número de blocos de linhas calculados em paralelo; `0` é sequencial. Cada bloco trabalha numa cópia (`Array.clone`, barato) de `A` e `B`.
+- `par` (nos produtos) é o log2 do número de blocos calculados em paralelo; `0` é sequencial. Divide as linhas de `C`, ou as colunas quando `n = 1` (matriz · vetor). Cada bloco trabalha numa cópia (`Array.clone`, barato) de `A` e `B`.
 
 ## Operações
 
 | Operação | Tipo |
 |---|---|
-| `Mat.zeros`, `Mat.fill`, `Mat.of_list`, `Mat.to_list`, `Mat.clone` | `Mat<r,c>` (`of_list` só devolve `Some` se a lista tem `r*c` números) |
+| `Mat.zeros`, `Mat.fill`, `Mat.of_list`, `Mat.from_list`, `Mat.to_list`, `Mat.clone` | `Mat<r,c>` (`of_list` só devolve `Some` se a lista tem `r*c` números; `from_list` não confere) |
 | `Mat.matmul` | `Mat<n,k> · Mat<k,m> = Mat<n,m>` |
 | `Mat.matmul_nt` | `Mat<n,k> · Mat<m,k>ᵀ = Mat<n,m>` (pesos com uma linha por saída) |
 | `Mat.matmul_tn` | `Mat<k,n>ᵀ · Mat<k,m> = Mat<n,m>` (gradiente de pesos: `Xᵀ · dY`) |
@@ -63,3 +63,8 @@ Com blocos paralelos o produto grande de MNIST (100×784·784×128) ganha ~2× e
 - A invariante "a capacidade do `Array` é `>= r*c`" vale porque os construtores (`zeros`, `fill`, `of_list`) alocam o tamanho certo; ela não é um fato no tipo.
 - `softmax_ce` e `count_correct` esperam `labels` com `n` entradas (uma por linha); não é checado pelo tipo.
 - A numérica em `F32` é validada por testes contra o PyTorch, não por prova.
+
+## Versões
+
+- `0.1.1.0`: divisão por colunas para `n = 1` (matriz · vetor) e `Mat.from_list`.
+- `0.1.0.0`: primeira publicação.
