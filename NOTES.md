@@ -231,3 +231,16 @@ Matrizes planas em `Array<F32>`, `gemm` com strides (cobre `X·W`, `H·Wᵀ` e `
 
 Distância ao PyTorch (1 thread): de ~1800× para **~38×**. Correção preservada (mesma perda e mesmos acertos).
 Os ~19 ms por lote se dividem em ~9 ms de `gemm` (20 M mult-soma a 2,3 G/s) e ~10 ms de todo o resto (monta `X` com 78 400 `set`, lê 78 KB, bias/relu/máscara/SGD sobre ~100 mil elementos com get+set).
+
+### Exp. 7: `gemm` paralelo no MNIST (`fast.bend` agora usa 2^3 blocos nos dois produtos grandes)
+
+Blocos de linhas de C, cada um com cópia de A e B (`Array.clone`), resultados em listas escritas em C no fim. Mesma correção (50 lotes: 1,6616004 e 7829; época: 0,5204771 e 9129).
+
+| 1 época | tempo |
+|---|---|
+| `Array`, sequencial | 11,5 s |
+| `Array`, gemm paralelo, 2^2 blocos, 8 threads | 7,2 s |
+| `Array`, gemm paralelo, 2^3 blocos, 16 threads | **6,3 s** |
+| `Array`, gemm paralelo, 2^4 blocos, 16 threads | 7,5 s |
+
+Distância ao PyTorch: 6,3 s contra 0,21 s (16 threads, ~30×) e 0,30 s (1 thread, ~21×). O que sobra é a parte sequencial (carga de dados ~2 s por época; bias/relu/máscara/SGD sobre ~100 mil elementos): lei de Amdahl.
