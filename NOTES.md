@@ -304,3 +304,19 @@ The older versions stay on BendHub (publication is permanent). The demos and ben
 The test inputs that contain accented Portuguese words (`reference/test_bpe.py`, `test_gpt2_tok.py`, `gpt2_prep.py`) were kept on purpose: they exercise multi-byte UTF-8.
 
 Commit history: rewritten on 2026-10-04 to remove the `Co-Authored-By` trailers, translate the messages to English and split the work into small commits (the content of each commit is unchanged; the tags `v0.1.0` and `v1.0.0` point to the equivalent commits).
+
+### Exp. 10: GPU with a user-local CUDA 12 (2026-10-04)
+
+- **Setup works without sudo:** the Bend binary honors `CUDA_HOME`; the NVIDIA redistributable archives `cuda_cudart` 12.9.79 and `cuda_nvrtc` 12.9.86 (headers and `libnvrtc` only) unpacked into `~/.local/cuda12` were enough. The driver 610.57.04 supplies `libcuda`. Steps in `docs/gpu-setup.md`. The guide's `pow2!(26n)` builds (`prog.gpu` is written next to the binary), runs on the RTX 4050 and returns the right value.
+- **But the GPU is slower than the CPU for every kernel I tried** (22-thread CPU vs `!` on the GPU, same program, `--gpu off` for the CPU):
+
+| workload (each task builds its own data) | GPU | CPU | GPU / CPU |
+|---|---|---|---|
+| dot products on `Array`, 32 tasks | 0.40 s | 0.022 s | 18x slower |
+| dot products on `Array`, 1024 tasks, k = 20,000 | 3.13 s | 1.00 s | 3.1x slower |
+| dot products on `Array`, 1024 tasks, k = 200,000 | 29.6 s | 9.3 s | 3.2x slower |
+| dot products on lists, 1024 tasks, k = 3,000 | 18.1 s | 2.5 s | 7.3x slower |
+| dot products on lists, 1024 tasks, k = 30,000 | 178.6 s | 24.3 s | 7.3x slower |
+
+  There is no crossover as the work grows: the ratio is flat. The shared-`Array` matrix product (`bench/mm_par.bend` with `par!`) aborts on the GPU with `memory fault`, while it runs on the CPU. The guide itself says GPU work shines on uniform numeric kernels (mandelbrot, n-body) and that data is "managed" memory that faults across PCIe on first touch; our kernels are long sequential loops over heap structures, which is the opposite.
+- **Conclusion:** with Bend 2.0.35, `!` on the RTX 4050 does not help this project; the parallel CPU is the faster target. The hybrid-CPU numbers in the benchmarks stand. A GPU-friendly formulation would need flat loops over data that already lives in the lanes (as in the guide's shader demo), which is a different design from `Array`-backed matrices.
