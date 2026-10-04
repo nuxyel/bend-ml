@@ -25,7 +25,18 @@ def run(name, cmd, ok_if=None, timeout=3600):
     return out
 
 
+def check_toolchain():
+    """Fail early, with a clear message, when the pinned toolchain is not the one in use."""
+    bv = subprocess.run([BEND, "version"], capture_output=True, text=True, env=ENV).stdout.split()
+    if not bv or bv[-1] != "2.0.35":
+        sys.exit(f"ERROR: bend 2.0.35 is required (found {' '.join(bv) or 'none'}); run scripts/setup.sh")
+    lv = subprocess.run(["lean", "--version"], capture_output=True, text=True, env=ENV)
+    if "version 4.34.0" not in lv.stdout:
+        sys.exit(f"ERROR: lean 4.34.0 is required for --verdict (found {lv.stdout.strip() or 'none'}); run scripts/setup.sh")
+
+
 def main():
+    check_toolchain()
     # 1. proofs: checker and audited kernel, in each package
     for pkg in ["nat-lemmas", "bpe", "tensor", "tensor-array", "autograd"]:
         f = f"{pkg}/main.bend"
