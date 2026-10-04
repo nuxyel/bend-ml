@@ -168,3 +168,20 @@ Demos relevantes para nós: `proof_numerics` (prova de `add_comm`, `add_assoc`, 
 - **Validação de corretude:** após 50 passos, Bend: `loss_treino=1.6616005`, `7829/10000`; PyTorch: `loss_treino=1.661600`, `acc_teste=0.7829`. Idênticos.
 - Desempenho (honesto): ~0,84 s por lote de 100 numa thread (≈ 24 M mult-soma/s efetivos). O paralelismo de `x y = f g` escala bem no `pow2` (8× com 16 threads), mas o `matmul` por linhas em listas só chegou a ~1,8× (com ou sem compartilhamento de dados); causa não resolvida. O `bend -o` + `--threads N` é o mecanismo.
 - `tensor@0.1.1.0` acrescenta `Mat.matmul_t` (operando já transposto) para o GPT-2.
+
+## v0.6 e v1.0 — MNIST, GPT-2 e entrega (2026-10-03)
+
+- **MNIST (1 época completa, 600 lotes de 100, lr 0,1):** Bend perda `0,52047706`, 9129/10000, 544,3 s; PyTorch perda `0,520477`, 9129/10000 (9128 com 1 thread), 0,21 s (16 threads) / 0,30 s (1 thread). Correção idêntica; o Bend é ~1800× mais lento por falta de BLAS e por usar listas. Detalhes e hardware em `demos/mnist/BENCHMARK.md`.
+- **GPT-2 small (124 M) em Bend:** pesos carregados em ~10 s (bytes -> F32 por bitcast `U32{w}` -> `F32{w}`, em blocos de 1 MB); ~3 s por token com KV cache; ids idênticos aos do PyTorch em 22 tokens (3 prompts), logits a menos de 2e-4. `reference/test_gpt2.py`.
+- **Tokenizer do GPT-2 em Bend:** pré-tokenizador da regex sobre bytes + as 50 000 regras via `bend-ml-bpe-tokenizer`; 16/16 textos idênticos ao `tiktoken`. A equivalência "aplicar as regras em ordem == algoritmo por rank do GPT-2" foi confirmada contra o tiktoken real (`reference/gpt2_prep.py`). Limite: bytes >= 128 contam como letra.
+- **Pacotes publicados:** `bend-ml-nat-lemmas@0.1.0.0` (`0xa7aa06c0...`), `bend-ml-bpe-tokenizer@0.1.0.0` (`0x3333bd52...`), `bend-ml-tensor@0.1.0.0` (`0xf9837737...`) e `0.1.1.0` (`0xdbe1000e...`, acrescenta `matmul_t`), `bend-ml-autograd@0.1.0.0` (`0x174ef0d2...`). Todos importam do BendHub numa pasta limpa e as leis são reutilizáveis (`BPE.roundtrip`, `AG.reverse_eq_forward`).
+- `reference/check_all.py --full`: 25/25 verificações ok (provas + kernel, erros de shape esperados, referências Python, tokenizer, GPT-2, MNIST).
+
+### Dívidas e limites conhecidos
+
+- **Nenhuma dívida de prova**: nenhum `@unsafe`, nenhum `?TODO` publicado.
+- **Paralelismo não resolvido:** o `pow2` do guia escala ~8× com 16 threads, mas o `matmul` por linhas sobre listas só chegou a ~1,8× (com ou sem dados compartilhados, em qualquer profundidade). Hipóteses descartadas: laziness (somas estritas nas folhas), sharing (dados privados por tarefa). Não investigado: alocador compartilhado, acesso de memória por ponteiros. Vale reportar no GitHub do Bend.
+- **GPU não usada:** o Bend pede CUDA 12 em `/usr/local/cuda`; o pacote `cuda` do Arch é o 13.3 e a instalação exige sudo. A RTX 4050 (6 GB) ficou fora dos benchmarks.
+- A invariante "linhas com `c` números" de `Mat<r,c>` não está no tipo.
+- O `bpe/LICENSE` publicado não tem a linha SPDX (só o texto MIT).
+- Para o Renan: (1) abrir hub.bend-lang.com e procurar tokenizer/tensor/autograd de terceiros (a lista é carregada por JS e não consegui ler); (2) gravar o vídeo e postar a thread (`docs/launch/`); (3) se quiser GPU, instalar CUDA 12 em `/usr/local/cuda`; (4) o token do `bend login` está em `~/.bend/bender.json` (permissão 600); a chave `bend-ml` foi revogada.
