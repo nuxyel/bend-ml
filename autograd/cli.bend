@@ -2,7 +2,7 @@ import Base
 import ./main.bend as AG
 import bend-ml-tensor@0.1.0.0/main.bend as T
 
-# ---- leitura de números em texto ----
+# ---- reading numbers from text ----
 def rb_done(m: File & Result<&1, &1, U32 & String, List<&2, U32>>) -> IO(List<&2, U32>):
   (f, r) = m
   do IO<List<&2, U32>>:
@@ -56,7 +56,7 @@ def take_rows(r: Nat, +c: Nat, +xs: List<&2, F32>) -> List<&2, List<&2, F32>>:
     case 1n+p:
       List.take(&2, F32, xs, c) <> take_rows(p, c, List.drop(&2, F32, xs, c))
 
-# ---- saída ----
+# ---- output ----
 def fshow(xs: List<&2, F32>) -> String:
   match xs:
     case Nil{}:
@@ -78,7 +78,7 @@ def nats(xs: List<&2, F32>) -> List<&2, Nat>:
     case Con{h, t}:
       F32.to_nat(h) <> nats(t)
 
-# ---- escalares: expressões fixas, em 3 variáveis ----
+# ---- scalars: fixed expressions in 3 variables ----
 def x0() -> AG.G:
   AG.GVar{0n}
 def x1() -> AG.G:
@@ -107,9 +107,9 @@ def scalar4(mk: Maybe<&2, Nat>, a: Maybe<&2, F32>, b: Maybe<&2, F32>, c: Maybe<&
     case Some{k} Some{u} Some{v} Some{w}:
       run_scalar(expr(k), [u, v, w])
     case _ _ _ _:
-      IO.print("argumentos invalidos")
+      IO.print("invalid arguments")
 
-# ---- camadas: as dimensões vêm da linha de comando e entram nos tipos ----
+# ---- layers: the dimensions come from the command line and enter the types ----
 def lin_show(n: Nat, i: Nat, o: Nat, t: T.Mat<n, i> & (T.Mat<i, o> & T.Vec<o>)) -> IO(Unit):
   match t:
     case Tuple{dx, rest}:
@@ -122,7 +122,7 @@ def lin_run(+n: Nat, +i: Nat, +o: Nat, mx: Maybe<&2, T.Mat<n, i>>, mw: Maybe<&2,
     case Some{x} Some{w} Some{dy}:
       lin_show(n, i, o, AG.linear_bwd(n, i, o, x, w, dy))
     case _ _ _:
-      IO.print("tamanho invalido")
+      IO.print("invalid size")
 
 def do_linear(+n: Nat, +i: Nat, +o: Nat, fx: List<&2, U32>, fw: List<&2, U32>, fd: List<&2, U32>) -> IO(Unit):
   lin_run(n, i, o, T.Mat.of(n, i, take_rows(n, i, floats(fx))), T.Mat.of(i, o, take_rows(i, o, floats(fw))), T.Mat.of(n, o, take_rows(n, o, floats(fd))))
@@ -132,7 +132,7 @@ def relu_run(+r: Nat, +c: Nat, mx: Maybe<&2, T.Mat<r, c>>, md: Maybe<&2, T.Mat<r
     case Some{x} Some{d}:
       IO.print(rshow(T.Mat.to_rows(r, c, AG.relu_bwd(r, c, x, d))))
     case _ _:
-      IO.print("tamanho invalido")
+      IO.print("invalid size")
 
 def do_relu(+r: Nat, +c: Nat, fx: List<&2, U32>, fd: List<&2, U32>) -> IO(Unit):
   relu_run(r, c, T.Mat.of(r, c, take_rows(r, c, floats(fx))), T.Mat.of(r, c, take_rows(r, c, floats(fd))))
@@ -140,14 +140,14 @@ def do_relu(+r: Nat, +c: Nat, fx: List<&2, U32>, fd: List<&2, U32>) -> IO(Unit):
 def ce_run(+n: Nat, +c: Nat, ml: Maybe<&2, T.Mat<n, c>>, +labels: List<&2, Nat>) -> IO(Unit):
   match ml:
     case None{}:
-      IO.print("tamanho invalido")
+      IO.print("invalid size")
     case Some{+l}:
       IO.print(F32.show(AG.ce_loss(n, c, l, labels)) ++ " " ++ rshow(T.Mat.to_rows(n, c, AG.ce_grad(n, c, l, labels))))
 
 def do_ce(+n: Nat, +c: Nat, fl: List<&2, U32>, fy: List<&2, U32>) -> IO(Unit):
   ce_run(n, c, T.Mat.of(n, c, take_rows(n, c, floats(fl))), nats(floats(fy)))
 
-# ---- argumentos ----
+# ---- arguments ----
 def go_scalar(k: String, a: String, b: String, c: String) -> IO(Unit):
   scalar4(Nat.read(k), F32.read(a), F32.read(b), F32.read(c))
 
@@ -160,7 +160,7 @@ def go_linear(mn: Maybe<&2, Nat>, mi: Maybe<&2, Nat>, mo: Maybe<&2, Nat>, fx: St
         d : List<&2, U32> <- read_bytes(fd)
         do_linear(n, i, o, x, w, d)
     case _ _ _:
-      IO.print("dimensoes invalidas")
+      IO.print("invalid dimensions")
 
 def go_relu(mr: Maybe<&2, Nat>, mc: Maybe<&2, Nat>, fx: String, fd: String) -> IO(Unit):
   match mr mc:
@@ -170,7 +170,7 @@ def go_relu(mr: Maybe<&2, Nat>, mc: Maybe<&2, Nat>, fx: String, fd: String) -> I
         d : List<&2, U32> <- read_bytes(fd)
         do_relu(r, c, x, d)
     case _ _:
-      IO.print("dimensoes invalidas")
+      IO.print("invalid dimensions")
 
 def go_ce(mn: Maybe<&2, Nat>, mc: Maybe<&2, Nat>, fl: String, fy: String) -> IO(Unit):
   match mn mc:
@@ -180,7 +180,7 @@ def go_ce(mn: Maybe<&2, Nat>, mc: Maybe<&2, Nat>, fl: String, fy: String) -> IO(
         y : List<&2, U32> <- read_bytes(fy)
         do_ce(n, c, l, y)
     case _ _:
-      IO.print("dimensoes invalidas")
+      IO.print("invalid dimensions")
 
 def dispatch2(m1: Bool, m2: Bool, m3: Bool, m4: Bool, args: List<String>) -> IO(Unit):
   match m1 m2 m3 m4 args:
@@ -193,14 +193,14 @@ def dispatch2(m1: Bool, m2: Bool, m3: Bool, m4: Bool, args: List<String>) -> IO(
     case False{} False{} False{} True{} Con{n, Con{c, Con{fl, Con{fy, Nil{}}}}}:
       go_ce(Nat.read(n), Nat.read(c), fl, fy)
     case _ _ _ _ _:
-      IO.print("uso invalido")
+      IO.print("invalid usage")
 
 def dispatch(args: List<String>) -> IO(Unit):
   match args:
     case Con{prog, Con{+mode, rest}}:
       dispatch2(String.eq(mode, "scalar"), String.eq(mode, "linear_bwd"), String.eq(mode, "relu_bwd"), String.eq(mode, "ce"), rest)
     case _:
-      IO.print("uso invalido")
+      IO.print("invalid usage")
 
 def main() -> IO(Unit):
   do IO<Unit>:
