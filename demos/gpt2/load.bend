@@ -1,5 +1,5 @@
 import Base
-import bend-ml-tensor@0.1.1.0/main.bend as T
+import bend-ml-tensor@0.1.2.0/main.bend as T
 
 # 4 little-endian bytes -> F32 (U32 and F32 hold the same Word(32n): it is a bitcast)
 def bitcast(u: U32) -> F32:

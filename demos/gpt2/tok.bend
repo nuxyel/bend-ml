@@ -6,7 +6,7 @@
 # other alphabets, but does not split Unicode symbols that are not letters (em dash, emoji).
 
 import Base
-import bend-ml-bpe-tokenizer@0.1.1.0/main.bend as BPE
+import bend-ml-bpe-tokenizer@0.1.2.0/main.bend as BPE
 
 # ---- reading files ----
 

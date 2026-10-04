@@ -7,8 +7,8 @@
 # bend-ml-bpe-tokenizer with GPT-2's table of 50,000 rules.
 
 import Base
-import bend-ml-tensor@0.1.1.0/main.bend as T
-import bend-ml-bpe-tokenizer@0.1.1.0/main.bend as BPE
+import bend-ml-tensor@0.1.2.0/main.bend as T
+import bend-ml-bpe-tokenizer@0.1.2.0/main.bend as BPE
 import ./load.bend as L
 import ./tok.bend as K
 

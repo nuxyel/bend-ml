@@ -6,8 +6,8 @@
 # plain SGD). Run from the repository root.
 
 import Base
-import bend-ml-tensor@0.1.0.0/main.bend as T
-import bend-ml-autograd@0.1.0.0/main.bend as AG
+import bend-ml-tensor@0.1.2.0/main.bend as T
+import bend-ml-autograd@0.1.1.0/main.bend as AG
 
 # ---- reading numbers from text ----
 def rb_done(m: File & Result<&1, &1, U32 & String, List<&2, U32>>) -> IO(List<&2, U32>):

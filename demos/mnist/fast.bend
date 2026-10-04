@@ -6,7 +6,7 @@
 # Same data, initial weights, batch order and lr as train.bend and reference/mnist_torch.py.
 
 import Base
-import bend-ml-tensor-array@0.1.1.0/main.bend as TA
+import bend-ml-tensor-array@0.1.2.0/main.bend as TA
 
 # ---- reading numbers from text ----
 
