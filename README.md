@@ -53,6 +53,19 @@ v1 used linked lists for the matrices and measured ~1800x PyTorch on MNIST. v2 m
 - **By the type**: the shapes of `matmul`, of each layer gradient (`dW: Mat<i,o>`) and `reshape` with a proof. The whole MNIST training step is checked this way.
 - **Tested, not proved**: all `F32` numerics (it is not a real number; it rounds). Gradient checking and comparison with PyTorch live in `reference/`. The tokenizer is exact on ASCII; bytes ≥ 128 count as letters in the GPT-2 pre-tokenizer.
 
+## Quick start
+
+Requirements: Linux x86_64 (or WSL), clang >= 14, Python >= 3.12, `curl`, ~3 GB of disk and 16 GB of RAM for the GPT-2 check.
+
+```bash
+git clone https://github.com/nuxyel/bend-ml.git && cd bend-ml
+make setup          # Bend 2.0.35 (SHA256-checked), Lean 4.34.0, Python venv, MNIST and GPT-2 data; no sudo
+make check          # about 30 s
+make check-full     # + GPT-2 and MNIST
+```
+
+`make setup-lite` skips the 550 MB GPT-2 download. If you cloned this repository before 2026-10-04, clone it again: the history was rewritten (same content, English messages, smaller commits).
+
 ## Verify everything
 
 ```bash
