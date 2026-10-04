@@ -1,53 +1,54 @@
 # bend-ml-bpe-tokenizer
 
-Tokenizer **BPE byte-level** (estilo GPT-2) em Bend 2, com o **roundtrip provado** pelo kernel: `decode(encode(s)) == s`.
+**Byte-level BPE** tokenizer (GPT-2 style) in Bend 2, with the **roundtrip proved** by the kernel: `decode(encode(s)) == s`.
 
-- Bend: **2.0.35** · Licença: MIT · Depende de `bend-ml-nat-lemmas@0.1.0.0`.
-- `bend bpe/main.bend` e `bend bpe/main.bend --verdict` → `ALL PROOFS CHECK` (sem `@unsafe`, sem `?TODO`).
+- Bend: **2.0.35** · License: MIT · Depends on `bend-ml-nat-lemmas@0.1.0.0`.
+- `bend bpe/main.bend` and `bend bpe/main.bend --verdict` → `ALL PROOFS CHECK` (no `@unsafe`, no `?TODO`).
 
-## Modelo
+## Model
 
-- **Token**: `B{n}` (byte cru `n`) ou `M{k}` (criado pela regra de id `k`). Os ids numéricos do GPT-2 são `n` para bytes e `256 + k` para as fusões.
-- **Regra**: `Rule{id, a, b}` funde o par de tokens `(a, b)` em `M{id}`.
-- **Tabela**: lista de regras da **mais antiga para a mais nova**, como o `merges.txt` do GPT-2.
-- `encode(tabela, tokens)` aplica as regras em ordem (cada uma funde, da esquerda para a direita, as ocorrências não sobrepostas do par).
-- `decode(tabela, tokens)` expande cada token de volta para bytes olhando só as regras mais antigas que ele.
-- `train(n, 0n, tokens)` aprende até `n` fusões (desempate: o primeiro par que apareceu).
+- **Token**: `B{n}` (raw byte `n`) or `M{k}` (created by the rule with id `k`). GPT-2's numeric ids are `n` for bytes and `256 + k` for merges.
+- **Rule**: `Rule{id, a, b}` merges the token pair `(a, b)` into `M{id}`.
+- **Table**: a list of rules from the **oldest to the newest**, like GPT-2's `merges.txt`.
+- `encode(table, tokens)` applies the rules in order (each one merges, left to right, the non-overlapping occurrences of the pair).
+- `decode(table, tokens)` expands each token back into bytes, looking only at the rules older than it.
+- `train(n, 0n, tokens)` learns up to `n` merges (tie-break: the first pair that appeared).
 
 ```python
 import Base
-import bend-ml-bpe-tokenizer@0.1.1.0/main.bend as BPE
+import bend-ml-bpe-tokenizer@0.1.2.0/main.bend as BPE
 
 # BPE.encode(table, BPE.lift(bytes))   BPE.decode(table, ids)   BPE.train(30n, 0n, BPE.lift(bytes))
 ```
 
-## LAWS provadas (em português)
+## Proved LAWS (in plain language)
 
-| Lei | O que afirma |
+| Law | What it states |
 |---|---|
-| `roundtrip` | Se a tabela é **bem formada** (nenhum id de regra se repete: `wf(tabela) = True`), então `decode(encode(bytes)) = bytes`, para **qualquer** sequência de bytes. |
-| `vocab_bound` | Todo token que `encode` emite é um byte cru ou foi criado por uma regra da tabela; nunca aparece um id desconhecido. |
-| `dec_append` | Decodificar duas listas de tokens juntas é decodificar cada uma e juntar os bytes. |
-| `train_wf` | A tabela que `train` devolve é **sempre bem formada** (os ids das regras são `next, next+1, ...`, nenhum repete), para qualquer corpus e quantas fusões forem pedidas. |
-| `roundtrip_trained` | Consequência das duas primeiras: treine uma tabela em **qualquer corpus** e `decode(encode(s)) = s` para qualquer `s`, **sem nenhuma hipótese**. |
+| `roundtrip` | If the table is **well formed** (no rule id repeats: `wf(table) = True`), then `decode(encode(bytes)) = bytes`, for **any** byte sequence. |
+| `vocab_bound` | Every token that `encode` emits is a raw byte or was created by a rule of the table; an unknown id never appears. |
+| `dec_append` | Decoding two token lists together is decoding each one and joining the bytes. |
+| `train_wf` | The table that `train` returns is **always well formed** (the rule ids are `next, next+1, ...`, none repeats), for any corpus and any number of merges. |
+| `roundtrip_trained` | A consequence of the first and fourth laws: train a table on **any corpus** and `decode(encode(s)) = s` for any `s`, **with no hypothesis at all**. |
 
-A prova do roundtrip tem a seguinte ideia (os comentários em `main.bend` detalham): ao aplicar a regra `k`, cada par `(a, b)` vira `M{k}`, e `M{k}` expande para `expansão(a) ++ expansão(b)`; logo o decode não muda. Isso só vale se `k` ainda não aparecia na lista, e é exatamente isso que a tabela bem formada garante (ids distintos). Os lemas auxiliares provam que acrescentar a regra nova no topo da tabela não muda a expansão dos tokens que já existiam.
+The idea of the roundtrip proof (the comments in `main.bend` give the details): when rule `k` is applied, each pair `(a, b)` becomes `M{k}`, and `M{k}` expands to `expansion(a) ++ expansion(b)`; so decoding does not change. This only holds if `k` did not already appear in the list, which is exactly what a well-formed table guarantees (distinct ids). The auxiliary lemmas prove that adding the new rule on top of the table does not change the expansion of the tokens that already existed.
 
-## Testes (contra Python)
+## Tests (against Python)
 
-`reference/test_bpe.py` roda o CLI em Bend (`bpe/cli.bend`) contra `reference/bpe_ref.py` (mesmo algoritmo e desempate), com textos em inglês, com acentos (`coração`, `ação`) e com emoji/CJK em UTF-8: `train`, `encode`, `decode` e roundtrip batem em todos os casos. Rodar:
+`reference/test_bpe.py` runs the Bend CLI (`bpe/cli.bend`) against `reference/bpe_ref.py` (same algorithm and tie-break), with English text, accented text (`coração`, `ação`) and UTF-8 emoji/CJK: `train`, `encode`, `decode` and the roundtrip match in every case. To run it:
 
 ```bash
 reference/.venv/bin/python reference/test_bpe.py
 ```
 
-## Limites conhecidos
+## Known limits
 
-- A *escolha* das fusões pelo `train` (qual par é o mais frequente) não é provada, e não precisa ser: a correção do roundtrip não depende dela (`train_wf` + `roundtrip`). Tabelas lidas de um `merges.txt` com ids sequenciais também cumprem `wf`, mas essa leitura (`rules.go` do CLI) não é provada.
-- A busca do par de menor rank é feita aplicando as regras em ordem (equivalente ao algoritmo do GPT-2 para tabelas treinadas), com custo `regras × tamanho`. Para o vocabulário completo do GPT-2 (50 mil regras) o uso é por palavra, depois do pré-tokenizador.
-- Ainda não há o pré-tokenizador por regex do GPT-2; vem em versão futura.
+- The *choice* of merges by `train` (which pair is the most frequent) is not proved, and does not need to be: the roundtrip's correctness does not depend on it (`train_wf` + `roundtrip`). Tables read from a `merges.txt` with sequential ids also satisfy `wf`, but that reading (the CLI's `rules.go`) is not proved.
+- The lookup of the lowest-rank pair is done by applying the rules in order (equivalent to GPT-2's algorithm for trained tables), at a cost of `rules × size`. For GPT-2's full vocabulary (50 thousand rules) it is used per word, after the pre-tokenizer.
+- The package does not include GPT-2's regex pre-tokenizer; the GPT-2 demo implements it (`demos/gpt2/tok.bend`).
 
-## Versões
+## Versions
 
-- `0.1.1.0`: acrescenta `train_wf` e `roundtrip_trained`.
-- `0.1.0.0`: primeira publicação (`roundtrip`, `vocab_bound`, `dec_append`).
+- `0.1.2.0`: the same laws, with English comments and README.
+- `0.1.1.0`: adds `train_wf` and `roundtrip_trained`.
+- `0.1.0.0`: first publication (`roundtrip`, `vocab_bound`, `dec_append`).
