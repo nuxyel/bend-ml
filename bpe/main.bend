@@ -1,6 +1,6 @@
 # bend-ml-bpe-tokenizer: byte-level BPE with a proved roundtrip.
 #
-#   import bend-ml-bpe-tokenizer@0.1.0.0/main.bend as BPE
+#   import bend-ml-bpe-tokenizer@0.1.2.0/main.bend as BPE
 #
 # A token is a raw byte (B{n}) or the result of a merge rule (M{id}).
 # The table is a list of rules from the oldest to the newest, like GPT-2's
