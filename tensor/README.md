@@ -7,7 +7,7 @@ Tensores em Bend 2 com a **shape no tipo**: um erro de shape é um erro de tipo,
 
 ```python
 import Base
-import bend-ml-tensor@0.1.0.0/main.bend as T
+import bend-ml-tensor@0.1.1.0/main.bend as T
 
 def prod() -> T.Mat<2n, 4n>:
   T.Mat.matmul(2n, 3n, 4n, T.Mat.fill(2n, 3n, 2.0), T.Mat.fill(3n, 4n, 3.0))
@@ -22,7 +22,7 @@ def prod() -> T.Mat<2n, 4n>:
 
 ## Operações
 
-`Mat.add/sub/mul/scale`, `Mat.matmul`, `Mat.transpose`, `Mat.relu`, `Mat.gelu` (tanh, como o GPT-2), `Mat.softmax` (por linha, estável), `Mat.layernorm`, `Mat.add_row` (soma um bias `Vec<m>` a cada linha), `Mat.col_sums`, `Mat.matvec`, `Mat.reshape`, `Mat.flatten`, `Mat.reshape_swap`; e `Vec.add/sub/mul/scale/dot/sum/relu/softmax`.
+`Mat.add/sub/mul/scale`, `Mat.matmul`, `Mat.matmul_t` (o segundo operando já transposto, para pesos grandes: `Mat<n,k> · Mat<m,k>ᵀ = Mat<n,m>`), `Mat.transpose`, `Mat.relu`, `Mat.gelu` (tanh, como o GPT-2), `Mat.softmax` (por linha, estável), `Mat.layernorm`, `Mat.add_row` (soma um bias `Vec<m>` a cada linha), `Mat.col_sums`, `Mat.matvec`, `Mat.reshape`, `Mat.flatten`, `Mat.reshape_swap`; e `Vec.add/sub/mul/scale/dot/sum/relu/softmax`.
 
 ## Erro de shape = erro de tipo
 
@@ -61,3 +61,8 @@ Além das leis, **o próprio tipo de `Mat.matmul` é uma garantia**: `Mat<n,k> �
 ## Desempenho
 
 Os dados são listas (copiáveis e sem índices com custo logarítmico): ≈ 44 milhões de multiplicações-e-somas por segundo numa thread. Veja `demos/mnist/BENCHMARK.md` quando existir.
+
+## Versões
+
+- `0.1.1.0`: acrescenta `Mat.matmul_t`.
+- `0.1.0.0`: primeira publicação.

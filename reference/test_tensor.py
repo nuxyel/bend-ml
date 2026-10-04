@@ -42,6 +42,8 @@ def main():
             B = rng.standard_normal((k, m)).astype(np.float32)
             got = bend("matmul", n, k, m, w("a", A), w("b", B))
             check(f"matmul {n}x{k} · {k}x{m}", got, A @ B)
+            got_t = bend("matmul_t", n, k, m, w("a", A), w("bt", B.T.copy()))
+            check(f"matmul_t {n}x{k} · ({m}x{k})ᵀ", got_t, A @ B)
 
         X = rng.standard_normal((4, 6)).astype(np.float32) * 3
         tx = torch.from_numpy(X)

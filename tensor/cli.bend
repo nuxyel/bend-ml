@@ -104,6 +104,17 @@ def do_unary(+r: Nat, +c: Nat, which: Nat, fa: List<&2, U32>) -> IO(Unit):
 def do_matmul(+n: Nat, +k: Nat, +m: Nat, fa: List<&2, U32>, fb: List<&2, U32>) -> IO(Unit):
   show_mat(n, m, mm(n, k, m, T.Mat.of(n, k, take_rows(n, k, floats(fa))), T.Mat.of(k, m, take_rows(k, m, floats(fb)))))
 
+# matmul_t: B chega como (m x k) já transposta (Bt = Bᵀ)
+def mm_t(n: Nat, k: Nat, m: Nat, ma: Maybe<&2, T.Mat<n, k>>, mb: Maybe<&2, T.Mat<m, k>>) -> Maybe<&2, T.Mat<n, m>>:
+  match ma mb:
+    case Some{a} Some{b}:
+      Some{T.Mat.matmul_t(n, k, m, a, b)}
+    case _ _:
+      None{}
+
+def do_matmul_t(+n: Nat, +k: Nat, +m: Nat, fa: List<&2, U32>, fb: List<&2, U32>) -> IO(Unit):
+  show_mat(n, m, mm_t(n, k, m, T.Mat.of(n, k, take_rows(n, k, floats(fa))), T.Mat.of(m, k, take_rows(m, k, floats(fb)))))
+
 def ln_run(n: Nat, d: Nat, eps: F32, mx: Maybe<&2, T.Mat<n, d>>, mg: Maybe<&2, T.Vec<d>>, mb: Maybe<&2, T.Vec<d>>) -> IO(Unit):
   match mx mg mb:
     case Some{x} Some{g} Some{b}:
@@ -138,6 +149,16 @@ def run_unary(mr: Maybe<&2, Nat>, mc: Maybe<&2, Nat>, which: Nat, f: String) -> 
     case _ _:
       IO.print("dimensoes invalidas")
 
+def run_matmul_t(mn: Maybe<&2, Nat>, mk: Maybe<&2, Nat>, mm_: Maybe<&2, Nat>, fa: String, fb: String) -> IO(Unit):
+  match mn mk mm_:
+    case Some{n} Some{k} Some{m}:
+      do IO<Unit>:
+        a : List<&2, U32> <- read_bytes(fa)
+        b : List<&2, U32> <- read_bytes(fb)
+        do_matmul_t(n, k, m, a, b)
+    case _ _ _:
+      IO.print("dimensoes invalidas")
+
 def run_matmul(mn: Maybe<&2, Nat>, mk: Maybe<&2, Nat>, mm_: Maybe<&2, Nat>, fa: String, fb: String) -> IO(Unit):
   match mn mk mm_:
     case Some{n} Some{k} Some{m}:
@@ -159,13 +180,15 @@ def run_ln2(mn: Maybe<&2, Nat>, md: Maybe<&2, Nat>, me: Maybe<&2, F32>, fx: Stri
     case _ _ _:
       IO.print("dimensoes invalidas")
 
-def dispatch2(is_mm: Bool, is_ln: Bool, args: List<String>) -> IO(Unit):
-  match is_mm is_ln args:
-    case True{} _ Con{n, Con{k, Con{m, Con{fa, Con{fb, Nil{}}}}}}:
+def dispatch2(is_mm: Bool, is_mt: Bool, is_ln: Bool, args: List<String>) -> IO(Unit):
+  match is_mm is_mt is_ln args:
+    case True{} _ _ Con{n, Con{k, Con{m, Con{fa, Con{fb, Nil{}}}}}}:
       run_matmul(Nat.read(n), Nat.read(k), Nat.read(m), fa, fb)
-    case False{} True{} Con{n, Con{d, Con{eps, Con{fx, Con{fg, Con{fb, Nil{}}}}}}}:
+    case False{} True{} _ Con{n, Con{k, Con{m, Con{fa, Con{fb, Nil{}}}}}}:
+      run_matmul_t(Nat.read(n), Nat.read(k), Nat.read(m), fa, fb)
+    case False{} False{} True{} Con{n, Con{d, Con{eps, Con{fx, Con{fg, Con{fb, Nil{}}}}}}}:
       run_ln2(Nat.read(n), Nat.read(d), F32.read(eps), fx, fg, fb)
-    case _ _ _:
+    case _ _ _ _:
       IO.print("uso invalido")
 
 def dispatch(args: List<String>) -> IO(Unit):
@@ -173,7 +196,7 @@ def dispatch(args: List<String>) -> IO(Unit):
     case Con{prog, Con{+mode, Con{r, Con{c, Con{f, Nil{}}}}}}:
       run_unary(Nat.read(r), Nat.read(c), which_of(mode), f)
     case Con{prog, Con{+mode, rest}}:
-      dispatch2(String.eq(mode, "matmul"), String.eq(mode, "layernorm"), rest)
+      dispatch2(String.eq(mode, "matmul"), String.eq(mode, "matmul_t"), String.eq(mode, "layernorm"), rest)
     case _:
       IO.print("uso invalido")
 

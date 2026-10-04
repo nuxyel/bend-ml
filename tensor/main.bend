@@ -273,6 +273,14 @@ def Mat.matmul(-n: Nat, +k: Nat, +m: Nat, a: Mat<n, k>, b: Mat<k, m>) -> Mat<n, 
     case Mat{x} Mat{y}:
       Mat{matmul.rows(x, transpose.go(m, y))}
 
+# (n x k) · (m x k)ᵀ = (n x m): o segundo operando já vem TRANSPOSTO (guardado como
+# m linhas de k números). Evita transpor pesos grandes a cada chamada; o tipo
+# continua exigindo a mesma dimensão interna k.
+def Mat.matmul_t(-n: Nat, -k: Nat, -m: Nat, a: Mat<n, k>, bt: Mat<m, k>) -> Mat<n, m>:
+  match a bt:
+    case Mat{x} Mat{y}:
+      Mat{matmul.rows(x, y)}
+
 # soma bias (um vetor de m números) a cada linha de uma matriz n x m
 def Mat.add_row(-n: Nat, -m: Nat, a: Mat<n, m>, b: Vec<m>) -> Mat<n, m>:
   match a b:
