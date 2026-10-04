@@ -1,6 +1,6 @@
 # bend-ml-tensor-array: tensors over a flat Array<F32>, with the shape in the type.
 #
-#   import bend-ml-tensor-array@0.1.2.0/main.bend as TA
+#   import bend-ml-tensor-array@0.1.3.0/main.bend as TA
 #
 # Mat<r, c> stores r*c numbers in an Array<F32>, row by row (index i*c + j). The
 # dimensions are erased type parameters: the same guarantee as bend-ml-tensor
@@ -598,6 +598,13 @@ def Mat.of_list(+r: Nat, +c: Nat, +xs: List<&2, F32>) -> Maybe<&1, Mat<r, c>>:
 
 def Mat.from_list(+r: Nat, +c: Nat, xs: List<&2, F32>) -> Mat<r, c>:
   Mat{fill_list(xs, 0, Array.new(F32, cap_depth(Nat.mul(r, c)), 0.0))}
+
+# writes the numbers of xs into m starting at flat index i (row-major); numbers past the
+# capacity are dropped. For loading a large matrix block by block without building one big list.
+def Mat.fill_at(-r: Nat, -c: Nat, +i: U32, xs: List<&2, F32>, m: Mat<r, c>) -> Mat<r, c>:
+  match m:
+    case Mat{d}:
+      Mat{fill_list(xs, i, d)}
 
 type ML<-r: Nat, -c: Nat> is Type:
   ML{m: Mat<r, c>, l: List<&2, F32>}

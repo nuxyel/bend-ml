@@ -1,7 +1,7 @@
 # matrix · vector as in GPT-2: y(1 x M) = x(1 x K) · W(M x K)ᵀ, repeated REPS times; W with distinct data.
 import Base
 import bend-ml-tensor@0.1.2.0/main.bend as T
-import bend-ml-tensor-array@0.1.2.0/main.bend as TA
+import bend-ml-tensor-array@0.1.3.0/main.bend as TA
 
 # list of n values ((i mod 13) / 10)
 

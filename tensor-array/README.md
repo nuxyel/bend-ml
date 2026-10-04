@@ -8,7 +8,7 @@ Tensors in Bend 2 over a flat `Array<F32>`, **with the shape in the type**: the 
 
 ```python
 import Base
-import bend-ml-tensor-array@0.1.2.0/main.bend as TA
+import bend-ml-tensor-array@0.1.3.0/main.bend as TA
 
 def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 128n>:
   TA.Mat.matmul(100n, 784n, 128n, 3n, a, w)   # 3n = 2^3 = 8 parallel blocks
@@ -66,7 +66,7 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 
 ## Versions
 
-- `0.1.3.0`: `cap_depth` is now defined by `Nat` recursion and proved (`law cap_ok`); adds `Mat.softmax_ce_checked` and `Mat.count_correct_checked`.
+- `0.1.3.0`: `cap_depth` is now defined by `Nat` recursion and proved (`law cap_ok`); adds `Mat.softmax_ce_checked`, `Mat.count_correct_checked` and `Mat.fill_at` (load a matrix block by block).
 - `0.1.2.0`: the same API, with English comments and README.
 - `0.1.1.0`: column split for `n = 1` (matrix · vector) and `Mat.from_list`.
 - `0.1.0.0`: first publication.
