@@ -1,10 +1,10 @@
-# GPT-2 small (124M) em Bend com bend-ml-tensor-array: os produtos matriz·vetor (124 M
-# mult-soma por token) rodam sobre Array<F32> com blocos paralelos; atenção, LayerNorm
-# e GELU ficam em listas (pequenos). Formatos das matrizes conferidos pelo tipo.
+# GPT-2 small (124M) in Bend with bend-ml-tensor-array: the matrix·vector products (124 M
+# multiply-adds per token) run over Array<F32> with parallel blocks; attention, LayerNorm
+# and GELU stay in lists (they are small). Matrix shapes are checked by the type.
 #
 #   bend demos/gpt2/fast.bend -o /tmp/gpt2_fast && /tmp/gpt2_fast "The capital of France is" 8
 #
-# Rodar da raiz do repositório, depois de `reference/gpt2_prep.py --split`.
+# Run from the repository root, after `reference/gpt2_prep.py --split`.
 
 import Base
 import bend-ml-tensor-array@0.1.1.0/main.bend as TA
@@ -13,9 +13,9 @@ import bend-ml-bpe-tokenizer@0.1.1.0/main.bend as BPE
 import ./load.bend as L
 import ./tok.bend as K
 
-# níveis de paralelismo dos produtos: 2^PAR blocos; 0 = sequencial. Em matriz·vetor cada peso é
-# lido uma vez só, e copiar a matriz para cada bloco custa mais que calcular: par=3 é ~10x PIOR
-# que 0 (NOTES.md, exp. 9).
+# parallelism levels of the products: 2^PAR blocks; 0 = sequential. In matrix·vector each weight is
+# read only once, and copying the matrix for each block costs more than computing: par=3 is ~10x WORSE
+# than 0 (NOTES.md, exp. 9).
 def par() -> Nat:
   0n
 
@@ -179,7 +179,7 @@ def text_of(+table: List<&2, BPE.Rule>, +perm: List<&2, Nat>, ids: List<&2, Nat>
   text_of2(u32s(BPE.decode(table, tks_of(perm, ids))))
 
 # ---------------------------------------------------------------------
-# modelo
+# model
 # ---------------------------------------------------------------------
 
 type Layer is Type:
@@ -188,7 +188,7 @@ type Layer is Type:
 type Model is Type:
   Model{wte: TA.Mat<50257n, 768n>, wpe: TA.Mat<1024n, 768n>, layers: List<&1, Layer>, +lnfg: List<&2, F32>, +lnfb: List<&2, F32>}
 
-# cache de chaves e valores de uma camada (uma linha de 768 números por posição)
+# key and value cache of one layer (one row of 768 numbers per position)
 
 type KV is Data:
   KV{k: List<&2, List<&2, F32>>, v: List<&2, List<&2, F32>>}
@@ -242,20 +242,20 @@ def load_model() -> IO(Model):
     return Model{wte, wpe, layers, lnfg, lnfb}
 
 # ---------------------------------------------------------------------
-# um bloco do transformador para uma posição
+# one transformer block for one position
 # ---------------------------------------------------------------------
 
 def ln(+xs: List<&2, F32>, +g: List<&2, F32>, +b: List<&2, F32>) -> List<&2, F32>:
   T.layernorm.l(xs, 768.0, 0.00001, g, b)
 
-# 6. segundo produto do MLP e saída do bloco
+# 6. second MLP product and the block output
 
 def k6b(+x1: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, aw: TA.Mat<2304n, 768n>, +ab: List<&2, F32>, pw: TA.Mat<768n, 768n>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, fw: TA.Mat<3072n, 768n>, +fb: List<&2, F32>, mw: TA.Mat<768n, 3072n>, +mb: List<&2, F32>, r: TA.ML<1n, 768n>) -> BR:
   match r:
     case TA.ML{m, y}:
       BR{T.zip_with.add(x1, T.zip_with.add(y, mb)), kv, Layer{ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb}}
 
-# 5. primeiro produto do MLP (768 -> 3072), bias e GELU
+# 5. first MLP product (768 -> 3072), bias and GELU
 
 def k6(+x1: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, aw: TA.Mat<2304n, 768n>, +ab: List<&2, F32>, pw: TA.Mat<768n, 768n>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, fw: TA.Mat<3072n, 768n>, +fb: List<&2, F32>, +mb: List<&2, F32>, r: TA.MMulNT<1n, 3072n, 768n>) -> BR:
   match r:
@@ -272,7 +272,7 @@ def k5(+x1: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, a
     case TA.MMulNT{h, fw, c}:
       k5b(x1, kv, ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb, TA.Mat.to_list(1n, 3072n, c))
 
-# 4. projeção da atenção, resíduo, segundo LayerNorm
+# 4. attention projection, residual, second LayerNorm
 
 def k4c(+x1: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, aw: TA.Mat<2304n, 768n>, +ab: List<&2, F32>, pw: TA.Mat<768n, 768n>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, fw: TA.Mat<3072n, 768n>, +fb: List<&2, F32>, mw: TA.Mat<768n, 3072n>, +mb: List<&2, F32>) -> BR:
   k5(x1, kv, ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fb, mw, mb, TA.Mat.matmul_nt(1n, 768n, 3072n, par(), TA.Mat.from_list(1n, 768n, ln(x1, ln2g, ln2b)), fw))
@@ -287,7 +287,7 @@ def k4(+x: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, aw
     case TA.MMulNT{att, pw, c}:
       k4b(x, kv, ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb, TA.Mat.to_list(1n, 768n, c))
 
-# 3. atenção sobre o cache
+# 3. attention over the cache
 
 def k3b(+x: List<&2, F32>, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, aw: TA.Mat<2304n, 768n>, +ab: List<&2, F32>, pw: TA.Mat<768n, 768n>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, fw: TA.Mat<3072n, 768n>, +fb: List<&2, F32>, mw: TA.Mat<768n, 3072n>, +mb: List<&2, F32>, +q: List<&2, F32>, +nk: List<&2, List<&2, F32>>, +nv: List<&2, List<&2, F32>>) -> BR:
   k4(x, KV{nk, nv}, ln1g, ln1b, aw, ab, pb, ln2g, ln2b, fw, fb, mw, mb, TA.Mat.matmul_nt(1n, 768n, 768n, par(), TA.Mat.from_list(1n, 768n, attn(12n, 0n, q, nk, nv)), pw))
@@ -318,13 +318,13 @@ def block(l: Layer, kv: KV, +x: List<&2, F32>) -> BR:
       k1(x, kv, ln1g, ln1b, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb, TA.Mat.matmul_nt(1n, 768n, 2304n, par(), TA.Mat.from_list(1n, 768n, ln(x, ln1g, ln1b)), aw))
 
 # ---------------------------------------------------------------------
-# camadas, embedding e logits
+# layers, embedding and logits
 # ---------------------------------------------------------------------
 
 type RunOut is Type:
   RunOut{x: List<&2, F32>, layers: List<&1, Layer>, cs: List<&2, KV>}
 
-# pend é o resultado do bloco anterior
+# pend is the result of the previous block
 
 def run(ls: List<&1, Layer>, cs: List<&2, KV>, al: List<&1, Layer>, ac: List<&2, KV>, pend: BR) -> RunOut:
   match ls cs pend:
@@ -374,7 +374,7 @@ def f1(wpe: TA.Mat<1024n, 768n>, layers: List<&1, Layer>, +lnfg: List<&2, F32>, 
     case TA.MRow{wte, row}:
       f2(wte, layers, lnfg, lnfb, cs, row, TA.Mat.read_row(1024n, 768n, wpe, pos))
 
-# uma posição: devolve o id mais provável, o seu logit, os novos caches e o modelo
+# one position: returns the most likely id, its logit, the new caches and the model
 
 def fwd(m: Model, cs: List<&2, KV>, tok: Nat, pos: Nat) -> Out:
   match m:
@@ -382,7 +382,7 @@ def fwd(m: Model, cs: List<&2, KV>, tok: Nat, pos: Nat) -> Out:
       f1(wpe, layers, lnfg, lnfb, cs, U32.from_nat(pos), TA.Mat.read_row(50257n, 768n, wte, U32.from_nat(tok)))
 
 # ---------------------------------------------------------------------
-# geração gulosa (alimenta o prompt, depois o próprio token mais provável)
+# greedy generation (feeds the prompt, then its own most likely token)
 # ---------------------------------------------------------------------
 
 type St is Data:
@@ -422,18 +422,18 @@ def loop(fuel: Nat, +t0: Nat, sm: SM) -> IO(St):
         loop(p, t0, s2)
 
 # ---------------------------------------------------------------------
-# programa principal
+# main program
 # ---------------------------------------------------------------------
 
 def fin(+table: List<&2, BPE.Rule>, +perm: List<&2, Nat>, ids: List<&2, Nat>, st: St) -> IO(Unit):
   match st:
     case St{cs, tok, pos, queue, left, gen}:
-      IO.print("texto: " ++ text_of(table, perm, List.append(&2, Nat, ids, List.reverse(&2, Nat, gen))))
+      IO.print("text: " ++ text_of(table, perm, List.append(&2, Nat, ids, List.reverse(&2, Nat, gen))))
 
 def start2(model: Model, +table: List<&2, BPE.Rule>, +perm: List<&2, Nat>, +ids: List<&2, Nat>, +n: Nat) -> IO(Unit):
   match ids:
     case Nil{}:
-      IO.print("prompt vazio")
+      IO.print("empty prompt")
     case Con{t0, qt}:
       do IO<Unit>:
         t0ms : Nat <- IO.now()
@@ -447,7 +447,7 @@ def generate(model: Model, +mb: List<&2, U32>, +pb: List<&2, U32>, prompt: Strin
 def run1(prompt: String, mn: Maybe<&2, Nat>) -> IO(Unit):
   match mn:
     case None{}:
-      IO.print("uso: gpt2_fast \"prompt\" n_tokens")
+      IO.print("usage: gpt2_fast \"prompt\" n_tokens")
     case Some{n}:
       do IO<Unit>:
         mb : List<&2, U32> <- K.read_bytes("demos/gpt2/data/merges_num.txt")
@@ -455,7 +455,7 @@ def run1(prompt: String, mn: Maybe<&2, Nat>) -> IO(Unit):
         t0 : Nat <- IO.now()
         model : Model <- load_model()
         t1 : Nat <- IO.now()
-        IO.print("pesos carregados em " ++ Nat.show(Nat.div(Nat.sub(t1, t0), 1000n)) ++ "s")
+        IO.print("weights loaded in " ++ Nat.show(Nat.div(Nat.sub(t1, t0), 1000n)) ++ "s")
         generate(model, mb, pb, prompt, n)
 
 def dispatch(args: List<String>) -> IO(Unit):
@@ -463,7 +463,7 @@ def dispatch(args: List<String>) -> IO(Unit):
     case Con{prog, Con{prompt, Con{n, Nil{}}}}:
       run1(prompt, Nat.read(n))
     case _:
-      IO.print("uso: gpt2_fast \"prompt\" n_tokens")
+      IO.print("usage: gpt2_fast \"prompt\" n_tokens")
 
 def main() -> IO(Unit):
   do IO<Unit>:
