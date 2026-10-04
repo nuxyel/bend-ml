@@ -38,7 +38,7 @@ def main():
                 falhas += 1
 
         # matmul nas três variações de layout e com 0, 1 e 3 níveis de paralelismo
-        for (n, k, m) in [(2, 3, 4), (5, 7, 3), (1, 6, 1), (9, 5, 11), (16, 20, 8)]:
+        for (n, k, m) in [(2, 3, 4), (5, 7, 3), (1, 6, 1), (9, 5, 11), (16, 20, 8), (1, 8, 13), (1, 40, 100), (1, 3, 5)]:
             A = rng.standard_normal((n, k)).astype(np.float32)
             B = rng.standard_normal((k, m)).astype(np.float32)
             for par in (0, 1, 3):
