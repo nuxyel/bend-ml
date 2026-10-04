@@ -1,50 +1,50 @@
-# GPT-2 small: Bend × PyTorch
+# GPT-2 small: Bend vs PyTorch
 
-**Resumo (v2):** o GPT-2 small de 124 M de parâmetros roda em Bend e **gera exatamente os mesmos tokens do PyTorch**, com logits iguais em até 2e-4. Na v1 levava ~3 s por token (~150× o PyTorch); na v2 (produtos matriz·vetor sobre `Array`) leva **~0,1 s por token**: ~5× o PyTorch com 16 threads (21 ms por forward de 11 tokens) e ~2× o PyTorch com 1 thread (55 ms). O que ainda pesa é carregar os pesos (9 s contra ~1 s), porque os 124 M de números viram árvores de nós (~10 GB de memória durante a carga).
+**Summary (v2):** GPT-2 small with 124 M parameters runs in Bend and **generates exactly the same tokens as PyTorch**, with logits equal to within 2e-4. In v1 it took ~3 s per token (~150x PyTorch); in v2 (matrix · vector products over `Array`) it takes **~0.1 s per token**: ~5x PyTorch with 16 threads (21 ms per forward pass of 11 tokens) and ~2x PyTorch with 1 thread (55 ms). What still weighs is loading the weights (9 s against ~1 s), because the 124 M numbers become trees of nodes (~10 GB of memory during loading).
 
-## v2: `demos/gpt2/fast.bend` (pacote `bend-ml-tensor-array@0.1.1.0`)
+## v2: `demos/gpt2/fast.bend` (package `bend-ml-tensor-array@0.1.1.0`)
 
-| GPT-2 small, "The capital of France is", 8 tokens | por token | total |
+| GPT-2 small, "The capital of France is", 8 tokens | per token | total |
 |---|---|---|
-| Bend v1 (listas) | ~3 s | 49,8 s |
-| Bend v2 com `par = 3` (cópias da matriz por tarefa) | ~1,1 s | 22 s |
-| **Bend v2, sequencial (`par = 0`)** | **~0,1 s** | **11,1 s** (9 s de carga + 1,2 s para os 8 tokens) |
-| PyTorch (CPU, 16 threads, sem KV cache): forward de 11 tokens | **21 ms** | 1,3 s no `gpt2_ref.py` (inclui ~1 s para carregar os pesos) |
-| PyTorch (CPU, 1 thread, sem KV cache): forward de 11 tokens | 55 ms | |
+| Bend v1 (lists) | ~3 s | 49.8 s |
+| Bend v2 with `par = 3` (a copy of the matrix per task) | ~1.1 s | 22 s |
+| **Bend v2, sequential (`par = 0`)** | **~0.1 s** | **11.1 s** (9 s of loading + 1.2 s for the 8 tokens) |
+| PyTorch (CPU, 16 threads, no KV cache): forward pass of 11 tokens | **21 ms** | 1.3 s in `gpt2_ref.py` (includes ~1 s to load the weights) |
+| PyTorch (CPU, 1 thread, no KV cache): forward pass of 11 tokens | 55 ms | |
 
-Mesma verificação da v1 (`reference/test_gpt2.py`): 3 prompts, 22 tokens, ids idênticos, |Δlogit| ≤ 2e-4.
+The same verification as v1 (`reference/test_gpt2.py`): 3 prompts, 22 tokens, identical ids, |Δlogit| ≤ 2e-4.
 
-Em matriz·vetor, `par = 3` é ~10× **pior** que sequencial: o custo de clonar a matriz de pesos por tarefa supera o de calcular (cada peso é lido uma vez). Medição isolada em `NOTES.md`, exp. 9.
+In matrix · vector products, `par = 3` is ~10x **worse** than sequential: the cost of cloning the weight matrix per task exceeds the cost of computing (each weight is read once). Isolated measurement in `NOTES.md`, experiment 9.
 
 ---
 
-## v1: listas (`demos/gpt2/gpt2.bend`), mantido como linha de base
+## v1: lists (`demos/gpt2/gpt2.bend`), kept as the baseline
 
-## Verificação (`reference/test_gpt2.py`)
+## Verification (`reference/test_gpt2.py`)
 
-Geração gulosa a partir de três prompts, comparando ids, texto e o logit do token escolhido em cada passo (22 tokens):
+Greedy generation from three prompts, comparing ids, text and the logit of the chosen token at each step (22 tokens):
 
-| prompt | ids | texto | max \|Δ logit\| |
+| prompt | ids | text | max \|Δ logit\| |
 |---|---|---|---|
-| `The capital of France is` (8 tokens) | idênticos | idêntico | 8e-5 |
-| `Machine learning is` (8 tokens) | idênticos | idêntico | 2e-4 |
-| `1, 2, 3, 4,` (6 tokens) | idênticos | idêntico | 1,1e-4 |
+| `The capital of France is` (8 tokens) | identical | identical | 8e-5 |
+| `Machine learning is` (8 tokens) | identical | identical | 2e-4 |
+| `1, 2, 3, 4,` (6 tokens) | identical | identical | 1.1e-4 |
 
-Exemplo: `The capital of France is the capital of the French Republic, and` (nas duas implementações).
+Example: `The capital of France is the capital of the French Republic, and` (in both implementations).
 
-O tokenizer em Bend (pré-tokenizador + 50 000 regras, pacote `bend-ml-bpe-tokenizer`) bate com o `tiktoken` em 16 de 16 textos (`reference/test_gpt2_tok.py`).
+The tokenizer in Bend (pre-tokenizer + 50,000 rules, package `bend-ml-bpe-tokenizer`) matches `tiktoken` on 16 out of 16 texts (`reference/test_gpt2_tok.py`).
 
-## Desempenho
+## Performance
 
-| | tempo |
+| | time |
 |---|---|
-| Bend: carregar 124 M de pesos | ~10 s |
-| Bend: cada token gerado | ~3 s (uma posição com KV cache; 12 camadas + 50 257 logits) |
-| Bend: 8 tokens, total | 49,8 s |
-| PyTorch (CPU, sem KV cache, 16 threads): 8 tokens, total incluindo carregar pesos | 1,3 s |
+| Bend: loading 124 M weights | ~10 s |
+| Bend: each generated token | ~3 s (one position with a KV cache; 12 layers + 50,257 logits) |
+| Bend: 8 tokens, total | 49.8 s |
+| PyTorch (CPU, no KV cache, 16 threads): 8 tokens, total including loading the weights | 1.3 s |
 
-Configuração: Intel Core Ultra 7 155H (22 threads), 32 GB; Bend 2.0.35 (1 thread efetiva), clang 22.1.8; PyTorch 2.14.1 (CPU). Sem GPU: a RTX 4050 (6 GB) não é usada (o Bend pede CUDA 12 em `/usr/local/cuda` e o Arch traz o 13).
+Setup: Intel Core Ultra 7 155H (22 threads), 32 GB; Bend 2.0.35 (1 effective thread), clang 22.1.8; PyTorch 2.14.1 (CPU). No GPU: the RTX 4050 (6 GB) is not used (Bend asks for CUDA 12 at `/usr/local/cuda` and Arch ships 13).
 
-## Memória
+## Memory
 
-~2 GB para os pesos em listas de `F32` (16 bytes por número).
+~2 GB for the weights in lists of `F32` (16 bytes per number).
