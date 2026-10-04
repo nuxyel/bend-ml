@@ -1,10 +1,10 @@
-# GPT-2 small (124M) em Bend: inferência com KV cache, geração gulosa.
+# GPT-2 small (124M) in Bend: inference with a KV cache, greedy generation.
 #
 #   bend demos/gpt2/gpt2.bend -o gpt2 && ./gpt2 "The capital of France is" 8
 #
-# Rodar da raiz do repositório, depois de `reference/gpt2_prep.py --split`.
-# Os formatos das matrizes entram nos tipos (bend-ml-tensor); o tokenizer é o
-# bend-ml-bpe-tokenizer com a tabela de 50 000 regras do GPT-2.
+# Run from the repository root, after `reference/gpt2_prep.py --split`.
+# The matrix shapes enter the types (bend-ml-tensor); the tokenizer is
+# bend-ml-bpe-tokenizer with GPT-2's table of 50,000 rules.
 
 import Base
 import bend-ml-tensor@0.1.1.0/main.bend as T
@@ -13,7 +13,7 @@ import ./load.bend as L
 import ./tok.bend as K
 
 # ---------------------------------------------------------------------
-# modelo
+# model
 # ---------------------------------------------------------------------
 
 type Layer is Data:
@@ -22,7 +22,7 @@ type Layer is Data:
 type Model is Data:
   Model{wte: T.Mat<50257n, 768n>, wpe: T.Mat<1024n, 768n>, layers: List<&2, Layer>, lnfg: T.Vec<768n>, lnfb: T.Vec<768n>}
 
-# cache de chaves e valores de uma camada (uma linha de 768 números por posição)
+# key and value cache of one layer (one row of 768 numbers per position)
 
 type KV is Data:
   KV{k: List<&2, List<&2, F32>>, v: List<&2, List<&2, F32>>}
@@ -68,7 +68,7 @@ def load_model() -> IO(Model):
     return Model{wte, wpe, layers, lnfg, lnfb}
 
 # ---------------------------------------------------------------------
-# atenção de uma posição: q (768) contra as chaves/valores em cache
+# attention for one position: q (768) against the cached keys/values
 # ---------------------------------------------------------------------
 
 def slice64(xs: List<&2, F32>, off: Nat) -> List<&2, F32>:
@@ -91,7 +91,7 @@ def weighted(w: List<&2, F32>, vs: List<&2, List<&2, F32>>, +off: Nat, acc: List
 def head_out(qh: List<&2, F32>, ks: List<&2, List<&2, F32>>, +vs: List<&2, List<&2, F32>>, +off: Nat) -> List<&2, F32>:
   weighted(T.softmax.l(scores_l(qh, ks, off)), vs, off, T.fill.l(64n, 0.0))
 
-# 12 cabeças de 64: concatena as saídas
+# 12 heads of 64: concatenates the outputs
 
 def attn(h: Nat, +off: Nat, +q: List<&2, F32>, +ks: List<&2, List<&2, F32>>, +vs: List<&2, List<&2, F32>>) -> List<&2, F32>:
   match h:
@@ -101,7 +101,7 @@ def attn(h: Nat, +off: Nat, +q: List<&2, F32>, +ks: List<&2, List<&2, F32>>, +vs
       List.append(&2, F32, head_out(slice64(q, off), ks, vs, off), attn(p, Nat.add(off, 64n), q, ks, vs))
 
 # ---------------------------------------------------------------------
-# um bloco do transformador para uma posição (cada passo recebe o anterior)
+# one transformer block for one position (each step receives the previous one)
 # ---------------------------------------------------------------------
 
 def mat1(r: List<&2, F32>) -> T.Mat<1n, 768n>:
@@ -127,7 +127,7 @@ def blk_c(+l: Layer, +kv: KV, +x: T.Mat<1n, 768n>, +att: T.Mat<1n, 768n>) -> BR:
     case Layer{ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb}:
       blk_d(Layer{ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb}, kv, T.Mat.add(1n, 768n, x, T.Mat.add_row(1n, 768n, T.Mat.matmul_t(1n, 768n, 768n, att, pw), pb)), T.Mat.layernorm(1n, 768n, 0.00001, ln2g, ln2b, T.Mat.add(1n, 768n, x, T.Mat.add_row(1n, 768n, T.Mat.matmul_t(1n, 768n, 768n, att, pw), pb))))
 
-# qkv: uma linha de 2304 = q (768), k (768), v (768)
+# qkv: one row of 2304 = q (768), k (768), v (768)
 
 def blk_b2(+l: Layer, +x: T.Mat<1n, 768n>, +nk: List<&2, List<&2, F32>>, +nv: List<&2, List<&2, F32>>, +q: List<&2, F32>) -> BR:
   blk_c(l, KV{nk, nv}, x, mat1(attn(12n, 0n, q, nk, nv)))
@@ -148,7 +148,7 @@ def block(+l: Layer, c: KV, +x: T.Mat<1n, 768n>) -> BR:
       blk_a(Layer{ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb}, c, x, T.Mat.layernorm(1n, 768n, 0.00001, ln1g, ln1b, x))
 
 # ---------------------------------------------------------------------
-# embedding, 12 camadas, logits
+# embedding, 12 layers, logits
 # ---------------------------------------------------------------------
 
 def nth_row(rows: List<&2, List<&2, F32>>, i: Nat) -> List<&2, F32>:
@@ -163,7 +163,7 @@ def nth_row(rows: List<&2, List<&2, F32>>, i: Nat) -> List<&2, F32>:
 def embed(+wte: T.Mat<50257n, 768n>, wpe: T.Mat<1024n, 768n>, tok: Nat, pos: Nat) -> T.Mat<1n, 768n>:
   mat1(T.zip_with.add(nth_row(T.Mat.to_rows(50257n, 768n, wte), tok), nth_row(T.Mat.to_rows(1024n, 768n, wpe), pos)))
 
-# percorre as camadas; pend é o resultado do bloco anterior (x, cache)
+# walks the layers; pend is the result of the previous block (x, cache)
 
 def run(ls: List<&2, Layer>, cs: List<&2, KV>, acc: List<&2, KV>, pend: BR) -> T.Mat<1n, 768n> & List<&2, KV>:
   match ls cs pend:
@@ -220,7 +220,7 @@ def logits_out(+wte: T.Mat<50257n, 768n>, +lnfg: T.Vec<768n>, +lnfb: T.Vec<768n>
     case Tuple{x, cs}:
       lo2(T.Mat.matmul_t(1n, 768n, 50257n, T.Mat.layernorm(1n, 768n, 0.00001, lnfg, lnfb, x), wte), cs)
 
-# uma posição: devolve o id mais provável, o seu logit e os novos caches
+# one position: returns the most likely id, its logit and the new caches
 
 def fwd(m: Model, cs: List<&2, KV>, tok: Nat, pos: Nat) -> Out:
   match m:
@@ -228,7 +228,7 @@ def fwd(m: Model, cs: List<&2, KV>, tok: Nat, pos: Nat) -> Out:
       logits_out(wte, lnfg, lnfb, start(layers, cs, embed(wte, wpe, tok, pos)))
 
 # ---------------------------------------------------------------------
-# geração gulosa (alimenta o prompt, depois o próprio token mais provável)
+# greedy generation (feeds the prompt, then its own most likely token)
 # ---------------------------------------------------------------------
 
 def selb(b: Bool, x: List<&2, U32>, y: List<&2, U32>) -> List<&2, U32>:
@@ -276,7 +276,7 @@ def loop(fuel: Nat, +m: Model, +t0: Nat, st: St) -> IO(St):
         loop(p, m, t0, s2)
 
 # ---------------------------------------------------------------------
-# texto <-> bytes (UTF-8)
+# text <-> bytes (UTF-8)
 # ---------------------------------------------------------------------
 
 def u32s(xs: List<&2, Nat>) -> List<&2, U32>:
@@ -286,7 +286,7 @@ def u32s(xs: List<&2, Nat>) -> List<&2, U32>:
     case Con{n, t}:
       U32.from_nat(n) <> u32s(t)
 
-# ids GPT-2 -> token do bpe/
+# GPT-2 ids -> bpe/ token
 
 def index_sel(b: Bool, x: Nat, y: Nat) -> Nat:
   match b:
@@ -336,7 +336,7 @@ def selu(b: Bool, x: U32, y: U32) -> U32:
     case False{}:
       y
 
-# code point -> bytes UTF-8
+# code point -> UTF-8 bytes
 
 def cont(+b: U32) -> Bool:
   Bool.and(U32.is_le(128, b), U32.is_le(b, 191))
@@ -376,18 +376,18 @@ def text_of(+table: List<&2, BPE.Rule>, +perm: List<&2, Nat>, ids: List<&2, Nat>
   text_of2(u32s(BPE.decode(table, tks_of(perm, ids))))
 
 # ---------------------------------------------------------------------
-# programa principal
+# main program
 # ---------------------------------------------------------------------
 
 def fin(+table: List<&2, BPE.Rule>, +perm: List<&2, Nat>, ids: List<&2, Nat>, st: St) -> IO(Unit):
   match st:
     case St{cs, tok, pos, queue, left, gen}:
-      IO.print("texto: " ++ text_of(table, perm, List.append(&2, Nat, ids, List.reverse(&2, Nat, gen))))
+      IO.print("text: " ++ text_of(table, perm, List.append(&2, Nat, ids, List.reverse(&2, Nat, gen))))
 
 def start2(+model: Model, +table: List<&2, BPE.Rule>, +perm: List<&2, Nat>, +ids: List<&2, Nat>, +n: Nat) -> IO(Unit):
   match ids:
     case Nil{}:
-      IO.print("prompt vazio")
+      IO.print("empty prompt")
     case Con{t0, qt}:
       do IO<Unit>:
         t0ms : Nat <- IO.now()
@@ -401,7 +401,7 @@ def generate(model: Model, +mb: List<&2, U32>, +pb: List<&2, U32>, prompt: Strin
 def run1(prompt: String, mn: Maybe<&2, Nat>) -> IO(Unit):
   match mn:
     case None{}:
-      IO.print("uso: gpt2 \"prompt\" n_tokens")
+      IO.print("usage: gpt2 \"prompt\" n_tokens")
     case Some{n}:
       do IO<Unit>:
         mb : List<&2, U32> <- K.read_bytes("demos/gpt2/data/merges_num.txt")
@@ -409,7 +409,7 @@ def run1(prompt: String, mn: Maybe<&2, Nat>) -> IO(Unit):
         t0 : Nat <- IO.now()
         model : Model <- load_model()
         t1 : Nat <- IO.now()
-        IO.print("pesos carregados em " ++ Nat.show(Nat.div(Nat.sub(t1, t0), 1000n)) ++ "s")
+        IO.print("weights loaded in " ++ Nat.show(Nat.div(Nat.sub(t1, t0), 1000n)) ++ "s")
         generate(model, mb, pb, prompt, n)
 
 def dispatch(args: List<String>) -> IO(Unit):
@@ -417,7 +417,7 @@ def dispatch(args: List<String>) -> IO(Unit):
     case Con{prog, Con{prompt, Con{n, Nil{}}}}:
       run1(prompt, Nat.read(n))
     case _:
-      IO.print("uso: gpt2 \"prompt\" n_tokens")
+      IO.print("usage: gpt2 \"prompt\" n_tokens")
 
 def main() -> IO(Unit):
   do IO<Unit>:
