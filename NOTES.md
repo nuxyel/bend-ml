@@ -345,3 +345,10 @@ Goal: a stranger can clone the repository, reproduce every claim, and see it ver
 - **MNIST timing:** an epoch of the local `tensor-array` and of the published 0.1.2.0 version both took 16.0 s on a loaded machine (load average ~2.5, the 6.6 s figure was taken on an idle machine), so the proved `cap_depth` costs nothing measurable.
 - **Republished:** `bend-ml-tensor-array@0.1.3.0`, hash `0xa78e1f1609ed090d0092c5fff6f9bac7`. The usage comment in `tensor-array/main.bend` was updated to 0.1.3.0 after publication (comment only).
 - **History:** the repository history was rewritten on 2026-10-04 (English messages, smaller commits, no attribution lines); old clones must be cloned again.
+
+## README and video (2026-10-04)
+
+- The README images are generated, not drawn: `scripts/capture_outputs.sh` stores the real command outputs in `docs/media/outputs/`, `docs/media/shoot.mjs` renders them as terminal screenshots, `docs/media/charts.mjs` builds the charts, the package diagram and the banner from `docs/media/numbers.json`, and `docs/media/render_video.mjs` renders `docs/media/video/scene.html` into a 60 s MP4 with headless Brave and ffmpeg (`make media`).
+- Numbers re-measured for them on an idle machine: MNIST epoch 7.0, 7.0, 7.2 s (6.6 s in the original runs; 12.5 s once under load), PyTorch 0.18 to 0.20 s (0.55 s once), so PyTorch is ~35x ahead rather than the ~22 to 33x quoted before; GPT-2 loads in 7 s and generates the prompt plus 8 tokens in 1.2 s.
+- The stale label "3 prompts" of the GPT-2 check was fixed: `test_gpt2.py` has always run all 11 prompts.
+- The MP4 (~10 MB) is attached to the v2.1.0 release instead of the repository, so it does not stay in the history forever.

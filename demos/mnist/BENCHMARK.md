@@ -1,6 +1,6 @@
 # MNIST: an honest benchmark, Bend vs PyTorch
 
-**Summary (v2):** the results are **identical** (same loss, same accuracy after 1 and after 3 epochs). In v1 Bend took **544 s per epoch** (~1800x PyTorch); in v2, with matrices in a flat `Array` and parallel products, it takes **6.6 s** (~33x PyTorch with 16 threads, ~22x with 1). The difference between v1 and v2 is the data structure, not the language; what is left is scalar code against BLAS/SIMD.
+**Summary (v2):** the results are **identical** (same loss, same accuracy after 1 and after 3 epochs). In v1 Bend took **544 s per epoch** (~1800x PyTorch); in v2, with matrices in a flat `Array` and parallel products, it takes **6.6 s** (~33x PyTorch with 16 threads, ~22x with 1). The difference between v1 and v2 is the data structure, not the language; what is left is scalar code against BLAS/SIMD. Re-measured on 2026-10-04 on an idle machine: 7.0, 7.0 and 7.2 s per epoch for Bend (the 6.6 s of the tables below are the original runs) and 0.18 to 0.20 s for PyTorch, i.e. ~35x.
 
 ## v2: flat `Array` (`demos/mnist/fast.bend`, package `bend-ml-tensor-array@0.1.1.0`)
 
