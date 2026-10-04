@@ -118,6 +118,47 @@ def gp2(d: Nat, +n: Nat, +mm1: Nat, +kn: Nat, +arow: U32, +sa: U32, +sb: U32, +b
 def gemm_par(d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
   gp2(d, n, Nat.sub(m, 1n), k, arow, sa, sb, bcol, c, Array.clone(F32, a), Array.clone(F32, b))
 
+
+# ---------------------------------------------------------------------
+# gemm paralelo por COLUNAS, para n = 1 (matriz · vetor): cada bloco calcula um
+# intervalo de colunas de C, com a sua cópia dos operandos
+# ---------------------------------------------------------------------
+
+def cblock_fin(st: S3) -> List<&2, F32>:
+  match st:
+    case S3{a, b, out}:
+      List.reverse(&2, F32, out)
+
+# cnt colunas a partir de j0 (cnt >= 1); a linha 0 de A fica em ia0
+
+def cblock_go(cnt1: Nat, +kn: Nat, +ia0: U32, +j0: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>) -> List<&2, F32>:
+  cblock_fin(lcols(cnt1, kn, ia0, (j0 * bcol : U32), sa, sb, bcol, Nil{}, dotg(kn, ia0, (j0 * bcol : U32), sa, sb, 0.0, Array.get(F32, a, ia0), Array.get(F32, b, (j0 * bcol : U32)))))
+
+def cblock(cnt: Nat, +kn: Nat, +ia0: U32, +j0: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>) -> List<&2, F32>:
+  match cnt:
+    case 0n:
+      Nil{}
+    case 1n+p:
+      cblock_go(p, kn, ia0, j0, sa, sb, bcol, a, b)
+
+def cpar(d: Nat, +cnt: Nat, +kn: Nat, +ia0: U32, +j0: U32, +sa: U32, +sb: U32, +bcol: U32, ra: Array<F32> & Array<F32>, rb: Array<F32> & Array<F32>) -> List<&2, F32>:
+  match d ra rb:
+    case 0n Tuple{a, a2} Tuple{b, b2}:
+      cblock(cnt, kn, ia0, j0, sa, sb, bcol, a, b)
+    case 1n++q Tuple{a, a2} Tuple{b, b2}:
+      x y = cpar(q, Nat.div(cnt, 2n), kn, ia0, j0, sa, sb, bcol, Array.clone(F32, a), Array.clone(F32, b)) cpar(q, Nat.sub(cnt, Nat.div(cnt, 2n)), kn, ia0, (j0 + U32.from_nat(Nat.div(cnt, 2n)) : U32), sa, sb, bcol, Array.clone(F32, a2), Array.clone(F32, b2))
+      List.append(&2, F32, x, y)
+
+def cp2(d: Nat, +m: Nat, +kn: Nat, +sa: U32, +sb: U32, +bcol: U32, c: Array<F32>, pa: Array<F32> & Array<F32>, pb: Array<F32> & Array<F32>) -> G:
+  match pa pb:
+    case Tuple{a1, a2} Tuple{b1, b2}:
+      gp3(a1, b1, c, cpar(d, m, kn, 0, 0, sa, sb, bcol, Array.clone(F32, a2), Array.clone(F32, b2)))
+
+# C (1 x m) = A (1 x k) · B, com 2^d blocos de colunas em paralelo
+
+def gemm_par_cols(d: Nat, +m: Nat, +k: Nat, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
+  cp2(d, m, k, sa, sb, bcol, c, Array.clone(F32, a), Array.clone(F32, b))
+
 # ---------------------------------------------------------------------
 # operações elementwise (em lugar, por índice)
 # ---------------------------------------------------------------------
@@ -399,6 +440,12 @@ def Mat.of_list(+r: Nat, +c: Nat, +xs: List<&2, F32>) -> Maybe<&1, Mat<r, c>>:
 
 # lê os n primeiros números, devolvendo a matriz
 
+# Mat<r, c> sem checar o tamanho da lista (uma lista curta deixa o resto em zero, uma longa é cortada
+# pela capacidade): só para quando o tamanho é conhecido por construção. Prefira Mat.of_list.
+
+def Mat.from_list(+r: Nat, +c: Nat, xs: List<&2, F32>) -> Mat<r, c>:
+  Mat{fill_list(xs, 0, Array.new(F32, cap_depth(Nat.mul(r, c)), 0.0))}
+
 type ML<-r: Nat, -c: Nat> is Type:
   ML{m: Mat<r, c>, l: List<&2, F32>}
 
@@ -444,12 +491,22 @@ type MMulNT<-n: Nat, -k: Nat, -m: Nat> is Type:
 type MMulTN<-n: Nat, -k: Nat, -m: Nat> is Type:
   MMulTN{a: Mat<k, n>, b: Mat<k, m>, c: Mat<n, m>}
 
-def gemm_any(d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
+def gemm_any3(cols: Bool, d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
+  match cols:
+    case True{}:
+      gemm_par_cols(d, m, k, sa, sb, bcol, a, b, c)
+    case False{}:
+      gemm_par(d, n, m, k, arow, sa, sb, bcol, a, b, c)
+
+def gemm_any2(d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
   match d:
     case 0n:
       gemm(n, m, k, arow, sa, sb, bcol, a, b, c)
     case 1n+q:
-      gemm_par(1n+q, n, m, k, arow, sa, sb, bcol, a, b, c)
+      gemm_any3(Nat.is_eq(n, 1n), 1n+q, n, m, k, arow, sa, sb, bcol, a, b, c)
+
+def gemm_any(d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
+  gemm_any2(d, n, m, k, arow, sa, sb, bcol, a, b, c)
 
 def mmul_fin(-n: Nat, -k: Nat, -m: Nat, g: G) -> MMul<n, k, m>:
   match g:
