@@ -1,5 +1,5 @@
-# C = A · Btᵀ  (A: n x k, Bt: m x k, ambos Array<F32> linha a linha) com blocos de linhas em paralelo.
-# Dados: A[r][c] = ((7r + 3c) mod 13) / 10,  Bt[j][c] = ((5j + 2c) mod 11) / 10.
+# C = A · Btᵀ  (A: n x k, Bt: m x k, both Array<F32> row by row) with blocks of rows in parallel.
+# Data: A[r][c] = ((7r + 3c) mod 13) / 10,  Bt[j][c] = ((5j + 2c) mod 11) / 10.
 import Base
 
 type R is Type:
@@ -8,7 +8,7 @@ type R is Type:
 type S is Type:
   S{a: Array<F32>, b: Array<F32>, out: List<&2, F32>}
 
-# acc += a[ia+t] * b[ib+t], t = 0..n-1; ra, rb já trazem o primeiro par (array, elemento)
+# acc += a[ia+t] * b[ib+t], t = 0..n-1; ra, rb already carry the first (array, element) pair
 def dotk(n: Nat, +ia: U32, +ib: U32, acc: F32, ra: Array<F32> & F32, rb: Array<F32> & F32) -> R:
   match n ra rb:
     case 0n Tuple{a, x} Tuple{b, y}:
@@ -16,7 +16,7 @@ def dotk(n: Nat, +ia: U32, +ib: U32, acc: F32, ra: Array<F32> & F32, rb: Array<F
     case 1n+p Tuple{a, +x} Tuple{b, +y}:
       dotk(p, (ia + 1 : U32), (ib + 1 : U32), (acc + (x * y : F32) : F32), Array.get(F32, a, (ia + 1 : U32)), Array.get(F32, b, (ib + 1 : U32)))
 
-# a linha i de C: uma coluna por vez; r é o produto da coluna j (já calculado)
+# row i of C: one column at a time; r is the product of column j (already computed)
 def cols(m: Nat, +kn: Nat, +ku: U32, +i: U32, +j: U32, out: List<&2, F32>, r: R) -> S:
   match m r:
     case 0n R{a, b, +x}:
@@ -27,7 +27,7 @@ def cols(m: Nat, +kn: Nat, +ku: U32, +i: U32, +j: U32, out: List<&2, F32>, r: R)
 def first(+kn: Nat, +ku: U32, +i: U32, a: Array<F32>, b: Array<F32>) -> R:
   dotk(kn, (i * ku : U32), 0, 0.0, Array.get(F32, a, (i * ku : U32)), Array.get(F32, b, 0))
 
-# cnt linhas de C a partir da linha i
+# cnt rows of C starting at row i
 def rows(cnt: Nat, +mm1: Nat, +kn: Nat, +ku: U32, +i: U32, st: S) -> S:
   match cnt st:
     case 0n S{a, b, out}:
@@ -43,8 +43,8 @@ def drop_arrays(st: S) -> List<&2, F32>:
 def block(cnt: Nat, +mm1: Nat, +kn: Nat, +ku: U32, +i: U32, a: Array<F32>, b: Array<F32>) -> List<&2, F32>:
   drop_arrays(rows(cnt, mm1, kn, ku, i, S{a, b, Nil{}}))
 
-# 2^d blocos de linhas em paralelo; cada bloco recebe a sua cópia de A e Bt.
-# ra e rb são (original, cópia): um vai para cada metade.
+# 2^d blocks of rows in parallel; each block receives its own copy of A and Bt.
+# ra and rb are (original, copy): one goes to each half.
 def par(d: Nat, +cnt: Nat, +mm1: Nat, +kn: Nat, +ku: U32, +i: U32, ra: Array<F32> & Array<F32>, rb: Array<F32> & Array<F32>) -> List<&2, F32>:
   match d ra rb:
     case 0n Tuple{a, a2} Tuple{b, b2}:
@@ -53,11 +53,11 @@ def par(d: Nat, +cnt: Nat, +mm1: Nat, +kn: Nat, +ku: U32, +i: U32, ra: Array<F32
       x y = par(q, Nat.div(cnt, 2n), mm1, kn, ku, i, Array.clone(F32, a), Array.clone(F32, b)) par(q, Nat.sub(cnt, Nat.div(cnt, 2n)), mm1, kn, ku, (i + U32.from_nat(Nat.div(cnt, 2n)) : U32), Array.clone(F32, a2), Array.clone(F32, b2))
       List.append(&2, F32, x, y)
 
-# ---- dados e verificação ----
+# ---- data and verification ----
 def md(+x: U32, +m: U32) -> U32:
   (x - (U32.div(x, m) * m : U32) : U32)
 
-# preenche as n linhas (cada uma com k valores) de um Array com f(r, c) = ((u*r + v*c) mod w) / 10
+# fills the n rows (each with k values) of an Array with f(r, c) = ((u*r + v*c) mod w) / 10
 def fillrow(c: Nat, +cc: U32, +r: U32, +u: U32, +v: U32, +w: U32, +base: U32, a: Array<F32>) -> Array<F32>:
   match c:
     case 0n:
@@ -79,11 +79,11 @@ def sum.l(xs: List<&2, F32>, acc: F32) -> F32:
     case Con{+h, t}:
       sum.l(t, (acc + h : F32))
 
-# n=100, k=784, m=128; 2^d blocos
+# n=100, k=784, m=128; 2^d blocks
 def run(d: Nat, a: Array<F32>, b: Array<F32>) -> F32:
   sum.l(par(d, 100n, 127n, 784n, 784, 0, Array.clone(F32, a), Array.clone(F32, b)), 0.0)
 
-# repete o produto k vezes (cada vez com cópias novas de A e Bt)
+# repeats the product k times (each time with fresh copies of A and Bt)
 def many(k: Nat, +d: Nat, ra: Array<F32> & Array<F32>, rb: Array<F32> & Array<F32>, acc: F32) -> F32:
   match k ra rb:
     case 0n Tuple{a, a2} Tuple{b, b2}:

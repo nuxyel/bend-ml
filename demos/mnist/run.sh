@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Treina o MLP em Bend e em PyTorch com os mesmos dados, pesos iniciais e hiperparâmetros.
-# Uso (da raiz do repositório): demos/mnist/run.sh [épocas] [máx. lotes; 0 = todos] [lr]
+# Trains the MLP in Bend and in PyTorch with the same data, initial weights and hyperparameters.
+# Usage (from the repository root): demos/mnist/run.sh [epochs] [max batches; 0 = all] [lr]
 set -euo pipefail
 EP=${1:-1}; MB=${2:-0}; LR=${3:-0.1}
 export PATH="$HOME/.bend/bin:$PATH" BEND_NO_TELEMETRY=1

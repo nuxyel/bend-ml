@@ -1,9 +1,9 @@
-# matriz · vetor como no GPT-2: y(1 x M) = x(1 x K) · W(M x K)ᵀ, repetido REPS vezes; W com dados distintos.
+# matrix · vector as in GPT-2: y(1 x M) = x(1 x K) · W(M x K)ᵀ, repeated REPS times; W with distinct data.
 import Base
 import bend-ml-tensor@0.1.1.0/main.bend as T
 import bend-ml-tensor-array@0.1.1.0/main.bend as TA
 
-# lista de n valores ((i mod 13) / 10)
+# list of n values ((i mod 13) / 10)
 
 def gen(n: Nat, +i: U32, acc: List<&2, F32>) -> List<&2, F32>:
   match n:
@@ -17,7 +17,7 @@ def ml_max(-r: Nat, -c: Nat, x: TA.ML<r, c>) -> F32:
     case TA.ML{m, l}:
       T.max.l(l)
 
-# r é o produto da iteração anterior
+# r is the product of the previous iteration
 def loop(k: Nat, +par: Nat, acc: F32, r: TA.MMulNT<1n, KN, MN>) -> F32:
   match k r:
     case 0n TA.MMulNT{x, w, c}:

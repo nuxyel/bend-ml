@@ -7,7 +7,7 @@ def fill(n: Nat, +i: U32, a: Array<F32>) -> Array<F32>:
     case 1n+p:
       fill(p, (i + 1 : U32), Array.set(F32, a, i, U32.to_f32(i)))
 
-# k clones encadeados; cada um LÊ o último elemento da cópia (obriga a materializar)
+# k chained clones; each one READS the last element of the copy (forces materialization)
 def loop(k: Nat, acc: F32, r: Array<F32> & Array<F32>, g: Array<F32> & F32) -> F32:
   match k r g:
     case 0n Tuple{x, y} Tuple{z, +v}:

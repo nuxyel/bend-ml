@@ -1,4 +1,4 @@
-# confere o ganho do Array com dados DISTINTOS: a[i] = i/100, b[i] = (783-i)/100
+# checks the Array speedup with DISTINCT data: a[i] = i/100, b[i] = (783-i)/100
 import Base
 
 type R is Type:
@@ -21,7 +21,7 @@ def many(k: Nat, acc: F32, r: R) -> F32:
     case 1n+p R{a, b, +x}:
       many(p, (acc + x : F32), dot(a, b))
 
-# preenche a[i] = i/100 e b[i] = (783-i)/100 para i = 0..783
+# fills a[i] = i/100 and b[i] = (783-i)/100 for i = 0..783
 def fill(n: Nat, +i: U32, a: Array<F32>, b: Array<F32>) -> Array<F32> & Array<F32>:
   match n:
     case 0n:

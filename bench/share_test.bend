@@ -1,5 +1,5 @@
-# Cada tarefa faz K produtos escalares de 784 elementos. MODO privado: a tarefa constrói seus
-# arrays. MODO clone: recebe clones de um par construído uma vez na raiz.
+# Each task does K dot products of 784 elements. PRIVATE mode: the task builds its own
+# arrays. CLONE mode: it receives clones of a pair built once at the root.
 import Base
 
 type R is Type:
@@ -32,7 +32,7 @@ def fill(n: Nat, +i: U32, a: Array<F32>) -> Array<F32>:
 def go(k: Nat, a: Array<F32>, b: Array<F32>) -> F32:
   many(k, 0.0, dot(a, b))
 
-# privado
+# private
 def tp(+d: Nat, +k: Nat) -> F32:
   match d:
     case 0n:
@@ -41,7 +41,7 @@ def tp(+d: Nat, +k: Nat) -> F32:
       x y = tp(q, k) tp(q, k)
       (x + y : F32)
 
-# clone: cada folha recebe um par (a, b) clonado do pai
+# clone: each leaf receives a pair (a, b) cloned from its parent
 def tc(d: Nat, +k: Nat, ra: Array<F32> & Array<F32>, rb: Array<F32> & Array<F32>) -> F32:
   match d ra rb:
     case 0n Tuple{a, a2} Tuple{b, b2}:

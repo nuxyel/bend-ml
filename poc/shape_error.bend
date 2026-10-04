@@ -1,7 +1,7 @@
 import Base
 
-# Vetor de F32 com o tamanho no TIPO: Vec(3n) é um tipo diferente de Vec(4n).
-# O tipo é calculado por recursão em n, como Word(n) na Base.
+# F32 vector with its size in the TYPE: Vec(3n) is a different type from Vec(4n).
+# The type is computed by recursion on n, like Word(n) in Base.
 type Vec.Nil is Data:
   VNil{}
 
@@ -31,7 +31,7 @@ def Vec.add(n: Nat, a: Vec(n), b: Vec(n)) -> Vec(n):
       VCon{y, ys} = b
       VCon{(x + y : F32), Vec.add(p, xs, ys)}
 
-# produto escalar acumulando em acc
+# dot product accumulating in acc
 def Vec.dot(n: Nat, a: Vec(n), b: Vec(n), acc: F32) -> F32:
   match n:
     case 0n:
@@ -48,7 +48,7 @@ def Vec.fill(n: Nat, +v: F32) -> Vec(n):
     case 1n+p:
       VCon{v, Vec.fill(p, v)}
 
-# DEVE FALHAR: somar um Vec(3) com um Vec(4) é erro de tipo.
+# MUST FAIL: adding a Vec(3) to a Vec(4) is a type error.
 def main() -> IO(Unit):
   do IO<Unit>:
     a : Vec(3n) = Vec.fill(3n, 2.0)

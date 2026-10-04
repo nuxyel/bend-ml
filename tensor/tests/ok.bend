@@ -24,7 +24,7 @@ def showm(-r: Nat, -c: Nat, m: T.Mat<r, c>) -> String:
 def prod() -> T.Mat<2n, 4n>:
   T.Mat.matmul(2n, 3n, 4n, T.Mat.fill(2n, 3n, 2.0), T.Mat.fill(3n, 4n, 3.0))
 
-# 2x6 -> 3x4: 12 == 12, a prova é só calcular
+# 2x6 -> 3x4: 12 == 12, the proof is just computing
 def resh() -> T.Mat<3n, 4n>:
   T.Mat.reshape(2n, 6n, 3n, 4n, {==}, T.Mat.fill(2n, 6n, 1.0))
 

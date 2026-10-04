@@ -1,4 +1,4 @@
-# matmul 100x784 · 784x128 com listas (como o bend-ml-tensor), repetido N vezes.
+# 100x784 · 784x128 matmul with lists (like bend-ml-tensor), repeated N times.
 import Base
 
 def dot(xs: List<&2, F32>, ys: List<&2, F32>, acc: F32) -> F32:

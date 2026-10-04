@@ -1,4 +1,4 @@
-# produto escalar percorrendo as DUAS árvores juntas (sem índices); devolve as árvores reconstruídas.
+# dot product walking BOTH trees together (no indices); returns the rebuilt trees.
 import Base
 
 type R is Type:
@@ -9,7 +9,7 @@ def dotT2(l: R, r: R) -> R:
     case R{a1, b1, x1} R{a2, b2, x2}:
       R{ANode{a1, a2}, ANode{b1, b2}, (x1 + x2 : F32)}
 
-# soma dos produtos; as árvores são devolvidas reconstruídas
+# sum of the products; the trees are returned rebuilt
 def dotT(a: Array<F32>, b: Array<F32>) -> R:
   match a b:
     case ALeaf{+x} ALeaf{+y}:

@@ -1,11 +1,11 @@
-# produto escalar de dois Array<F32> de 1024 casas (784 usadas), repetido
-# 128000 vezes = o mesmo número de multiplicações do mm_list (10 * 100 * 128 produtos de 784).
+# dot product of two Array<F32> with 1024 slots (784 used), repeated
+# 128000 times = the same number of multiplications as mm_list (10 * 100 * 128 products of 784).
 import Base
 
 type R is Type:
   R{a: Array<F32>, b: Array<F32>, x: F32}
 
-# lê a[i] e b[i], acumula; devolve os dois arrays para o próximo passo
+# reads a[i] and b[i], accumulates; returns both arrays for the next step
 def dot2(n: Nat, +i: U32, acc: F32, ra: Array<F32> & F32, rb: Array<F32> & F32) -> R:
   match n ra rb:
     case 0n Tuple{a, x} Tuple{b, y}:
