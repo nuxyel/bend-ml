@@ -37,7 +37,9 @@ def main():
                 failures += 1
 
         # matmul: different shapes, including row and column vectors
-        for (n, k, m) in [(2, 3, 4), (5, 7, 3), (1, 6, 1), (16, 20, 8)]:
+        rr = np.random.default_rng(13)
+        random_shapes = [(int(rr.integers(1, 20)), int(rr.integers(1, 30)), int(rr.integers(1, 20))) for _ in range(10)]
+        for (n, k, m) in [(2, 3, 4), (5, 7, 3), (1, 6, 1), (16, 20, 8)] + random_shapes:
             A = rng.standard_normal((n, k)).astype(np.float32)
             B = rng.standard_normal((k, m)).astype(np.float32)
             got = bend("matmul", n, k, m, w("a", A), w("b", B))

@@ -38,10 +38,13 @@ def main():
                 failures += 1
 
         # matmul in the three layouts and with 0, 1 and 3 levels of parallelism
-        for (n, k, m) in [(2, 3, 4), (5, 7, 3), (1, 6, 1), (9, 5, 11), (16, 20, 8), (1, 8, 13), (1, 40, 100), (1, 3, 5)]:
+        rr = np.random.default_rng(11)
+        random_shapes = [(int(rr.integers(1, 25)), int(rr.integers(1, 41)), int(rr.integers(1, 25))) for _ in range(12)]
+        random_shapes += [(1, int(rr.integers(1, 60)), int(rr.integers(1, 80))) for _ in range(4)]      # matrix . vector
+        for (n, k, m) in [(2, 3, 4), (5, 7, 3), (1, 6, 1), (9, 5, 11), (16, 20, 8), (1, 8, 13), (1, 40, 100), (1, 3, 5)] + random_shapes:
             A = rng.standard_normal((n, k)).astype(np.float32)
             B = rng.standard_normal((k, m)).astype(np.float32)
-            for par in (0, 1, 3):
+            for par in (0, 1, 2, 3, 4):
                 check(f"matmul nn   {n}x{k}·{k}x{m} par={par}", bend("nn", par, n, k, m, w("a", A), w("b", B)), A @ B)
             check(f"matmul nt   {n}x{k}·({m}x{k})ᵀ par=2", bend("nt", 2, n, k, m, w("a", A), w("bt", B.T.copy())), A @ B)
             check(f"matmul tn   ({k}x{n})ᵀ·{k}x{m} par=2", bend("tn", 2, n, k, m, w("at", A.T.copy()), w("b", B)), A @ B)
