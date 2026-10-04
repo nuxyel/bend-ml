@@ -7,7 +7,7 @@ Mostra três coisas: o **erro de shape pego pelo compilador**, a **prova verific
 ```bash
 cd ~/Repos/bend2-ml
 export PATH="$HOME/.bend/bin:$HOME/.elan/bin:$PATH"
-bend demos/gpt2/gpt2.bend -o /tmp/gpt2     # compila antes de gravar
+bend demos/gpt2/fast.bend -o /tmp/gpt2_fast     # compila antes de gravar
 clear
 ```
 
@@ -21,10 +21,10 @@ Gravar a tela: o atalho de captura do Omarchy, ou `wf-recorder -f bend-ml.mp4`.
 | 5–15 s | `bend tensor/tests/bad_matmul.bend` → `expected Mat<3n,5n> / observed Mat<4n,5n>` | "Em Bend, isso é erro de **tipo**: não compila." |
 | 15–22 s | `bend tensor/tests/bad_reshape.bend` → `expected 12n / observed 15n` | "Reshape só compila com a prova de que o número de elementos não muda." |
 | 22–32 s | `bend bpe/main.bend --verdict` → `ALL PROOFS CHECK`; mostrar `law roundtrip` | "O tokenizer tem o roundtrip provado: decode(encode(s)) = s, verificado pelo kernel." |
-| 32–50 s | `/tmp/gpt2 "The capital of France is" 8` (acelerar a espera) → `The capital of France is the capital of the French Republic, and` | "GPT-2 small de 124 milhões de parâmetros, inteiro em Bend, mesmos tokens do PyTorch." |
-| 50–60 s | `reference/.venv/bin/python reference/check_all.py` → `TOTAL: 20/20` | "Pacotes no BendHub, MIT. Link no tópico." |
+| 32–50 s | `/tmp/gpt2_fast "The capital of France is" 8` (cada token leva ~0,1 s; acelerar só os 9 s de carga) → `The capital of France is the capital of the French Republic, and` | "GPT-2 small de 124 milhões de parâmetros, inteiro em Bend, mesmos tokens do PyTorch, ~0,1 s por token." |
+| 50–60 s | `reference/.venv/bin/python reference/check_all.py` → `TOTAL: 27/27` | "Cinco pacotes no BendHub, MIT. Link no tópico." |
 
 ## Dicas
 
-- O GPT-2 leva ~10 s para carregar e ~3 s por token: acelere esse trecho 4–6× na edição e diga isso na legenda ("acelerado").
-- Se quiser mostrar o MNIST, use `demos/mnist/run.sh 1 50 0.1` (rápido): os dois imprimem `7829/10000`.
+- O GPT-2 leva ~9 s para carregar e ~0,1 s por token: acelere só a carga e diga isso na legenda ("acelerado").
+- Para mostrar o MNIST: `demos/mnist/run.sh 1 0 0.1` treina uma época completa em ~7 s no Bend e ~0,3 s no PyTorch (honesto no vídeo!), os dois imprimem `9129/10000`.

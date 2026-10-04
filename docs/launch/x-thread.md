@@ -15,32 +15,37 @@ Repo: github.com/nuxyel/bend-ml
 [video]
 
 **2/**
-4 packages on BendHub (MIT):
+5 packages on BendHub (MIT):
 • bend-ml-nat-lemmas: the Nat/List lemmas Base lacks
 • bend-ml-bpe-tokenizer: BPE with a proven roundtrip
-• bend-ml-tensor: Vec<n>, Mat<r,c>, reshape needs a proof
+• bend-ml-tensor and bend-ml-tensor-array: shapes in the type, on lists and on flat Arrays
 • bend-ml-autograd
 
 All `--verdict` clean, no @unsafe.
 
 **3/**
-Two laws I'm proud of:
-• decode(encode(s)) == s for any well-formed merge table
+Laws I'm proud of:
+• decode(encode(s)) == s, for ANY table you get from `train`, no hypotheses (train_wf + roundtrip)
 • reverse-mode autodiff == forward-mode (over Nat, using the proven mul/add lemmas)
+• reshape only compiles with a proof that the element count is preserved
 
-Floats aren't reals, so F32 numerics are checked against PyTorch instead. (21 gradient checks, max err ~5e-7.)
+Floats aren't reals, so F32 numerics are checked against PyTorch instead.
 
 **4/**
-GPT-2 small (124M) runs in Bend: my tokenizer matches tiktoken (16/16 texts), and generation matches PyTorch token for token, logits within 2e-4.
+GPT-2 small (124M) runs in Bend. Token for token the same as PyTorch, logits within 2e-4. My tokenizer matches tiktoken on 16/16 texts.
 
 "The capital of France is the capital of the French Republic, and"
 
-**5/**
-Honest part: it's slow. MNIST epoch: 544 s in Bend vs 0.3 s PyTorch (same loss, same 9129/10000). GPT-2 ~3 s/token. No BLAS, lists as matrices, CUDA 12 not set up here. My row-parallel matmul only scaled ~1.8x and I couldn't tell why.
+~0.1 s/token (PyTorch: 21-55 ms for the whole forward).
 
-Benchmarks with hardware/versions in the repo.
+**5/**
+Speed, honestly. v1 was 1800x slower than PyTorch on MNIST: matrices as linked lists, 544 s/epoch. I measured every hypothesis (all in NOTES.md):
+• flat Array instead of lists: 49x
+• parallel blocks: ~2x more
+• parallelizing matvec by copying the matrix: 10x WORSE
+Now: 6.6 s/epoch vs 0.2-0.3 s. Same loss, same accuracy (9129 -> 9298 -> 9418).
 
 **6/**
-Things I hit that might be useful: imports aren't re-exported (a library needs law+proof in one file); match only on parameters; `--` for negative CLI args; Base has almost no lemmas.
+Things I hit that might be useful: imports aren't re-exported (a library needs law+proof in one file); match only on parameters; Array reads return the array (affine); `--` for negative CLI args; Base has almost no lemmas. Remaining gap: scalar code vs AVX/BLAS, and Array.clone is O(n).
 
 Happy to help turn this into a proper `llama.bend` starting point. 🙂
