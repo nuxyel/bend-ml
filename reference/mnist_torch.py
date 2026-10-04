@@ -1,8 +1,8 @@
-"""MLP 784-128-10 no MNIST em PyTorch (CPU), gêmeo do demos/mnist/train.bend.
+"""MLP 784-128-10 on MNIST in PyTorch (CPU), twin of demos/mnist/train.bend.
 
-Mesmos pesos iniciais (arquivos de texto escritos por `make_init`), mesma ordem de
-lotes (sem embaralhar), mesma taxa de aprendizado, SGD puro, perda de entropia cruzada
-média. Imprime uma linha por época: perda média de treino, acurácia no teste, segundos.
+Same initial weights (text files written by `make_init`), same batch order (no
+shuffling), same learning rate, plain SGD, mean cross-entropy loss. Prints one line per
+epoch: mean training loss, test accuracy, seconds.
 """
 import argparse, os, time
 import numpy as np
@@ -25,7 +25,7 @@ def read_idx(path, images):
 def make_init(seed=0):
     os.makedirs(INIT, exist_ok=True)
     rng = np.random.default_rng(seed)
-    def u(i, o):  # mesma faixa do nn.Linear padrão do PyTorch: U(-1/sqrt(i), 1/sqrt(i))
+    def u(i, o):  # same range as PyTorch's default nn.Linear: U(-1/sqrt(i), 1/sqrt(i))
         k = 1.0 / np.sqrt(i)
         return rng.uniform(-k, k, (i, o)).astype(np.float32)
     parts = {"w1": u(784, 128), "b1": np.zeros(128, np.float32), "w2": u(128, 10), "b2": np.zeros(10, np.float32)}
@@ -44,7 +44,7 @@ def main():
     ap.add_argument("--epochs", type=int, default=1)
     ap.add_argument("--bs", type=int, default=100)
     ap.add_argument("--lr", type=float, default=0.1)
-    ap.add_argument("--max-batches", type=int, default=0, help="0 = época inteira")
+    ap.add_argument("--max-batches", type=int, default=0, help="0 = the whole epoch")
     ap.add_argument("--threads", type=int, default=0)
     ap.add_argument("--make-init", action="store_true")
     a = ap.parse_args()
@@ -64,7 +64,7 @@ def main():
     def fwd(x):
         return torch.relu(x @ p["w1"] + p["b1"]) @ p["w2"] + p["b2"]
 
-    print(f"torch {torch.__version__} threads={torch.get_num_threads()} bs={a.bs} lr={a.lr} batches/epoca={nb}")
+    print(f"torch {torch.__version__} threads={torch.get_num_threads()} bs={a.bs} lr={a.lr} batches/epoch={nb}")
     for ep in range(1, a.epochs + 1):
         t0 = time.time(); tot = 0.0
         for b in range(nb):
@@ -78,7 +78,7 @@ def main():
         dt = time.time() - t0
         with torch.no_grad():
             acc = (fwd(Xte).argmax(1) == yte).float().mean().item()
-        print(f"epoca {ep} loss_treino={tot / nb:.6f} acc_teste={acc:.4f} segundos={dt:.2f}")
+        print(f"epoch {ep} train_loss={tot / nb:.6f} test_acc={acc:.4f} seconds={dt:.2f}")
 
 
 if __name__ == "__main__":
