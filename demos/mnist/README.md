@@ -1,31 +1,36 @@
-# MNIST em Bend: MLP 784-128-10
+# MNIST in Bend: a 784-128-10 MLP
 
-Uma rede de duas camadas treinada com SGD puro, escrita com `bend-ml-tensor` e `bend-ml-autograd`. **Cada multiplicação de matrizes, cada gradiente e cada atualização de pesos tem o formato conferido pelo tipo**: se `dW` tivesse a dimensão errada, o programa não compilaria.
+A two-layer network trained with plain SGD. **Every matrix product, every gradient and every weight update has its shape checked by the type**: if `dW` had the wrong dimension, the program would not compile.
 
-## Rodar (da raiz do repositório)
+There are two implementations, with identical results:
+
+- `fast.bend` (v2): written with [`bend-ml-tensor-array`](../../tensor-array) (flat `Array`, parallel products). **6.6 s per epoch.**
+- `train.bend` (v1): matrices as lists, kept as the baseline. 544 s per epoch.
+
+## Run (from the repository root)
 
 ```bash
-# 1. dados e pesos iniciais (uma vez)
+# 1. data and initial weights (once)
 reference/.venv/bin/python reference/mnist_torch.py --make-init --epochs 1 --max-batches 1
-# (baixe os 4 arquivos do MNIST em demos/mnist/data/; veja BENCHMARK.md)
+# (download the 4 MNIST files into demos/mnist/data/; see run.sh)
 
-# 2. treino em Bend:  <épocas> <máx. lotes (0 = todos)> <lr>
-bend demos/mnist/train.bend -o /tmp/mnist_train
-/tmp/mnist_train 1 0 0.1
+# 2. training in Bend:  <epochs> <max batches (0 = all)> <lr>
+bend demos/mnist/fast.bend -o /tmp/mnist_fast
+/tmp/mnist_fast 1 0 0.1
 
-# 3. o gêmeo em PyTorch (mesmos pesos iniciais, mesmos lotes, mesmo lr)
+# 3. the PyTorch twin (same initial weights, same batches, same lr)
 reference/.venv/bin/python reference/mnist_torch.py --epochs 1 --lr 0.1
 ```
 
-Há um atalho que faz tudo: `demos/mnist/run.sh`.
+There is a shortcut that does it all: `demos/mnist/run.sh`.
 
-## Verificação de correção
+## Correctness check
 
-Com os mesmos pesos iniciais, a mesma ordem de lotes e o mesmo `lr`, as duas implementações têm de produzir as mesmas perdas e acertos. Depois de 50 passos:
+With the same initial weights, the same batch order and the same `lr`, the two implementations must produce the same losses and hits. After 50 steps:
 
-| | perda média de treino | acertos no teste |
+| | mean training loss | test hits |
 |---|---|---|
-| Bend | 1,6616005 | 7829 / 10000 |
-| PyTorch | 1,661600 | 7829 / 10000 |
+| Bend | 1.6616004 | 7829 / 10000 |
+| PyTorch | 1.661600 | 7829 / 10000 |
 
-Os resultados completos de uma época e o tempo estão em `BENCHMARK.md`.
+The full results for one and three epochs, with timings, are in `BENCHMARK.md`.
