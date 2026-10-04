@@ -63,8 +63,8 @@ Besides laws, **types** carry guarantees that no law restates: `Mat.matmul : Mat
 
 - The choice of merges made by `train` (which pair is the most frequent) is not proved. The roundtrip does not
   depend on it, but the quality of the tokenizer does.
-- `Mat<r,c>` does not carry "the array has capacity >= r*c" in its type; the constructors allocate it.
-- GPT-2's pre-tokenizer follows the GPT-2 regex on ASCII exactly; non-ASCII symbols are approximated by ranges.
+- `Mat<r,c>` does not carry "the array has capacity >= r*c" in its type; the constructors allocate `2^cap_depth(r*c)` slots, and `cap_ok` proves that this is enough. That `Array.new(d)` really gives `2^d` slots is trusted.
+- GPT-2's pre-tokenizer follows the GPT-2 regex through a table generated from Unicode (`reference/gen_unicode_table.py`) up to U+1FFFF; above that and for invalid UTF-8 everything counts as a letter. It is tested against `tiktoken`, not proved.
 - No Unicode tables for non-ASCII decimal digits.
 - Tests were written by the author of the code. An independent review of the laws in section 1 is the missing piece.
 

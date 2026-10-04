@@ -35,7 +35,7 @@ import bend-ml-bpe-tokenizer@0.1.2.0/main.bend as BPE
 | Demo | Result |
 |---|---|
 | [MNIST](demos/mnist) (784-128-10 MLP) | **6.6 s per epoch** (v1: 544 s). Loss and hits **identical** to PyTorch with the same weights and batches: 0.5204771 / 9129, then 0.27043572 / 9298, then 0.2156194 / 9418. PyTorch takes 0.2 to 0.3 s per epoch ([honest benchmark](demos/mnist/BENCHMARK.md)). |
-| [GPT-2 small](demos/gpt2) (124 M) | **~0.1 s per token** (v1: 3 s). It generates the **same tokens** as PyTorch (22 tokens, 3 prompts), logits within 2e-4. PyTorch does the forward pass in 21 ms (16 threads) or 55 ms (1 thread); loading the weights takes 9 s in Bend ([details](demos/gpt2/BENCHMARK.md)). Tokenizer identical to `tiktoken` on 16/16 texts. |
+| [GPT-2 small](demos/gpt2) (124 M) | **~0.1 s per token** (v1: 3 s). It generates the **same tokens** as PyTorch (22 tokens, 3 prompts), logits within 2e-4. PyTorch does the forward pass in 21 ms (16 threads) or 55 ms (1 thread); loading the weights takes ~10 s in Bend ([details](demos/gpt2/BENCHMARK.md)). Tokenizer identical to `tiktoken` on 79 texts (49 fixed, 30 random Unicode); loading the weights now takes ~10 s with ~1.5 GB of memory. |
 
 ```
 $ ./gpt2_fast "The capital of France is" 8
@@ -61,7 +61,7 @@ Requirements: Linux x86_64 (or WSL), clang >= 14, Python >= 3.12, `curl`, ~3 GB 
 ```bash
 git clone https://github.com/nuxyel/bend-ml.git && cd bend-ml
 make setup          # Bend 2.0.35 (SHA256-checked), Lean 4.34.0, Python venv, MNIST and GPT-2 data; no sudo
-make check          # about 30 s
+make check          # 31 checks, about 1.5 min
 make check-full     # + GPT-2 and MNIST
 ```
 
@@ -71,8 +71,8 @@ make check-full     # + GPT-2 and MNIST
 
 ```bash
 export PATH="$HOME/.bend/bin:$PATH"
-reference/.venv/bin/python reference/check_all.py          # 27 checks, ~30 s
-reference/.venv/bin/python reference/check_all.py --full   # + GPT-2 and MNIST (32 checks, ~1.5 min)
+reference/.venv/bin/python reference/check_all.py          # 31 checks, ~1.5 min
+reference/.venv/bin/python reference/check_all.py --full   # + GPT-2 and MNIST (36 checks, ~5 min)
 ```
 
 Data and weights preparation: [`reference/`](reference) (`gpt2_prep.py`, `mnist_torch.py`) and the README of each demo.
@@ -82,7 +82,7 @@ Data and weights preparation: [`reference/`](reference) (`gpt2_prep.py`, `mnist_
 - **Performance:** Bend 2.0.35 generates scalar code, with no BLAS or SIMD: on the same matrix product PyTorch does 62 G multiply-adds/s on 1 thread and Bend with `Array` ~2.3 G/s (~27x). Parallelism scales ~2 to 4x on this hybrid CPU (P+E cores). The GPU was tried (a user-local CUDA 12 makes `!` work on the RTX 4050, see `docs/gpu-setup.md`) and it is 3.8x faster than the CPU on compute-bound flat loops, but 3x to 18x slower on our memory-bound matrix kernels, so the benchmarks use the CPU.
 - **Memory:** the GPT-2 weights become trees of nodes. Loading streams 1 MB blocks straight into the arrays: peak resident memory is ~1.5 GB (the process reserves ~10 GB of address space), loading takes ~10 s.
 - Only `Nat`, `U32` and `F32`; no `F64`.
-- `Mat<r,c>` does not carry the invariant "the `Array` has capacity ≥ r*c" in its type: the constructors guarantee it, but it is not a fact of the type.
+- `Mat<r,c>` does not carry the invariant "the `Array` has capacity ≥ r*c" in its type: the constructors establish it with a **proved** capacity (`cap_ok`), but that `Array.new(d)` allocates `2^d` slots is a runtime fact that stays trusted.
 - The GPT-2 pre-tokenizer classifies code points with a table generated from Unicode (`\s`, `\p{L}`, `\p{N}`) up to U+1FFFF; code points above that, and invalid UTF-8 bytes, count as letters.
 
 ## Structure

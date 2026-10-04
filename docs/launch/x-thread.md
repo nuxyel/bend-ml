@@ -32,7 +32,7 @@ Laws I'm proud of:
 Floats aren't reals, so F32 numerics are checked against PyTorch instead.
 
 **4/**
-GPT-2 small (124M) runs in Bend. Token for token the same as PyTorch, logits within 2e-4. My tokenizer matches tiktoken on 16/16 texts.
+GPT-2 small (124M) runs in Bend. Token for token the same as PyTorch, logits within 2e-4. My tokenizer matches tiktoken on 79 texts, emoji and CJK included.
 
 "The capital of France is the capital of the French Republic, and"
 

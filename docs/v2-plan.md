@@ -59,4 +59,6 @@ Axis 1 (performance), every experiment measured and recorded in `NOTES.md` (expe
 
 Axis 2 (guarantees): `train_wf` and `roundtrip_trained` proved and published in `bend-ml-bpe-tokenizer@0.1.1.0`; the whole MNIST training step is type-checked (`tensor-array`).
 
-Not done: the `capacity >= r*c` invariant in the `Mat` type (it stays documented as a limit).
+Not done: carrying the `capacity >= r*c` invariant inside the `Mat` type.
+
+Update (2026-10-04): the `capacity >= r*c` arithmetic is now proved (`cap_ok`, `bend-ml-tensor-array@0.1.3.0`); the rest of the stability work is in the last section of `NOTES.md`.
