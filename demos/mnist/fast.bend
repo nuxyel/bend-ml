@@ -110,6 +110,67 @@ def grows(nleft: Nat, +mm1: Nat, +kn: Nat, +i: U32, +arow: U32, +sa: U32, +sb: U
 def gemm(+n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
   grows(n, Nat.sub(m, 1n), k, 0, arow, sa, sb, bcol, U32.from_nat(m), G{a, b, c})
 
+
+# ---------------------------------------------------------------------
+# gemm paralelo: 2^d blocos de linhas de C, cada um com a sua cópia de A e B,
+# devolvendo listas que são escritas em C no fim
+# ---------------------------------------------------------------------
+
+type S3 is Type:
+  S3{a: Array<F32>, b: Array<F32>, out: List<&2, F32>}
+
+def lcols(mleft: Nat, +kn: Nat, +ia0: U32, +ib0: U32, +sa: U32, +sb: U32, +bcol: U32, out: List<&2, F32>, r: R) -> S3:
+  match mleft r:
+    case 0n R{a, b, +x}:
+      S3{a, b, x <> out}
+    case 1n+p R{a, b, +x}:
+      lcols(p, kn, ia0, (ib0 + bcol : U32), sa, sb, bcol, x <> out, dotg(kn, ia0, (ib0 + bcol : U32), sa, sb, 0.0, Array.get(F32, a, ia0), Array.get(F32, b, (ib0 + bcol : U32))))
+
+def lrows(nleft: Nat, +mm1: Nat, +kn: Nat, +i: U32, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, st: S3) -> S3:
+  match nleft st:
+    case 0n S3{a, b, out}:
+      S3{a, b, out}
+    case 1n+p S3{a, b, out}:
+      lrows(p, mm1, kn, (i + 1 : U32), arow, sa, sb, bcol, lcols(mm1, kn, (i * arow : U32), 0, sa, sb, bcol, out, dotg(kn, (i * arow : U32), 0, sa, sb, 0.0, Array.get(F32, a, (i * arow : U32)), Array.get(F32, b, 0))))
+
+def lblock_fin(st: S3) -> List<&2, F32>:
+  match st:
+    case S3{a, b, out}:
+      List.reverse(&2, F32, out)
+
+def lblock(cnt: Nat, +mm1: Nat, +kn: Nat, +i: U32, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>) -> List<&2, F32>:
+  lblock_fin(lrows(cnt, mm1, kn, i, arow, sa, sb, bcol, S3{a, b, Nil{}}))
+
+def lpar(d: Nat, +cnt: Nat, +mm1: Nat, +kn: Nat, +i: U32, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, ra: Array<F32> & Array<F32>, rb: Array<F32> & Array<F32>) -> List<&2, F32>:
+  match d ra rb:
+    case 0n Tuple{a, a2} Tuple{b, b2}:
+      lblock(cnt, mm1, kn, i, arow, sa, sb, bcol, a, b)
+    case 1n++q Tuple{a, a2} Tuple{b, b2}:
+      x y = lpar(q, Nat.div(cnt, 2n), mm1, kn, i, arow, sa, sb, bcol, Array.clone(F32, a), Array.clone(F32, b)) lpar(q, Nat.sub(cnt, Nat.div(cnt, 2n)), mm1, kn, (i + U32.from_nat(Nat.div(cnt, 2n)) : U32), arow, sa, sb, bcol, Array.clone(F32, a2), Array.clone(F32, b2))
+      List.append(&2, F32, x, y)
+
+def write_l(xs: List<&2, F32>, +idx: U32, c: Array<F32>) -> Array<F32>:
+  match xs:
+    case Nil{}:
+      c
+    case Con{h, t}:
+      write_l(t, (idx + 1 : U32), Array.set(F32, c, idx, h))
+
+# c[idx..] += lista
+
+def gp3(a: Array<F32>, b: Array<F32>, c: Array<F32>, xs: List<&2, F32>) -> G:
+  G{a, b, write_l(xs, 0, c)}
+
+def gp2(d: Nat, +n: Nat, +mm1: Nat, +kn: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, c: Array<F32>, pa: Array<F32> & Array<F32>, pb: Array<F32> & Array<F32>) -> G:
+  match pa pb:
+    case Tuple{a1, a2} Tuple{b1, b2}:
+      gp3(a1, b1, c, lpar(d, n, mm1, kn, 0, arow, sa, sb, bcol, Array.clone(F32, a2), Array.clone(F32, b2)))
+
+# C (n x m) = A · B, com 2^d blocos de linhas em paralelo; devolve A, B (intactos) e C
+
+def gemm_par(d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
+  gp2(d, n, Nat.sub(m, 1n), k, arow, sa, sb, bcol, c, Array.clone(F32, a), Array.clone(F32, b))
+
 # ---------------------------------------------------------------------
 # operações elementwise (em lugar, por índice)
 # ---------------------------------------------------------------------
@@ -140,15 +201,6 @@ def read_l(mleft: Nat, +idx: U32, acc: List<&2, F32>, rc: Array<F32> & F32) -> A
       read_l(p, (idx + 1 : U32), v <> acc, Array.get(F32, c, (idx + 1 : U32)))
 
 # escreve a lista a partir de idx
-
-def write_l(xs: List<&2, F32>, +idx: U32, c: Array<F32>) -> Array<F32>:
-  match xs:
-    case Nil{}:
-      c
-    case Con{h, t}:
-      write_l(t, (idx + 1 : U32), Array.set(F32, c, idx, h))
-
-# c[idx..] += lista
 
 def addl(xs: List<&2, F32>, +idx: U32, rc: Array<F32> & F32) -> Array<F32>:
   match xs rc:
@@ -345,7 +397,7 @@ def f11(+lr: F32, w1: Array<F32>, b1: Array<F32>, w2: Array<F32>, dw2: Array<F32
 def f10(+lr: F32, x: Array<F32>, w1: Array<F32>, b1: Array<F32>, w2: Array<F32>, dw2: Array<F32>, b2: Array<F32>, db2: Array<F32>, loss: F32, r: P2) -> St2:
   match r:
     case P2{dz1, h}:
-      f11(lr, w1, b1, w2, dw2, b2, db2, loss, gemm(784n, 128n, 100n, 1, 784, 128, 1, x, dz1, Array.new(F32, 17n, 0.0)))
+      f11(lr, w1, b1, w2, dw2, b2, db2, loss, gemm_par(3n, 784n, 128n, 100n, 1, 784, 128, 1, x, dz1, Array.new(F32, 17n, 0.0)))
 
 # 2. gradientes da segunda camada e da relu
 
@@ -399,7 +451,7 @@ def f2(+lr: F32, w2: Array<F32>, b1: Array<F32>, b2: Array<F32>, labels: List<&2
 def step(pm: Pm, x: Array<F32>, labels: List<&2, Nat>, +lr: F32) -> St2:
   match pm:
     case Pm{w1, b1, w2, b2}:
-      f2(lr, w2, b1, b2, labels, gemm(100n, 128n, 784n, 784, 1, 128, 1, x, w1, Array.new(F32, 14n, 0.0)))
+      f2(lr, w2, b1, b2, labels, gemm_par(3n, 100n, 128n, 784n, 784, 1, 128, 1, x, w1, Array.new(F32, 14n, 0.0)))
 
 # ---------------------------------------------------------------------
 # avaliação: acertos em um lote de 100 (só forward)
