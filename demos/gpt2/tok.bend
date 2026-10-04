@@ -1,14 +1,14 @@
-# Tokenizer do GPT-2 em Bend: pré-tokenizador (a regex do GPT-2 sobre bytes) + as 50 000
-# regras de merge, aplicadas com o pacote bend-ml-bpe-tokenizer (roundtrip provado).
+# GPT-2 tokenizer in Bend: pre-tokenizer (the GPT-2 regex over bytes) + the 50,000
+# merge rules, applied with the bend-ml-bpe-tokenizer package (proved roundtrip).
 #
-# Limite conhecido: o pré-tokenizador classifica bytes ASCII exatamente; todo byte >= 128
-# (UTF-8 multibyte) conta como LETRA. Isso casa com a regex para letras acentuadas e de
-# outros alfabetos, mas não separa símbolos Unicode que não são letras (travessão, emoji).
+# Known limit: the pre-tokenizer classifies ASCII bytes exactly; every byte >= 128
+# (multibyte UTF-8) counts as a LETTER. That matches the regex for accented letters and
+# other alphabets, but does not split Unicode symbols that are not letters (em dash, emoji).
 
 import Base
 import bend-ml-bpe-tokenizer@0.1.1.0/main.bend as BPE
 
-# ---- leitura de arquivos ----
+# ---- reading files ----
 
 def rb_done(m: File & Result<&1, &1, U32 & String, List<&2, U32>>) -> IO(List<&2, U32>):
   (f, r) = m
@@ -30,12 +30,12 @@ def id_tok2(small: Bool, +n: Nat) -> BPE.Tk:
     case False{}:
       BPE.M{Nat.sub(n, 256n)}
 
-# id numérico no esquema do bpe/ (byte = 0..255, fusão k = 256+k) -> token
+# numeric id in the bpe/ scheme (byte = 0..255, merge k = 256+k) -> token
 
 def id_tok(+n: Nat) -> BPE.Tk:
   id_tok2(Nat.is_lt(n, 256n), n)
 
-# ---- inteiros em texto: qualquer byte que não é dígito separa ----
+# ---- integers in text: any byte that is not a digit separates ----
 
 def digit2(lo: Bool, hi: Bool, +code: U32) -> Maybe<&2, Nat>:
   match lo hi:
@@ -73,7 +73,7 @@ def nums.go(xs: List<&2, U32>, d: Maybe<&2, Nat>, +cur: Nat, have: Bool, acc: Li
 def nums(+xs: List<&2, U32>) -> List<&2, Nat>:
   nums.go(xs, head_digit(xs), 0n, False{}, Nil{})
 
-# pares de ids viram regras com id sequencial
+# pairs of ids become rules with sequential ids
 
 def rules.go(ns: List<&2, Nat>, +k: Nat) -> List<&2, BPE.Rule>:
   match ns:
@@ -94,7 +94,7 @@ def toks_of_ids(ns: List<&2, Nat>) -> List<&2, BPE.Tk>:
       id_tok(n) <> toks_of_ids(t)
 
 
-# ---- tabela e permutação de ids base do GPT-2 ----
+# ---- table and permutation of the GPT-2 base ids ----
 
 def nth(xs: List<&2, Nat>, n: Nat) -> Nat:
   match xs n:
@@ -105,7 +105,7 @@ def nth(xs: List<&2, Nat>, n: Nat) -> Nat:
     case Nil{} _:
       0n
 
-# id GPT-2 de um token: bytes passam por perm; fusões são 256+k
+# GPT-2 id of a token: bytes go through perm; merges are 256+k
 
 def gid(+perm: List<&2, Nat>, +t: BPE.Tk) -> Nat:
   match t:
@@ -121,9 +121,9 @@ def gids(+perm: List<&2, Nat>, xs: List<&2, BPE.Tk>) -> List<&2, Nat>:
     case Con{h, t}:
       gid(perm, h) <> gids(perm, t)
 
-# ---- pré-tokenizador: a regex do GPT-2 sobre bytes ----
+# ---- pre-tokenizer: the GPT-2 regex over bytes ----
 #   's|'t|'re|'ve|'m|'ll|'d | ?\p{L}+ | ?\p{N}+ | ?[^\s\p{L}\p{N}]+ | \s+(?!\S) | \s+
-# classes: 0 letra (ASCII ou byte >= 128), 1 dígito, 2 outro, 3 espaço, 4 fim da lista
+# classes: 0 letter (ASCII or byte >= 128), 1 digit, 2 other, 3 whitespace, 4 end of list
 
 def sel(b: Bool, x: Nat, y: Nat) -> Nat:
   match b:
@@ -159,7 +159,7 @@ def tail_l(xs: List<&2, U32>) -> List<&2, U32>:
     case Con{c, t}:
       t
 
-# tamanho (2 ou 3) da contração no início de xs, ou 0
+# length (2 or 3) of the contraction at the start of xs, or 0
 
 def contr2(+q: Bool, +b: U32, +c: U32) -> Nat:
   sel(Bool.and(q, Bool.or(Bool.or(U32.is_eq(b, 115), U32.is_eq(b, 116)), Bool.or(U32.is_eq(b, 109), U32.is_eq(b, 100)))), 2n, sel(Bool.and(q, Bool.or(Bool.or(Bool.and(U32.is_eq(b, 114), U32.is_eq(c, 101)), Bool.and(U32.is_eq(b, 118), U32.is_eq(c, 101))), Bool.and(U32.is_eq(b, 108), U32.is_eq(c, 108)))), 3n, 0n))
@@ -167,7 +167,7 @@ def contr2(+q: Bool, +b: U32, +c: U32) -> Nat:
 def contr_len(+xs: List<&2, U32>) -> Nat:
   contr2(U32.is_eq(head_u32(xs), 39), head_u32(tail_l(xs)), head_u32(tail_l(tail_l(xs))))
 
-# separa o maior prefixo da classe `cls`: (prefixo, resto)
+# splits off the longest prefix of class `cls`: (prefix, rest)
 
 def span(xs: List<&2, U32>, ok: Bool, +cls: Nat, acc: List<&2, U32>) -> List<&2, U32> & List<&2, U32>:
   match xs ok:
@@ -184,7 +184,7 @@ def prepend(c: U32, p: List<&2, U32> & List<&2, U32>) -> List<&2, U32> & List<&2
     case Tuple{a, b}:
       (c <> a, b)
 
-# espaços: \s+(?!\S) deixa o último espaço para o próximo token se vier algo depois
+# whitespace: \s+(?!\S) leaves the last space for the next token if something follows
 
 def ws4(long: Bool, +run: List<&2, U32>, +rest: List<&2, U32>, +n: Nat) -> List<&2, U32> & List<&2, U32>:
   match long:
@@ -208,7 +208,7 @@ def ws2(p: List<&2, U32> & List<&2, U32>) -> List<&2, U32> & List<&2, U32>:
 def ws(xs: List<&2, U32>) -> List<&2, U32> & List<&2, U32>:
   ws2(span_cls(xs, 3n))
 
-# 0 contração, 1 corrida da própria classe, 2 espaço + corrida, 3 corrida de espaços
+# 0 contraction, 1 run of its own class, 2 space + run, 3 run of whitespace
 
 def kind_of(n_contr: Nat, cc: Nat, is_sp: Bool, hc: Nat) -> Nat:
   sel(Nat.is_lt(0n, n_contr), 0n, sel(Bool.not(Nat.is_eq(cc, 3n)), 1n, sel(Bool.and(is_sp, Nat.is_lt(hc, 3n)), 2n, 3n)))
@@ -231,7 +231,7 @@ def next_token(+xs: List<&2, U32>) -> List<&2, U32> & List<&2, U32>:
     case Con{+c, t}:
       nt(kind_of(contr_len(xs), class_of(c), U32.is_eq(c, 32), head_class(t)), xs, contr_len(xs))
 
-# parte o texto em palavras; `fuel` >= número de tokens; pr = next_token(xs)
+# splits the text into words; `fuel` >= number of tokens; pr = next_token(xs)
 
 def split(fuel: Nat, xs: List<&2, U32>, pr: List<&2, U32> & List<&2, U32>) -> List<&2, List<&2, U32>>:
   match fuel pr:
@@ -247,7 +247,7 @@ def split(fuel: Nat, xs: List<&2, U32>, pr: List<&2, U32> & List<&2, U32>) -> Li
 def pretok(+xs: List<&2, U32>) -> List<&2, List<&2, U32>>:
   split(List.length(&2, U32, xs), xs, next_token(xs))
 
-# ---- codificação do texto inteiro ----
+# ---- encoding the whole text ----
 
 def nats_of(xs: List<&2, U32>) -> List<&2, Nat>:
   match xs:
@@ -266,7 +266,7 @@ def encode_words(+table: List<&2, BPE.Rule>, +perm: List<&2, Nat>, ws: List<&2, 
 def encode_text(+table: List<&2, BPE.Rule>, +perm: List<&2, Nat>, bs: List<&2, U32>) -> List<&2, Nat>:
   encode_words(table, perm, pretok(bs))
 
-# ---- CLI de teste: ids do texto em um arquivo ----
+# ---- test CLI: ids of the text in a file ----
 
 def show_nats(xs: List<&2, Nat>) -> String:
   match xs:
@@ -290,7 +290,7 @@ def dispatch(args: List<String>) -> IO(Unit):
     case Con{prog, Con{a, Con{b, Con{c, Nil{}}}}}:
       run3(a, b, c)
     case _:
-      IO.print("uso: tok.bend merges_num.txt perm.txt texto")
+      IO.print("usage: tok.bend merges_num.txt perm.txt text")
 
 def main() -> IO(Unit):
   do IO<Unit>:
