@@ -1,6 +1,6 @@
 # bend-ml-autograd: automatic differentiation with a proved law.
 #
-#   import bend-ml-autograd@0.1.0.0/main.bend as AG
+#   import bend-ml-autograd@0.1.1.0/main.bend as AG
 #
 # 1) PROVED MODEL (over Nat): the reverse mode of autodiff gives the same result
 #    as the forward mode (dual numbers). Proved by the kernel, using the sum and
