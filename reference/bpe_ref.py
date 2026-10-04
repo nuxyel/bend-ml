@@ -1,7 +1,7 @@
-"""Referência em Python do tokenizer BPE do bend-ml (mesmo algoritmo, mesmo desempate).
+"""Python reference for the bend-ml BPE tokenizer (same algorithm, same tie-break).
 
-Tokens são inteiros: 0..255 são bytes; 256+k é o token criado pela regra k.
-Uma tabela é uma lista de pares (a, b), da regra mais antiga para a mais nova.
+Tokens are integers: 0..255 are bytes; 256+k is the token created by rule k.
+A table is a list of pairs (a, b), from the oldest rule to the newest.
 """
 
 
@@ -21,14 +21,14 @@ def train(data: bytes, n_merges: int):
     ids = list(data)
     table = []
     for k in range(n_merges):
-        counts = {}  # dict mantém a ordem de primeira aparição
+        counts = {}  # dict keeps the order of first appearance
         for pair in zip(ids, ids[1:]):
             counts[pair] = counts.get(pair, 0) + 1
         if not counts:
             break
         best = None
         for pair, c in counts.items():
-            if best is None or c > counts[best]:  # estritamente maior: o primeiro vence empates
+            if best is None or c > counts[best]:  # strictly greater: the first one wins ties
                 best = pair
         table.append(best)
         ids = merge(ids, best, 256 + k)
