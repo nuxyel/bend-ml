@@ -1,146 +1,148 @@
-# bend-ml — Machine Learning em Bend 2
+# bend-ml — Machine Learning in Bend 2
 
-Contexto do projeto para o Claude Code. Leia este arquivo inteiro antes de qualquer ação.
+Project context for Claude Code. Read this whole file before any action.
 
-## Por que este projeto existe
+## Why this project exists
 
-Em 29/09/2026, Victor Taelin (criador do Bend/HVM, empresa HOC) publicou um "info dump" sobre o futuro do Bend:
+On 2026-09-29, Victor Taelin (creator of Bend/HVM, company HOC) published an "info dump" about the future of Bend:
 
-- HOC está levantando uma rodada de **US$ 20M** e vai montar dois times internos: **BendCore** (teoria, compilador, ecossistema, adoção) e **SupGen** (IA simbólica).
-- A wishlist do ecossistema inclui explicitamente: **"AI framework / PyTorch / llama.bend / etc."**, além de "all good parts of mathlib, npm, hackage".
-- Lançaram o **BendHub**: bibliotecas nomeadas e versionadas, com um "mini Hacker News" no site para descobrir, votar e discutir pacotes.
-- Adoção atual: ~400 IPs não-cloud por dia usando o comando `bend`. Ele mesmo acha baixo.
-- Tese do Bend: **"a language evolved by AI, secured by math"**. IA escreve o código, LAWS (provas verificadas pelo kernel) garantem a correção.
+- HOC is raising a **US$ 20M** round and will set up two internal teams: **BendCore** (theory, compiler, ecosystem, adoption) and **SupGen** (symbolic AI).
+- The ecosystem wishlist explicitly includes: **"AI framework / PyTorch / llama.bend / etc."**, besides "all good parts of mathlib, npm, hackage".
+- They launched **BendHub**: named, versioned libraries, with a "mini Hacker News" on the site to discover, vote on and discuss packages.
+- Current adoption: ~400 non-cloud IPs per day using the `bend` command. He himself thinks it is low.
+- Bend's thesis: **"a language evolved by AI, secured by math"**. AI writes the code, LAWS (proofs verified by the kernel) guarantee correctness.
 
-Quando perguntaram o que alguém que quer entrar num dos times deveria fazer, ele respondeu:
+When asked what someone who wants to join one of the teams should do, he answered:
 
 > build something in Bend so 1. VCs see traction and decide to invest in us 2. send that thing to impress us and be hired
 
 Link: https://x.com/VictorTaelin/status/2104956654542639176
 
-**Objetivo duplo deste projeto:**
+**Dual goal of this project:**
 
-1. **Tração mensurável**: pacotes no BendHub que outras pessoas usem (dependentes, upvotes, downloads).
-2. **Portfólio**: algo impressionante o bastante para mandar ao Taelin numa candidatura.
+1. **Measurable traction**: packages on BendHub that other people use (dependents, upvotes, downloads).
+2. **Portfolio**: something impressive enough to send to Taelin in an application.
 
-**Ângulo escolhido:** o diferencial que só o Bend tem é **tipos dependentes**. A proposta central é um "PyTorch onde erro de shape não compila", usando IA para escrever e LAWS para garantir, ou seja, fazendo dogfooding da própria tese do Bend.
+**Chosen angle:** the differentiator only Bend has is **dependent types**. The central proposal is a "PyTorch where a shape error does not compile", using AI to write and LAWS to guarantee, that is, dogfooding Bend's own thesis.
 
-## Sobre o autor
+## About the author
 
-- Renan (nuxyel), desenvolvedor backend. Linguagem principal: Python. Também TypeScript/Node.
-- Estudando ML formalmente agora (Stanford/DeepLearning.AI ML Specialization). Experiência prática com NLP (spaCy, stanza).
-- **Sem formação em teoria de tipos ou provas formais.** Ao escrever provas, explique o raciocínio em linguagem simples nos comentários e no chat. O projeto também é de aprendizado.
-- Máquina: Core Ultra 7 155H, 32 GB RAM, **RTX 4050 (6 GB VRAM)**, Windows/Linux. Considere o limite de VRAM em qualquer demo de GPU.
+- Renan (nuxyel), backend developer. Main language: Python. Also TypeScript/Node.
+- Currently studying ML formally (Stanford/DeepLearning.AI ML Specialization). Practical experience with NLP (spaCy, stanza).
+- **No background in type theory or formal proofs.** When writing proofs, explain the reasoning in plain language in comments and in chat. The project is also a learning project.
+- Machine: Core Ultra 7 155H, 32 GB RAM, **RTX 4050 (6 GB VRAM)**, Windows/Linux. Keep the VRAM limit in mind in any GPU demo.
 
-## Regras de trabalho
+## Working rules
 
-1. **Bend 2 é novo e muda rápido.** A sintaxe é diferente da do Bend 1 (que era estilo Python). Não assuma sintaxe de memória. Antes de escrever código, leia a documentação oficial, os exemplos e a biblioteca Base. Na dúvida, leia o código-fonte.
-2. **Fixe a versão do Bend** usada no projeto e registre em `NOTES.md`.
-3. **Rode o checker o tempo todo.** Ele é rápido; use-o como loop de feedback a cada mudança.
-4. **Nunca contorne uma prova.** Se o Bend tiver algum mecanismo equivalente a `sorry`/axioma/assume, não use sem avisar explicitamente e registrar em `NOTES.md` como dívida. Uma LAW falsa ou não provada destrói o valor do projeto.
-5. **Floats não são reais.** Não tente provar propriedades numéricas sobre ponto flutuante. Prove o que é estrutural (shapes, tipos, composição) e valide o numérico com testes (gradient checking, comparação com referência em Python).
-6. **Referências em Python** ficam em `reference/` (PyTorch, tiktoken etc.) e servem só para gerar valores esperados nos testes.
-7. Commits pequenos e frequentes, com mensagens claras.
-8. Toda LAW provada deve aparecer no README do pacote correspondente, em linguagem humana.
+1. **Bend 2 is new and changes fast.** Its syntax is different from Bend 1's (which was Python-style). Do not assume syntax from memory. Before writing code, read the official documentation, the examples and the Base library. When in doubt, read the source code.
+2. **Pin the Bend version** used by the project and record it in `NOTES.md`.
+3. **Run the checker all the time.** It is fast; use it as a feedback loop on every change.
+4. **Never work around a proof.** If Bend has some mechanism equivalent to `sorry`/axiom/assume, do not use it without warning explicitly and recording it in `NOTES.md` as debt. A false or unproved LAW destroys the project's value.
+5. **Floats are not reals.** Do not try to prove numerical properties about floating point. Prove what is structural (shapes, types, composition) and validate the numerics with tests (gradient checking, comparison with a Python reference).
+6. **Python references** live in `reference/` (PyTorch, tiktoken, etc.) and only serve to generate expected values for tests.
+7. Small, frequent commits, with clear messages.
+8. Every proved LAW must appear in the corresponding package's README, in human language.
+9. **Everything in the repository is written in English**: code comments, documentation and commit messages.
+10. **No attribution lines in commits or pull requests**: no `Co-Authored-By` trailers and no "Generated with" footers.
 
-## Fase 0 — Reconhecimento (fazer primeiro, antes de qualquer código)
+## Phase 0 — Reconnaissance (do first, before any code)
 
-Investigar e registrar tudo em `NOTES.md`:
+Investigate and record everything in `NOTES.md`:
 
-- [ ] Versão do Bend instalada e como atualizar.
-- [ ] Onde estão a documentação, os exemplos e a biblioteca Base.
-- [ ] O que a Base já oferece: Nat, List, String, Map, arrays. **Quais lemas já existem** (sabe-se que a Base tem poucos ou nenhum lema de Nat).
-- [ ] Suporte a números: inteiros (U32/I32/U64?), **floats (F32/F64?)** e operações disponíveis.
-- [ ] Backends de compilação disponíveis (JS, C, GPU). **Qual backend de GPU roda numa RTX 4050** (CUDA? só Metal?). Isso decide se a Fase 3 roda em GPU ou CPU.
-- [ ] Estado de IO / interop com C: leitura de arquivos é necessária para carregar datasets e pesos.
-- [ ] Como publicar no BendHub (namespace, versionamento, formato do pacote).
-- [ ] **Se já existe no BendHub** algum tokenizer, lib de tensores ou autograd. Se existir, avaliar se é melhor contribuir ou diferenciar.
+- [ ] Installed Bend version and how to update it.
+- [ ] Where the documentation, the examples and the Base library are.
+- [ ] What Base already offers: Nat, List, String, Map, arrays. **Which lemmas already exist** (Base is known to have few or no Nat lemmas).
+- [ ] Number support: integers (U32/I32/U64?), **floats (F32/F64?)** and the available operations.
+- [ ] Available compilation backends (JS, C, GPU). **Which GPU backend runs on an RTX 4050** (CUDA? Metal only?). That decides whether Phase 3 runs on GPU or CPU.
+- [ ] State of IO / C interop: reading files is necessary to load datasets and weights.
+- [ ] How to publish on BendHub (namespace, versioning, package format).
+- [ ] **Whether BendHub already has** a tokenizer, a tensor library or an autograd. If it does, evaluate whether it is better to contribute or to differentiate.
 
-Saída esperada: `NOTES.md` com respostas objetivas e uma recomendação sobre ajustes no plano abaixo.
+Expected output: `NOTES.md` with objective answers and a recommendation on adjustments to the plan below.
 
-## Fase 1 — `bpe.bend` (meta: poucos dias)
+## Phase 1 — `bpe.bend` (target: a few days)
 
-Tokenizer BPE byte-level (estilo GPT-2: vocabulário base de 256 bytes + merges).
+Byte-level BPE tokenizer (GPT-2 style: a base vocabulary of 256 bytes + merges).
 
-**Escopo:**
+**Scope:**
 - `train(corpus, n_merges) -> MergeTable`
 - `encode(table, bytes) -> List<Token>`
 - `decode(table, tokens) -> bytes`
 
-**LAWS a provar:**
-- **Roundtrip:** para qualquer tabela de merges bem formada e qualquer sequência de bytes, `decode(encode(s)) == s`.
-- **Limite de vocabulário:** todo token emitido por `encode` é menor que o tamanho do vocabulário da tabela.
-- (Se viável) `decode` distribui sobre concatenação de listas de tokens.
+**LAWS to prove:**
+- **Roundtrip:** for any well-formed merge table and any byte sequence, `decode(encode(s)) == s`.
+- **Vocabulary bound:** every token emitted by `encode` is smaller than the table's vocabulary size.
+- (If feasible) `decode` distributes over concatenation of token lists.
 
-**Testes:**
-- Comparar ids de tokens contra uma implementação de referência em Python em textos de exemplo (incluindo UTF-8 com acentos).
+**Tests:**
+- Compare token ids against a reference implementation in Python on sample texts (including UTF-8 with accents).
 
-**Stretch:** carregar a tabela de merges oficial do GPT-2 e bater 100% com tiktoken. Isso é pré-requisito da Fase 3.
+**Stretch:** load GPT-2's official merge table and match tiktoken 100%. This is a prerequisite for Phase 3.
 
-**Entrega:** pacote publicado no BendHub + README com as LAWS listadas.
+**Deliverable:** package published on BendHub + README listing the LAWS.
 
-## Fase 2 — `tensor.bend` + autograd (meta: semanas)
+## Phase 2 — `tensor.bend` + autograd (target: weeks)
 
-**Tensores com shape no tipo.** Ideia geral (pseudocódigo, NÃO sintaxe real do Bend):
+**Tensors with the shape in the type.** General idea (pseudocode, NOT real Bend syntax):
 
 ```
 Tensor(shape: List<Nat>)
 matmul : Tensor([n, k]) -> Tensor([k, m]) -> Tensor([n, m])
-reshape : Tensor(s1) -> (prova: product(s1) == product(s2)) -> Tensor(s2)
+reshape : Tensor(s1) -> (proof: product(s1) == product(s2)) -> Tensor(s2)
 ```
 
-**Operações iniciais:** add, mul (elementwise), matmul, transpose, reshape, sum, relu, softmax. Broadcasting fica para depois.
+**Initial operations:** add, mul (elementwise), matmul, transpose, reshape, sum, relu, softmax. Broadcasting comes later.
 
 **Autograd:**
-1. Primeiro, versão escalar estilo micrograd (grafo de expressões + reverse-mode).
-2. Depois, generalizar para tensores.
+1. First, a scalar micrograd-style version (expression graph + reverse mode).
+2. Then, generalize to tensors.
 
-**LAWS / garantias:**
-- Shapes corretos por construção (erro de shape = erro de tipo).
-- `reshape` só compila com prova de que o número de elementos se preserva.
-- Propriedades estruturais do backward que forem expressáveis (ex.: o backward de uma composição é a composição dos backwards).
-- Correção numérica dos gradientes: **testes de gradient checking**, não prova.
+**LAWS / guarantees:**
+- Correct shapes by construction (shape error = type error).
+- `reshape` only compiles with a proof that the number of elements is preserved.
+- Structural properties of the backward pass that can be expressed (e.g. the backward of a composition is the composition of the backwards).
+- Numerical correctness of the gradients: **gradient-checking tests**, not proof.
 
-**Atenção:** a aritmética de shapes vai exigir lemas de Nat (associatividade, comutatividade, distributividade da multiplicação, propriedades de `product` sobre listas). Se a Base não tiver, criar um pacote separado `nat-lemmas` e publicar também. É mais uma contribuição útil ao ecossistema.
+**Attention:** shape arithmetic will require Nat lemmas (associativity, commutativity, distributivity of multiplication, properties of `product` over lists). If Base does not have them, create a separate `nat-lemmas` package and publish it too. It is one more useful contribution to the ecosystem.
 
-## Fase 3 — Demo de impacto
+## Phase 3 — Impact demo
 
-1. **MLP no MNIST:** treinar, reportar acurácia e tempo. Comparar com um script PyTorch equivalente em `reference/`. Benchmark honesto, com hardware e versões documentados.
-2. **Stretch: inferência do GPT-2 small (124M).** Carregar pesos, tokenizar com `bpe.bend`, gerar texto. Atenção ao limite de 6 GB de VRAM. Isso é a semente de um "llama.bend".
+1. **MLP on MNIST:** train, report accuracy and time. Compare with an equivalent PyTorch script in `reference/`. Honest benchmark, with hardware and versions documented.
+2. **Stretch: GPT-2 small (124M) inference.** Load weights, tokenize with `bpe.bend`, generate text. Mind the 6 GB VRAM limit. This is the seed of a "llama.bend".
 
-## Estrutura sugerida do repositório
+## Suggested repository structure
 
 ```
 bend-ml/
-├── CLAUDE.md          # este arquivo
-├── NOTES.md           # achados da Fase 0, decisões, dívidas
-├── bpe/               # pacote bpe.bend
-├── nat-lemmas/        # lemas de Nat (se necessário)
-├── tensor/            # pacote tensor.bend + autograd
+├── CLAUDE.md          # this file
+├── NOTES.md           # Phase 0 findings, decisions, debts
+├── bpe/               # bpe.bend package
+├── nat-lemmas/        # Nat lemmas (if needed)
+├── tensor/            # tensor.bend package + autograd
 ├── demos/
 │   └── mnist/
-└── reference/         # scripts Python de referência (PyTorch, tiktoken)
+└── reference/         # Python reference scripts (PyTorch, tiktoken)
 ```
 
-## Critério de "pronto para mandar ao Taelin"
+## Criteria for "ready to send to Taelin"
 
-- Pelo menos um pacote publicado no BendHub, com README claro e LAWS listadas.
-- Demo reproduzível com um comando.
-- Benchmark honesto (sem esconder onde perde).
-- Vídeo curto (~60 s) mostrando um erro de shape sendo pego em tempo de compilação e o treino rodando.
-- Thread no X marcando @VictorTaelin, com link para o BendHub e o repositório.
+- At least one package published on BendHub, with a clear README and the LAWS listed.
+- A demo reproducible with one command.
+- Honest benchmark (without hiding where it loses).
+- A short video (~60 s) showing a shape error caught at compile time and the training running.
+- An X thread tagging @VictorTaelin, with a link to BendHub and the repository.
 
-## Riscos conhecidos
+## Known risks
 
-- Bend 2 ainda tem bugs e muda rápido; o próprio site avisa isso. Fixar versão e reportar bugs encontrados no GitHub oficial (isso também conta como contribuição).
-- O compilador é majoritariamente escrito por IA; só o kernel de provas é auditado por humanos. Se algo se comportar de forma estranha, desconfie do compilador antes de desconfiar da sua prova.
-- Suporte a floats, IO e GPU pode estar incompleto. A Fase 0 existe para descobrir isso cedo.
-- Base com poucos lemas: provar coisas simples pode custar caro. Estimar com folga.
+- Bend 2 still has bugs and changes fast; the site itself warns about this. Pin the version and report bugs found on the official GitHub (that also counts as a contribution).
+- The compiler is mostly written by AI; only the proof kernel is audited by humans. If something behaves strangely, suspect the compiler before suspecting your proof.
+- Support for floats, IO and GPU may be incomplete. Phase 0 exists to find that out early.
+- Base has few lemmas: proving simple things can be expensive. Estimate with margin.
 
 ## Links
 
-- Site oficial: https://bend-lang.com
-- Thread do Taelin (info dump + resposta sobre contratação): https://x.com/VictorTaelin/status/2104956654542639176
+- Official site: https://bend-lang.com
+- Taelin's thread (info dump + answer about hiring): https://x.com/VictorTaelin/status/2104956654542639176
 
 ## Agent skills
 
