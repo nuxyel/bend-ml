@@ -1,30 +1,32 @@
-# Video script (~60 s)
+# Presentation video (60 s)
 
-It shows three things: the **shape error caught by the compiler**, the **verified proof** and **GPT-2 generating text in Bend**. Terminal screen, large font, no heavy editing.
+The video is **generated**, not recorded: `docs/media/video/scene.html` animates the real command outputs (`docs/media/outputs/`) and the measured numbers (`docs/media/numbers.json`), `docs/media/render_video.mjs` renders it frame by frame with a headless Chromium-based browser, and `ffmpeg` encodes it. It is 1920x1080, 30 fps, silent, with English captions.
 
-## Preparation (once)
+The MP4 is not stored in git (it would stay in the history forever). It is attached to the GitHub release: `https://github.com/nuxyel/bend-ml/releases/download/v2.1.0/bend-ml.mp4`. The repository keeps `docs/media/poster.png` and the looping `docs/media/teaser.webp` used by the README.
+
+## Regenerate
 
 ```bash
-cd ~/Repos/bend2-ml
-export PATH="$HOME/.bend/bin:$HOME/.elan/bin:$PATH"
-bend demos/gpt2/fast.bend -o /tmp/gpt2_fast     # compile before recording
-clear
+make media                                  # screenshots, charts, poster, teaser and the video
+scripts/make_media.sh --capture             # also re-run the commands and refresh docs/media/outputs/ (slow)
+scripts/make_media.sh --no-video            # only the README images
+gh release upload v2.1.0 docs/media/bend-ml.mp4 --clobber
 ```
 
-To record the screen: Omarchy's capture shortcut, or `wf-recorder -f bend-ml.mp4`.
+Needs `node`, `ffmpeg` and a Chromium-based browser (`/usr/bin/brave`, or set `$BRAVE`). To look at single frames: `node docs/media/render_video.mjs --stills 3,14,40`.
 
-## Scenes
+## Storyboard
 
-| Time | On screen | Voice / caption |
+| Time | Scene | Caption |
 |---|---|---|
-| 0–5 s | `cat tensor/tests/bad_matmul.bend` | "Multiplying (2×3) by (4×5)." |
-| 5–15 s | `bend tensor/tests/bad_matmul.bend` → `expected Mat<3n,5n> / observed Mat<4n,5n>` | "In Bend, that is a **type** error: it does not compile." |
-| 15–22 s | `bend tensor/tests/bad_reshape.bend` → `expected 12n / observed 15n` | "Reshape only compiles with the proof that the number of elements does not change." |
-| 22–32 s | `bend bpe/main.bend --verdict` → `ALL PROOFS CHECK`; show `law roundtrip` | "The tokenizer has a proved roundtrip: decode(encode(s)) = s, verified by the kernel." |
-| 32–50 s | `/tmp/gpt2_fast "The capital of France is" 8` (each token takes ~0.1 s; speed up only the 9 s of loading) → `The capital of France is the capital of the French Republic, and` | "GPT-2 small, 124 million parameters, entirely in Bend, the same tokens as PyTorch, ~0.1 s per token." |
-| 50–60 s | `reference/.venv/bin/python reference/check_all.py` → `TOTAL: 27/27 checks ok` | "Five packages on BendHub, MIT. Link in the thread." |
+| 0–6 s | A `(2×3)·(4×5)` product: the grids collide, the inner dimensions 3 ≠ 4 turn red, and the real compiler error appears. | In bend-ml, this does not compile. |
+| 6–10 s | The `bend-ml` wordmark and the tagline. | — |
+| 10–19 s | `reshape` 2×6 → 5×3 is refused (`expected 12n / observed 15n`); 2×6 → 3×4 compiles because the proof `{==}` is just computing. | reshape needs a proof that the size is preserved. / 12 = 12: the proof is just computing. |
+| 19–29 s | `bend bpe/main.bend --verdict` → `ALL PROOFS CHECK`, the `roundtrip` law, and the counters 24 laws · 5 packages · 0 @unsafe. | Proofs checked again by a Lean-proved kernel. / 24 laws. 5 packages. No @unsafe. |
+| 29–43 s | GPT-2 small: loading (sped up, labelled), then the prompt and 8 tokens at their real pace (1.2 s), and the ids compared with PyTorch. | GPT-2 small, 124 M parameters, written in Bend. / Real time: the prompt and 8 tokens in 1.2 s. / Same tokens as PyTorch. |
+| 43–53 s | Honest benchmark: MNIST epoch and GPT-2 time per token, v1 → v2 and PyTorch, with the note that PyTorch is still ahead. | Fast enough to be real. Honest about the gap. |
+| 53–60 s | The 36 checks of `make check-full` roll by, then the repository card. | — |
 
-## Tips
+## Posting
 
-- GPT-2 takes ~9 s to load and ~0.1 s per token: speed up only the loading and say so in the caption ("sped up").
-- To show MNIST: `demos/mnist/run.sh 1 0 0.1` trains one full epoch in ~7 s in Bend and ~0.3 s in PyTorch (be honest in the video!); both print `9129/10000`.
+On X the video autoplays muted, so the captions carry the message; attach `bend-ml.mp4` to the first post of `x-thread.md`. A manual screen recording is still possible (`wf-recorder -f bend-ml.mp4`, then run the commands of the storyboard), but the generated video already shows the real outputs.

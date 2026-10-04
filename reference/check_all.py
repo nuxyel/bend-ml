@@ -79,7 +79,7 @@ def main():
         with tempfile.TemporaryDirectory() as d:
             exe = os.path.join(d, "gpt2")
             run("compile GPT-2 (Array)", [BEND, "demos/gpt2/fast.bend", "-o", exe])
-            run("GPT-2 (Array) in Bend vs PyTorch (3 prompts)", [PY, "reference/test_gpt2.py", exe])
+            run("GPT-2 (Array) in Bend vs PyTorch (11 prompts)", [PY, "reference/test_gpt2.py", exe])
             mn = os.path.join(d, "mnist")
             run("compile MNIST (Array)", [BEND, "demos/mnist/fast.bend", "-o", mn])
             out = run("MNIST (Array) in Bend, 50 batches", [mn, "1", "50", "0.1"], lambda o, c: "test_correct=7829/10000" in o)

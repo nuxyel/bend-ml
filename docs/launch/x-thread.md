@@ -12,7 +12,7 @@ A matmul of (2×3)·(4×5) doesn't compile:
 `expected Mat<3n,5n> / observed Mat<4n,5n>`
 
 Repo: github.com/nuxyel/bend-ml
-[video]
+[attach docs/media/bend-ml.mp4, 60 s; it is on the v2.1.0 release]
 
 **2/**
 5 packages on BendHub (MIT):
@@ -43,7 +43,7 @@ Speed, honestly. v1 was 1800x slower than PyTorch on MNIST: matrices as linked l
 • flat Array instead of lists: 49x
 • parallel blocks: ~2x more
 • parallelizing matvec by copying the matrix: 10x WORSE
-Now: 6.6 s/epoch vs 0.2-0.3 s. Same loss, same accuracy (9129 -> 9298 -> 9418).
+Now: ~7 s/epoch vs 0.2 s (PyTorch is still ~25-35x ahead). Same loss, same accuracy (9129 -> 9298 -> 9418).
 
 **6/**
 Things I hit that might be useful: imports aren't re-exported (a library needs law+proof in one file); match only on parameters; Array reads return the array (affine); `--` for negative CLI args; Base has almost no lemmas. Remaining gap: scalar code vs AVX/BLAS, and Array.clone is O(n).
