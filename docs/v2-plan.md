@@ -1,62 +1,62 @@
-# Plano v2: medir o teto de desempenho e aprofundar o que só o Bend tem
+# v2 plan: measure the performance ceiling and deepen what only Bend has
 
-## Por que
+## Why
 
-A v1.0 mostrou um Bend ~1800× mais lento que o PyTorch no MNIST. Mas a comparação foi injusta com a linguagem:
-matrizes em listas encadeadas, uma thread efetiva, sem GPU. A v2 tem dois eixos, nesta ordem:
+v1.0 showed Bend ~1800x slower than PyTorch on MNIST. But the comparison was unfair to the language:
+matrices as linked lists, one effective thread, no GPU. v2 has two axes, in this order:
 
-1. **Desempenho:** descobrir o teto real de cada técnica e a distância final para o PyTorch (sem prometer alcançá-lo).
-2. **Garantias:** usar o que sobrar de fôlego para aprofundar o que o PyTorch não tem: invariantes no tipo, mais leis provadas.
+1. **Performance:** find the real ceiling of each technique and the final distance to PyTorch (without promising to reach it).
+2. **Guarantees:** use whatever energy is left to deepen what PyTorch does not have: invariants in the type, more proved laws.
 
-Decisões do Renan: os dois eixos, desempenho primeiro; CUDA 12 tentando **sem sudo** primeiro; sem meta numérica fixa (medir e reduzir).
+Renan's decisions: both axes, performance first; try CUDA 12 **without sudo** first; no fixed numeric goal (measure and reduce).
 
-## Eixo 1: desempenho (cada passo registra o número em `NOTES.md`)
+## Axis 1: performance (each step records its number in `NOTES.md`)
 
-| # | Experimento | O que mede | Critério de saída |
+| # | Experiment | What it measures | Exit criterion |
 |---|---|---|---|
-| 1 | Linha de base reprodutível: um micro-benchmark único de `matmul` 100×784 · 784×128 e de um passo do MNIST | tempo e threads | script `bench/run.sh` com resultado salvo |
-| 2 | `Array<F32>` no lugar de listas (índice `i*c + j`, `Array.get/set`) | ganho de usar memória indexável | número comparado com listas |
-| 3 | Por que o paralelismo trava em ~1,8×: reproduzir com um caso mínimo, variar granularidade e a forma da divisão, ler `bend guide shaders` e `paper/BendRT.pdf` | gargalo (alocador, contagem de referências, divisão desbalanceada) | causa identificada ou relato mínimo reproduzível para o GitHub do Bend |
-| 4 | Blocagem do `matmul` (tiles) e laço interno sem alocação | ganho de localidade | número |
-| 5 | GPU: CUDA 12 sem sudo (toolkit em `~/.local/cuda12`, link `/usr/local/cuda` só se possível); testar `pow2!` e depois `matmul` com `!` | se a RTX 4050 roda; ganho de GPU | rodou ou limite documentado |
-| 6 | Reconstruir o passo do MNIST e o GPT-2 com a melhor técnica | tempo final vs PyTorch | tabela antes/depois em `BENCHMARK.md` |
+| 1 | Reproducible baseline: a single micro-benchmark of a 100×784 · 784×128 `matmul` and of one MNIST step | time and threads | `bench/` scripts with saved results |
+| 2 | `Array<F32>` instead of lists (index `i*c + j`, `Array.get/set`) | the gain from indexable memory | number compared with lists |
+| 3 | Why parallelism stalls at ~1.8x: reproduce with a minimal case, vary the granularity and the shape of the split, read `bend guide shaders` and `paper/BendRT.pdf` | bottleneck (allocator, reference counting, unbalanced split) | cause identified, or a minimal reproducible report for Bend's GitHub |
+| 4 | `matmul` tiling and an allocation-free inner loop | locality gain | number |
+| 5 | GPU: CUDA 12 without sudo (toolkit in `~/.local/cuda12`, a `/usr/local/cuda` link only if possible); test `pow2!` and then `matmul` with `!` | whether the RTX 4050 runs; GPU gain | it ran, or the limit is documented |
+| 6 | Rebuild the MNIST step and GPT-2 with the best technique | final time vs PyTorch | before/after table in `BENCHMARK.md` |
 
-Regra: um experimento descartado também entra nas notas (com o número). Nada de otimização que quebre a equivalência com o PyTorch (os testes de `check_all.py` continuam valendo).
+Rule: a discarded experiment also goes into the notes (with its number). No optimization that breaks the equivalence with PyTorch (the `check_all.py` tests remain valid).
 
-## Eixo 2: garantias (só depois do eixo 1)
+## Axis 2: guarantees (only after axis 1)
 
-- **Invariante no tipo:** `Mat<r,c>` com a lista de linhas amarrada a `r` e `c` (por exemplo um tipo indexado `Rows(r, c)`), eliminando a invariante "de biblioteca" do README.
-- **Mais leis:** `transpose(transpose(m)) = m`, `matmul` associativo sobre a estrutura, `Mat.of` correto (só devolve `Some` se os tamanhos batem), `softmax` com soma estrutural.
-- **Tokenizer:** lei de que `train` produz tabelas bem formadas (`wf = True`), fechando a lacuna do README do `bpe`.
-- Cada lei nova: `--verdict` limpo, publicada em nova versão do pacote (versões de 4 números).
+- **Invariant in the type:** `Mat<r,c>` with the list of rows tied to `r` and `c` (for example an indexed type `Rows(r, c)`), removing the "library" invariant from the README.
+- **More laws:** `transpose(transpose(m)) = m`, `matmul` associative over the structure, a correct `Mat.of` (only returns `Some` if the sizes match), `softmax` with a structural sum.
+- **Tokenizer:** a law that `train` produces well-formed tables (`wf = True`), closing the gap in the `bpe` README.
+- Every new law: a clean `--verdict`, published in a new package version (four-number versions).
 
-## Entregas
+## Deliverables
 
-- `NOTES.md` com cada medição e hipótese descartada.
-- `demos/*/BENCHMARK.md` atualizados (antes/depois, hardware, versões).
-- Pacotes novos como `0.2.x.0`; tag `v2.0.0` e release.
-- Se a causa do paralelismo ou outra limitação for do Bend: um relato mínimo para `github.com/bendlang/bend/issues` (em texto pronto; eu não abro issue em seu nome).
+- `NOTES.md` with every measurement and discarded hypothesis.
+- `demos/*/BENCHMARK.md` updated (before/after, hardware, versions).
+- New packages as `0.2.x.0`; tag `v2.0.0` and a release.
+- If the cause of the parallelism stall or another limitation belongs to Bend: a minimal report for `github.com/bendlang/bend/issues` (as ready text; the agent does not open issues on your behalf).
 
-## Critério de parada da v2
+## Stop criterion for v2
 
-1. Cada técnica do eixo 1 medida e registrada, com a distância final para o PyTorch.
-2. Pelo menos uma garantia nova do eixo 2 provada (`--verdict`) e publicada.
-3. `check_all.py --full` verde; benchmarks e README atualizados; `v2.0.0` publicada.
+1. Every axis-1 technique measured and recorded, with the final distance to PyTorch.
+2. At least one new axis-2 guarantee proved (`--verdict`) and published.
+3. `check_all.py --full` green; benchmarks and README updated; `v2.0.0` published.
 
-## Resultado (2026-10-04)
+## Result (2026-10-04)
 
-Eixo 1 (desempenho), todos os experimentos medidos e registrados em `NOTES.md` (exp. 1 a 9):
+Axis 1 (performance), every experiment measured and recorded in `NOTES.md` (experiments 1 to 9):
 
-| Experimento | Resultado |
+| Experiment | Result |
 |---|---|
-| 1-2. listas vs `Array` | ~49× num thread (44 M vs 2 200 M mult-soma/s) |
-| 3. por que o paralelo trava em ~1,8× | o gargalo era a estrutura de dados e o tamanho do `Array` (2^20 vs 2^17 custa ~60%); clones **não** causam contenção; a hipótese de cache/blocagem foi refutada |
-| 4. blocagem | sem efeito (1, 8, 16, 32 blocos de colunas: mesmo tempo) |
-| 5. GPU | **não feita**: o Bend pede CUDA 12 e a máquina tem o CUDA 13 do Arch; tentar sem sudo exigiria baixar o toolkit 12 e o link em `/usr/local/cuda`; fica como pendência |
-| 6. MNIST completo | 544 s → 6,6 s por época, mesma perda e acertos |
-| 7. GPT-2 | ~3 s → ~0,1 s por token, mesmos ids e logits |
-| Achado | paralelizar matriz·vetor copiando a matriz custa 10× mais que calcular; solução futura: partir a árvore do `Array` sem copiar |
+| 1-2. lists vs `Array` | ~49x on one thread (44 M vs 2,200 M multiply-adds/s) |
+| 3. why parallelism stalls at ~1.8x | the bottleneck was the data structure and the `Array` size (2^20 vs 2^17 costs ~60%); clones do **not** cause contention; the cache/tiling hypothesis was refuted |
+| 4. tiling | no effect (1, 8, 16, 32 blocks of columns: same time) |
+| 5. GPU | **not done**: Bend asks for CUDA 12 and the machine has Arch's CUDA 13. The Bend binary honors `CUDA_HOME`, so a user-local CUDA 12 toolkit (headers and `libnvrtc`) could be tried without sudo; it is left as a pending item |
+| 6. full MNIST | 544 s → 6.6 s per epoch, same loss and hits |
+| 7. GPT-2 | ~3 s → ~0.1 s per token, same ids and logits |
+| Finding | parallelizing matrix · vector by copying the matrix costs 10x more than computing; future solution: split the `Array` tree without copying |
 
-Eixo 2 (garantias): `train_wf` e `roundtrip_trained` provadas e publicadas em `bend-ml-bpe-tokenizer@0.1.1.0`; o passo de treino do MNIST inteiro é checado por tipo (`tensor-array`).
+Axis 2 (guarantees): `train_wf` and `roundtrip_trained` proved and published in `bend-ml-bpe-tokenizer@0.1.1.0`; the whole MNIST training step is type-checked (`tensor-array`).
 
-Não feito: invariante `capacidade >= r*c` no tipo de `Mat` (fica documentada como limite).
+Not done: the `capacity >= r*c` invariant in the `Mat` type (it stays documented as a limit).
