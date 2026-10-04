@@ -185,3 +185,19 @@ Demos relevantes para nós: `proof_numerics` (prova de `add_comm`, `add_assoc`, 
 - A invariante "linhas com `c` números" de `Mat<r,c>` não está no tipo.
 - O `bpe/LICENSE` publicado não tem a linha SPDX (só o texto MIT).
 - Para o Renan: (1) abrir hub.bend-lang.com e procurar tokenizer/tensor/autograd de terceiros (a lista é carregada por JS e não consegui ler); (2) gravar o vídeo e postar a thread (`docs/launch/`); (3) se quiser GPU, instalar CUDA 12 em `/usr/local/cuda`; (4) o token do `bend login` está em `~/.bend/bender.json` (permissão 600); a chave `bend-ml` foi revogada.
+
+## v2 — experimentos de desempenho (2026-10-04)
+
+Plano em `docs/v2-plan.md`; micro-benchmarks em `bench/` (`timeit.py` mede a mediana de 3 execuções por número de threads).
+
+### Exp. 1-2: listas × `Array<F32>` (100 M multiplicações-e-somas, 1 thread)
+
+| | tempo | multiplicações-e-somas/s |
+|---|---|---|
+| listas (`bench/mm_list.bend`, como o `bend-ml-tensor` 0.1.x) | 2,274 s | 44 M |
+| `Array<F32>` com `Array.get` (`bench/mm_array_check.bend`, dados distintos) | **0,046 s** | **2 200 M** |
+
+- **Ganho de ~49× só trocando a estrutura de dados.** Resultado conferido com NumPy (`1024010000` para 128001 produtos de 8000,79; o desvio pequeno é arredondamento de `F32`).
+- Conta de bolso para o MNIST: ~18 G de mult-soma por época (3 produtos por lote × 600 lotes). A 2,2 G/s dá ~8 s por época, contra 544 s com listas e 0,3 s do PyTorch com 1 thread. **A distância ao PyTorch cairia de ~1800× para ~30×**, antes de qualquer paralelismo. Isto é uma estimativa, não uma medição do treino completo.
+- Custo do `Array`: é afim (`Type`), então cada leitura devolve o array junto com o elemento, e `Array.get` recalcula `Array.size` (log n). Mesmo assim ganhou muito.
+- A conclusão da v1 ("o Bend é ~1800× mais lento") era um efeito da estrutura de dados, não da linguagem.
