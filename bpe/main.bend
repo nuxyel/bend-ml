@@ -546,3 +546,111 @@ def dec_append(D, xs, ys):
     case Con{+x, +t}:
       %Equal.sym(List<&2, Nat>, dec(D, List.append(&2, Tk, t, ys)), List.append(&2, Nat, dec(D, t), dec(D, ys)), dec_append(D, t, ys)) : {List.append(&2, Nat, exp(D, x), _) == List.append(&2, Nat, List.append(&2, Nat, exp(D, x), dec(D, t)), dec(D, ys)) : List<&2, Nat>}
       Equal.sym(List<&2, Nat>, List.append(&2, Nat, List.append(&2, Nat, exp(D, x), dec(D, t)), dec(D, ys)), List.append(&2, Nat, exp(D, x), List.append(&2, Nat, dec(D, t), dec(D, ys))), NL.append_assoc(Nat, exp(D, x), dec(D, t), dec(D, ys)))
+
+# =====================================================================
+# LEI 4: o train gera tabelas bem formadas (fecha a lacuna do roundtrip)
+# =====================================================================
+#
+# O train cria regras de ids next, next+1, next+2, ... Nenhum repete, então a
+# tabela satisfaz wf, que é a hipótese da lei roundtrip. Prova por indução
+# sobre o train.go, mantendo o invariante "todos os ids já usados são menores
+# que o próximo id".
+
+# n < 1 + n
+def lt_succ(n: Nat) -> {True{} == Nat.is_lt(n, 1n+n) : Bool}:
+  match n:
+    case 0n:
+      {==}
+    case 1n+p:
+      lt_succ(p)
+
+# j < i  ->  i != j
+def lt_ne(j: Nat, i: Nat, e: {True{} == Nat.is_lt(j, i) : Bool}) -> {False{} == Nat.is_eq(i, j) : Bool}:
+  match j i:
+    case 0n 0n:
+      %e : BD(_, Unit, {False{} == Nat.is_eq(0n, 0n) : Bool})
+      Unit{}
+    case 0n 1n+q:
+      {==}
+    case 1n+p 0n:
+      %e : BD(_, Unit, {False{} == Nat.is_eq(0n, 1n+p) : Bool})
+      Unit{}
+    case 1n+p 1n+q:
+      lt_ne(p, q, e)
+
+# j < i  ->  j < 1 + i
+def lt_up(j: Nat, i: Nat, e: {True{} == Nat.is_lt(j, i) : Bool}) -> {True{} == Nat.is_lt(j, 1n+i) : Bool}:
+  match j i:
+    case 0n 0n:
+      %e : BD(_, Unit, {True{} == Nat.is_lt(0n, 1n) : Bool})
+      Unit{}
+    case 0n 1n+q:
+      {==}
+    case 1n+p 0n:
+      %e : BD(_, Unit, {True{} == Nat.is_lt(1n+p, 1n) : Bool})
+      Unit{}
+    case 1n+p 1n+q:
+      lt_up(p, q, e)
+
+# todos os ids da lista de regras são menores que i
+def below(D: List<&2, Rule>, +i: Nat) -> Bool:
+  match D:
+    case Nil{}:
+      True{}
+    case Con{Rule{+j, a, b}, t}:
+      Bool.and(Nat.is_lt(j, i), below(t, i))
+
+def below_has(D: List<&2, Rule>, +i: Nat, +e: {True{} == below(D, i) : Bool}) -> {False{} == has(D, i) : Bool}:
+  match D:
+    case Nil{}:
+      {==}
+    case Con{Rule{+j, a, b}, +t}:
+      %lt_ne(j, i, and_true_l(Nat.is_lt(j, i), below(t, i), e)) : {False{} == Bool.or(_, has(t, i)) : Bool}
+      below_has(t, i, and_true_r(Nat.is_lt(j, i), below(t, i), e))
+
+def below_up(D: List<&2, Rule>, +i: Nat, +e: {True{} == below(D, i) : Bool}) -> {True{} == below(D, 1n+i) : Bool}:
+  match D:
+    case Nil{}:
+      {==}
+    case Con{Rule{+j, a, b}, +t}:
+      and_intro(Nat.is_lt(j, 1n+i), below(t, 1n+i), lt_up(j, i, and_true_l(Nat.is_lt(j, i), below(t, i), e)), below_up(t, i, and_true_r(Nat.is_lt(j, i), below(t, i), e)))
+
+# acrescentar a regra de id `next` (maior que todos os de `done`) mantém a tabela "abaixo de 1+next"
+def below_cons(+a: Tk, +b: Tk, +D: List<&2, Rule>, +i: Nat, +e: {True{} == below(D, i) : Bool}) -> {True{} == below(Rule{i, a, b} <> D, 1n+i) : Bool}:
+  and_intro(Nat.is_lt(i, 1n+i), below(D, 1n+i), lt_succ(i), below_up(D, i, e))
+
+# not (has D i) quando todos os ids de D são menores que i
+def below_fresh(+D: List<&2, Rule>, +i: Nat, +e: {True{} == below(D, i) : Bool}) -> {True{} == Bool.not(has(D, i)) : Bool}:
+  %below_has(D, i, e) : {True{} == Bool.not(_) : Bool}
+  {==}
+
+# train.go gera regras de ids next, next+1, ...: nenhum repete, qualquer que seja o corpus
+def tw(n: Nat, +next: Nat, +xs: List<&2, Tk>, m: Maybe<&1, Cnt>, +done: List<&2, Rule>, +bl: {True{} == below(done, next) : Bool}) -> {True{} == wf.go(train.go(n, next, xs, m), done) : Bool}:
+  match n m:
+    case 0n _:
+      {==}
+    case 1n++p None{}:
+      {==}
+    case 1n++p Some{Cnt{+a, +b, k}}:
+      and_intro(Bool.not(has(done, next)), wf.go(train.go(p, 1n+next, merge(a, b, M{next}, xs), best(count.go(merge(a, b, M{next}, xs), Nil{}))), Rule{next, a, b} <> done), below_fresh(done, next, bl), tw(p, 1n+next, merge(a, b, M{next}, xs), best(count.go(merge(a, b, M{next}, xs), Nil{})), Rule{next, a, b} <> done, below_cons(a, b, done, next, bl)))
+
+# LEI (train_wf): a tabela que o train devolve é sempre bem formada, então o roundtrip vale para ela
+law train_wf:
+  for n: Nat
+  for +next: Nat
+  for +xs: List<&2, Tk>
+  {True{} == wf(train(n, next, xs)) : Bool}
+
+def train_wf(n, next, xs):
+  tw(n, next, xs, best(count.go(xs, Nil{})), Nil{}, {==})
+
+# LEI 5 (roundtrip_trained): treine uma tabela em qualquer corpus, com quantas fusões quiser:
+# decodificar o que ela codifica devolve sempre os bytes originais. Sem hipótese nenhuma.
+law roundtrip_trained:
+  for +n: Nat
+  for +corpus: List<&2, Nat>
+  for +bs: List<&2, Nat>
+  {decode(train(n, 0n, lift(corpus)), encode(train(n, 0n, lift(corpus)), lift(bs))) == bs : List<&2, Nat>}
+
+def roundtrip_trained(n, corpus, bs):
+  roundtrip(train(n, 0n, lift(corpus)), bs, train_wf(n, 0n, lift(corpus)))
