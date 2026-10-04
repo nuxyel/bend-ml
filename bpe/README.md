@@ -16,7 +16,7 @@ Tokenizer **BPE byte-level** (estilo GPT-2) em Bend 2, com o **roundtrip provado
 
 ```python
 import Base
-import bend-ml-bpe-tokenizer@0.1.0.0/main.bend as BPE
+import bend-ml-bpe-tokenizer@0.1.1.0/main.bend as BPE
 
 # BPE.encode(table, BPE.lift(bytes))   BPE.decode(table, ids)   BPE.train(30n, 0n, BPE.lift(bytes))
 ```
@@ -28,6 +28,8 @@ import bend-ml-bpe-tokenizer@0.1.0.0/main.bend as BPE
 | `roundtrip` | Se a tabela é **bem formada** (nenhum id de regra se repete: `wf(tabela) = True`), então `decode(encode(bytes)) = bytes`, para **qualquer** sequência de bytes. |
 | `vocab_bound` | Todo token que `encode` emite é um byte cru ou foi criado por uma regra da tabela; nunca aparece um id desconhecido. |
 | `dec_append` | Decodificar duas listas de tokens juntas é decodificar cada uma e juntar os bytes. |
+| `train_wf` | A tabela que `train` devolve é **sempre bem formada** (os ids das regras são `next, next+1, ...`, nenhum repete), para qualquer corpus e quantas fusões forem pedidas. |
+| `roundtrip_trained` | Consequência das duas primeiras: treine uma tabela em **qualquer corpus** e `decode(encode(s)) = s` para qualquer `s`, **sem nenhuma hipótese**. |
 
 A prova do roundtrip tem a seguinte ideia (os comentários em `main.bend` detalham): ao aplicar a regra `k`, cada par `(a, b)` vira `M{k}`, e `M{k}` expande para `expansão(a) ++ expansão(b)`; logo o decode não muda. Isso só vale se `k` ainda não aparecia na lista, e é exatamente isso que a tabela bem formada garante (ids distintos). Os lemas auxiliares provam que acrescentar a regra nova no topo da tabela não muda a expansão dos tokens que já existiam.
 
@@ -41,6 +43,11 @@ reference/.venv/bin/python reference/test_bpe.py
 
 ## Limites conhecidos
 
-- `train` e a leitura de tabelas não têm prova; a lei vale para qualquer tabela com `wf = True` (as geradas por `train`, ou lidas de um `merges.txt` com ids sequenciais, cumprem).
+- A *escolha* das fusões pelo `train` (qual par é o mais frequente) não é provada, e não precisa ser: a correção do roundtrip não depende dela (`train_wf` + `roundtrip`). Tabelas lidas de um `merges.txt` com ids sequenciais também cumprem `wf`, mas essa leitura (`rules.go` do CLI) não é provada.
 - A busca do par de menor rank é feita aplicando as regras em ordem (equivalente ao algoritmo do GPT-2 para tabelas treinadas), com custo `regras × tamanho`. Para o vocabulário completo do GPT-2 (50 mil regras) o uso é por palavra, depois do pré-tokenizador.
 - Ainda não há o pré-tokenizador por regex do GPT-2; vem em versão futura.
+
+## Versões
+
+- `0.1.1.0`: acrescenta `train_wf` e `roundtrip_trained`.
+- `0.1.0.0`: primeira publicação (`roundtrip`, `vocab_bound`, `dec_append`).
