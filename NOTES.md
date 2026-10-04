@@ -251,3 +251,30 @@ Distância ao PyTorch: 6,3 s contra 0,21 s (16 threads, ~30×) e 0,30 s (1 threa
 - **Erro de shape também no gradiente:** `tensor-array/tests/bad_grad.bend` (`dW` pedido como 128×784 em vez de 784×128) não compila (`docs/shape-error-array-*.txt`).
 - `demos/mnist/fast.bend` agora usa só a API tipada (importando do BendHub): 50 lotes 1,6616004 / 7829; **1 época 0,5204771 / 9129 em 7,6 s** (a versão com kernels crus levava 6,3 s: o custo extra são as conversões lista <-> Array dos wrappers `of_list`/`scale255`, ainda não otimizadas).
 - Regras do Bend aprendidas: `Mat` é `Type` (afim), então `Maybe<&1, Mat<...>>` e não `&2`; um registro `MMul{a, b, c}` por operação resolve o "devolver o que leu"; um padrão aninhado de `&`/`Tuple` em `match` falha ("annotated term (cannot infer)"), use registros com um `type` próprio.
+
+### Exp. 9: GPT-2 sobre `Array` e por que paralelizar com cópias não compensa em matriz·vetor (2026-10-04)
+
+`demos/gpt2/fast.bend`: os produtos matriz·vetor (`matmul_nt` com `n = 1`: qkv, projeção, MLP e logits; 124 M mult-soma por token) sobre `bend-ml-tensor-array`; atenção, LayerNorm e GELU continuam em listas. Ids e logits idênticos aos do PyTorch (`reference/test_gpt2.py`, 22 tokens, |Δlogit| ≤ 2e-4).
+
+| GPT-2 small, "The capital of France is", 8 tokens | por token | total |
+|---|---|---|
+| listas (`gpt2.bend`) | ~3 s | 49,8 s (10 s de carga + 8 tokens) |
+| `Array`, produtos em 2^3 blocos de colunas (`par = 3`) | ~1,1 s | 22 s |
+| `Array`, sequencial (`par = 0`) | **~0,1 s** | **11,1 s** (9 s de carga + 1,2 s para os 8 tokens) |
+| PyTorch (CPU, sem KV cache): forward de 11 tokens, 16 threads / 1 thread | 21 ms / 55 ms | 1,3 s no `gpt2_ref.py` (inclui ~1 s de carga dos pesos) |
+
+- **Sequencial vence o paralelo por 10×.** Isolei com `bench/mv.bend` (768×2304, 100 repetições): sequencial 0,76 ms por produto (2,3 G mult-soma/s); `par = 3` 10 ms por produto, **igual com 1, 8 ou 16 threads**. A causa é custo, não contenção: cada nó da árvore de tarefas faz `Array.clone` de **toda** a matriz de pesos (28 clones por chamada); clonar custa ~0,1 ns por elemento e, em matriz·vetor, cada peso só é lido uma vez (~0,4 ns), então copiar P vezes custa mais que calcular. Em produto matriz·matriz (MNIST: cada peso é lido 100 vezes) a cópia é desprezível e o paralelismo ganha.
+- Solução futura (não feita): partir a matriz de pesos **sem copiar**, destruturando `ANode{xs, ys}` em subárvores e dando uma a cada tarefa. Exige linhas alinhadas a potência de 2 (preenchimento com zeros, ~1,3 a 1,8× de memória).
+- Distância ao PyTorch: de ~150× por token (v1: 3 s contra 21 ms) para **~5×** (v2: ~0,1 s contra 21 ms, 16 threads) e ~2× contra o PyTorch de 1 thread (55 ms). **Correção:** uma versão anterior desta nota estimava o PyTorch em ~0,15 s por token; era o tempo total dividido por 8 (inclui carregar pesos), não o *forward*. O total do Bend ainda é dominado pela carga dos pesos (9 s contra ~1 s).
+- Memória: o processo chega a ~10 GB durante a carga (árvores de nós, não vetores contíguos).
+
+### MNIST final com a API tipada (3 execuções, 16 threads; `demos/mnist/fast.bend`, `bend-ml-tensor-array@0.1.1.0`)
+
+| | 1 época | 3 épocas (perda / acertos) |
+|---|---|---|
+| v1, listas | 544,3 s | |
+| v2, `Array` tipado, 16 threads | **6,6 s** (6,6 / 6,7 / 6,6) | 0,5204771 / 9129; 0,27043572 / 9298; 0,2156194 / 9418 |
+| v2, `Array` tipado, 1 thread | 18,1 s | |
+| PyTorch (16 threads) | 0,19 a 0,21 s | 0,520477 / 9129; 0,270433 / 9298; 0,215613 / 9418 |
+
+Ganho de ~82× sobre a v1; distância ao PyTorch (16 threads) ~33×, (1 thread, 0,30 s) ~22×. Mesmas perdas e acertos nas três épocas.
