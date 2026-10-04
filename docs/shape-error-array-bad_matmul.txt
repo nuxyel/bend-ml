@@ -1,0 +1,9 @@
+SOME PROOFS FAIL
+Error:
+- expected : TA.Mat<3n, 5n>
+- observed : TA.Mat<4n, 5n>
+Location: bad
+4 | def bad() -> TA.MMul<2n, 3n, 5n>:
+5>|   TA.Mat.matmul(2n, 3n, 5n, 0n, TA.Mat.zeros(2n, 3n), TA.Mat.zeros(4n, 5n))
+  |                                                       ^^^^^^^^^^^^^^^^^^^^
+6 | def main() -> Nat:

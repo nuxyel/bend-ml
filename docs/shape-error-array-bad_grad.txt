@@ -1,0 +1,12 @@
+SOME PROOFS FAIL
+Error:
+- expected : TA.MMulTN<128n, 100n, 784n>
+- observed : TA.MMulTN<784n, 100n, 128n>
+Context:
+- x  : TA.Mat<100n, 784n>
+- dy : TA.Mat<100n, 128n>
+Location: bad
+4 | def bad(x: TA.Mat<100n, 784n>, dy: TA.Mat<100n, 128n>) -> TA.MMulTN<128n, 100n, 784n>:
+5>|   TA.Mat.matmul_tn(784n, 100n, 128n, 0n, x, dy)
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+6 | def main() -> Nat:
