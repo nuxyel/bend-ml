@@ -1,7 +1,7 @@
 import Base
 import bend-ml-tensor@0.1.1.0/main.bend as T
 
-# 4 bytes little-endian -> F32 (U32 e F32 guardam o mesmo Word(32n): é um bitcast)
+# 4 little-endian bytes -> F32 (U32 and F32 hold the same Word(32n): it is a bitcast)
 def bitcast(u: U32) -> F32:
   match u:
     case U32{w}:
@@ -17,7 +17,7 @@ def f32s(bs: List<&2, U32>) -> List<&2, F32>:
     case _:
       Nil{}
 
-# lê o arquivo em blocos de `blk` bytes; k blocos restantes; m é o bloco já lido
+# reads the file in blocks of `blk` bytes; k blocks remaining; m is the block already read
 def rf_loop(k: Nat, +off: U32, +blk: U32, m: File & Result<&1, &1, U32 & String, List<&2, U32>>, acc: List<&2, List<&2, F32>>) -> IO(List<&2, F32>):
   match k m:
     case 0n Tuple{f, r}:
@@ -33,7 +33,7 @@ def rf_loop(k: Nat, +off: U32, +blk: U32, m: File & Result<&1, &1, U32 & String,
 def blocks_of(n: Nat, +per: Nat) -> Nat:
   Nat.div(Nat.add(n, Nat.sub(per, 1n)), per)
 
-# n números F32 (little-endian) de um arquivo
+# n F32 numbers (little-endian) from a file
 def read_floats(path: String, +n: Nat) -> IO(List<&2, F32>):
   do IO<List<&2, F32>>:
     f : File <- IO.try(File, File.open(path, "r"))
@@ -51,14 +51,14 @@ def take_rows(r: Nat, +c: Nat, +xs: List<&2, F32>) -> List<&2, List<&2, F32>>:
 def unwrap_mat(-r: Nat, -c: Nat, m: Maybe<&2, T.Mat<r, c>>) -> IO(T.Mat<r, c>):
   match m:
     case None{}:
-      IO.die(T.Mat<r, c>, 1, "tamanho de matriz invalido")
+      IO.die(T.Mat<r, c>, 1, "invalid matrix size")
     case Some{x}:
       IO.pure(T.Mat<r, c>, x)
 
 def unwrap_vec(-n: Nat, m: Maybe<&2, T.Vec<n>>) -> IO(T.Vec<n>):
   match m:
     case None{}:
-      IO.die(T.Vec<n>, 1, "tamanho de vetor invalido")
+      IO.die(T.Vec<n>, 1, "invalid vector size")
     case Some{x}:
       IO.pure(T.Vec<n>, x)
 
