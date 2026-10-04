@@ -201,3 +201,13 @@ Plano em `docs/v2-plan.md`; micro-benchmarks em `bench/` (`timeit.py` mede a med
 - Conta de bolso para o MNIST: ~18 G de mult-soma por época (3 produtos por lote × 600 lotes). A 2,2 G/s dá ~8 s por época, contra 544 s com listas e 0,3 s do PyTorch com 1 thread. **A distância ao PyTorch cairia de ~1800× para ~30×**, antes de qualquer paralelismo. Isto é uma estimativa, não uma medição do treino completo.
 - Custo do `Array`: é afim (`Type`), então cada leitura devolve o array junto com o elemento, e `Array.get` recalcula `Array.size` (log n). Mesmo assim ganhou muito.
 - A conclusão da v1 ("o Bend é ~1800× mais lento") era um efeito da estrutura de dados, não da linguagem.
+
+### Exp. 3-5: paralelismo, cache, clone e distância ao PyTorch (2026-10-04)
+
+Todos os números: 1 thread salvo indicação, mediana de 3 execuções, Intel Core Ultra 7 155H (6 P + 8 E + 2 LP-E cores, 22 threads), `bend -o`. Código em `bench/`.
+
+- **Indexar vence percorrer a árvore:** `Array.get` com índice: 2 200 M mult-soma/s; percorrer as duas árvores juntas e reconstruí-las (`bench/tree_dot.bend`): 31 M/s (70× pior). Em Bend, o caminho rápido do `Array` é o indexado.
+- **`Array.clone` é barato** (~17 µs por array de 131 072 elementos, com leitura do resultado forçada). **A hipótese "o clone compartilha nós e as leituras viram atômicas disputadas" foi refutada:** 16 tarefas lendo clones de um mesmo par escalam como 16 tarefas com arrays privados (`bench/share_test.bend`: ~4,1× com 16 threads nos dois casos).
+- **Paralelismo, ordem de grandeza:** com trabalho independente e arrays pequenos (784 elementos), 16 threads dão ~4 a 6× (3,2 G mult-soma: 0,88 s em 1 thread, 0,13 s em 22). No produto 100×784×128 em blocos de linhas (`bench/mm_par.bend`), ~2,1× com 8 threads, igual para 2^d = 8 ou 16 blocos. Não depende de blocagem (`bench/mm_tile.bend`: 1, 8, 16 e 32 blocos de colunas, mesmo tempo) nem do custo dos clones (22% do tempo). O `pow2` do guia chega a 8×, então o limite é do tipo de carga. CPU híbrida: o teto prático é menor que 22×.
+- **O tamanho do `Array` custa:** o mesmo produto com arrays de 2^20 casas em vez de 2^17 ficou ~60% mais lento (1,9 s -> 3,1 s para 4 G mult-soma): a profundidade da árvore entra em cada `get`. Alocar o menor array possível.
+- **Distância ao PyTorch no produto 100×784×128:** PyTorch 1 thread = 0,162 ms (62 G mult-soma/s); 16 threads = 0,047 ms (212 G/s). Bend: listas 44 M/s (**~1400× atrás**), `Array` 1 thread 2,3 G/s (**~27× atrás**), `Array` com blocos paralelos ~4,5 G/s (**~47× atrás do PyTorch paralelo**). O que sobra: código escalar contra AVX/FMA com BLAS.
