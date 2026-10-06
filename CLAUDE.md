@@ -15,7 +15,13 @@ use on BendHub, and a portfolio piece for HOC.
 - `docs/upstream/`: drafts of reports for `bendlang/bend`. Renan posts them.
 - Plans after v3 (llama.bend, a training framework) live in the private repo `nuxyel/bend2-notes`.
 - `make check` / `make check-full` (`reference/check_all.py`) is the gate before a commit; CI runs the full
-  one on every push.
+  one on every push to `devel` and `main` and on pull requests.
+
+## Branches
+
+Work on `devel`: every commit and push goes there, and CI checks it. `main` only receives stable releases,
+through a pull request `devel` → `main` merged after its CI passes; the version tag (`vX.Y.Z`) and the GitHub
+release are made on `main` after that merge.
 
 ## About Renan
 

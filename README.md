@@ -114,7 +114,7 @@ make check-full     # 42 checks with GPT-2 and MNIST, about 5 min
 make media          # regenerate the figures and the video on this page
 ```
 
-`make setup-lite` skips the 550 MB GPT-2 download. CI runs `make check-full` on every push. The history was rewritten on 2026-10-04 (English messages, smaller commits), so clone again if you have an older copy.
+`make setup-lite` skips the 550 MB GPT-2 download. CI runs `make check-full` on every push. `main` holds the released versions; work in progress lives on the `devel` branch. The history was rewritten on 2026-10-04 (English messages, smaller commits), so clone again if you have an older copy.
 
 <details>
 <summary>limits</summary>
