@@ -10,7 +10,8 @@ use on BendHub, and a portfolio piece for HOC.
 
 - `NOTES.md`: every finding, measurement and discarded hypothesis, by date and experiment number. Read
   the relevant experiment before changing performance-sensitive code.
-- `docs/v3-plan.md`: the current plan and its stop criterion. Earlier plan: `docs/v2-plan.md`.
+- `docs/v3.1-plan.md`: the current plan and its stop criterion. Earlier plans: `docs/v3-plan.md`,
+  `docs/v2-plan.md`.
 - `docs/AUDIT.md`: the trust base and what is proved, tested or trusted.
 - `docs/upstream/`: drafts of reports for `bendlang/bend`. Renan posts them.
 - Plans after v3 (llama.bend, a training framework) live in the private repo `nuxyel/bend2-notes`.
