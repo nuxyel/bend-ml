@@ -43,3 +43,25 @@ its band and only the input vector is copied.
 2. The mat·vec result measured and recorded, including a negative result if it does not pay off.
 3. GPT-2 still matches PyTorch token for token.
 4. `make check-full` green locally and in CI; tag `v3.0.0` and a release.
+
+## Result (2026-10-05)
+
+Part A:
+
+| | Result |
+|---|---|
+| `Bands<r, c>` | indexed by rows in the type; law `half_cover`; erased proofs tie the run-time row counts to the type; published in `bend-ml-tensor-array@0.1.4.0` |
+| matrix · vector, 16 threads | 2304 × 768: 0.80 → 0.32 ms; 50257 × 768: 25.1 → 6.1 ms (4.5 ms with 2^5 bands); bit-identical to `matmul_nt` |
+| two compiler traps | an erased last parameter makes a parallel let sequential; a non-tail recursive helper in the fork tree halves the gain (NOTES exp. 11) |
+| GPT-2 | the same ids and logits as v2.1 on the 11 prompts; 13 forward passes 1.7 → 1.4 s under background load, 1.2 → 0.7 s in a quieter moment; ~12% slower on one thread |
+
+Part B:
+
+| | Result |
+|---|---|
+| dfdx comparison | README section 01, with links to dfdx's source; examples `symbolic_reshape`, `symbolic_reshape_bad`, `square_transpose_bad` in `check_all.py` |
+| compile times | checking: 0.22 s for 8 distinct layers, 0.27 s for 128; build (clang) 1.1 to 4.7 s |
+| upstream | two drafts in `docs/upstream/` (the erased-parameter bug with a minimal repro; a read-only `Array` borrow without `@unsafe`) |
+
+Not done: an idle-machine re-measure of GPT-2 for the README chart (the machine had background load all
+evening); a list-returning variant of `Bands.matvec` to remove the one-thread overhead.
