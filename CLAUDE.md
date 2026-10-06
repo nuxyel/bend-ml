@@ -64,6 +64,10 @@ NOTES exp. 10).
   erased** (put a runtime parameter after it), and suffer from non-tail recursive helpers in the fork
   tree (use tail loops with an accumulator). Check scaling with `--threads 1` against `--threads 16`, and
   read the emitted C (`bend X.bend -o x.c`) when it does not scale. NOTES exp. 11.
+- `IO.fork` gives concurrency, not parallelism: forked computations run their pure code on one core
+  (NOTES exp. 12). Use parallel lets in pure code for several cores.
+- Proofs follow the affine rules too: a lemma about values that hold an `Array` cannot mention them twice at
+  run-time positions; pass the expression in an erased argument (`-s`) and the arrays once.
 - `Array` is a plain ADT (`ALeaf`/`ANode`): matching an owned array hands out its halves in O(1) and is
   safe; `Array.clone` is O(n); `Array.fork` is `@unsafe`. Indexes wrap around, so never write past a
   capacity.

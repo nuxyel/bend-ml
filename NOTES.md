@@ -443,3 +443,76 @@ checking takes 0.22 s for 8 distinct typed layers and 0.27 s for 128; the build 
 - `docs/upstream/shared-readonly-array.md`: a read-only `Array` borrow that does not need `@unsafe`
   (`Array.fork`, the answer to #885, is `@unsafe`, and `--check-only` then reports
   `SOME PROOFS FAIL: 1 def relies on unsafe or foreign code`).
+
+## v3.1 (2026-10-06)
+
+Plan: `docs/v3.1-plan.md`. From now on work happens on the `devel` branch; `main` only receives releases
+through a pull request, and tags are made on `main` (rule in `CLAUDE.md`).
+
+### Exp. 12: loading GPT-2's weights
+
+v3.0 profile: `wte` (38.6 M numbers) 1.9 s, the 12 layers (85 M) 4.8 s, ~50 ns per number, spent turning
+1 MB blocks into a list of bytes, then a list of `F32`, then writing the array.
+
+- **Decoding straight into the array** (`fill_bytes` in `demos/gpt2/fast.bend`: 4 bytes → `F32` → `Array.set`,
+  no intermediate `F32` list): load 5.1-5.6 s → 3.8-4.3 s, alternated runs, the same machine state (-25%).
+- **`IO.fork` does not parallelize pure work (negative result).** Loading the 12 layers with one `IO.fork`
+  each, joined in order, took 6.6-7.1 s instead of 5.1-5.6 s, the same with 1 and 16 threads. A minimal test
+  (`docs/upstream/io_fork_parallel.bend`: 4 forks of a flat loop of 4 G steps seeded at run time): 1.86 s with 1 thread,
+  1.73 s with 16, user time equal to real time. In Bend 2.0.35 `IO.fork` interleaves computations on one core;
+  the guide's "each runs its pure code (in parallel, on every core)" does not hold across forks. Parallelism
+  across cores comes from parallel lets in pure code. Reverted; noted for Renan (upstream, below).
+- **Size check at the boundary:** every weight file must hold exactly `r*c*4` bytes (`check_size` with
+  `File.size`), otherwise the program stops: `h3.fw.bin: expected 9437184 bytes, found 1000000; run
+  reference/gpt2_prep.py --split again` (tested with a truncated copy in a temporary tree of links).
+
+### The one-thread regression of v3.0, fixed
+
+On one thread v3.0 was slower than v2.1 (36 forward passes: 5.2 s against 4.7 s). Two causes: the typed API
+converts `y` to a `Mat` and the demo back to a list (`Bands.matvec_l` removes that: 5.0 s), and the bands
+themselves (their results are appended at every node and `x` is cloned per node). With 2 threads or fewer
+the demo now uses one band (`depth_for(IO.thread_count())`), which runs exactly v2.1's kernel: 4.8 s against
+4.7-5.0 s for v2.1. With 16 threads: 3.6-3.8 s (v3.0: 3.8-4.2 s; v2.1: 4.7 s). Over 36 forward passes the
+attention over the key/value cache, still in lists, takes a growing share, so the end-to-end gain is smaller
+than the per-product gain. `bench/results/gpt2-v31-2026-10-06.txt`. The 11 prompts give the same ids and
+logits as v3.0 and v2.1, digit for digit.
+
+### Laws: one band yes, the whole tree not yet
+
+- Proved (`bend-ml-tensor-array@0.1.5.0`): `leaf_len` (the kernel of a band puts one number per row on its
+  list), `band_len` (a band of `rows` rows gives `rows` numbers), and the helper `join_len` (joining two halves
+  adds their lengths). 27 laws in 5 packages.
+- **Open:** "`Bands.matvec_l` gives exactly r numbers". The induction applies `join_len` to the two recursive
+  results and needs the induction hypotheses about the same calls; that mentions each band's `Array` twice at
+  run-time positions, and the affine checker refuses it (`x2 (consumed more than once)`, even in the rewrite
+  motive). Erased copies do not help: a rewrite needs a non-erased proof, and an erased scrutinee may only be
+  matched "in a dead region". Covered by tests (20 shapes, all depths, every number).
+- A trick that worked: pass the expression that mentions the arrays only in an erased argument (the length
+  `-s` of `len_step`, `succ_out`, `zero_out`) and the arrays themselves once.
+
+### Robustness
+
+- `reference/check_all.py` compiles `tensor-array/tests/par_bands.bend` to C and requires the join task of
+  `bmv` (`FID_..._BMV_J..`). Checked against a mutant with the erased parameter last: no join, the check fails.
+- `reference/test_tensor_array.py`: 280 checks, now with empty bands (r = 3, d = 5), one row, one column,
+  blocks of one number, a block larger than the matrix, and `matvec_l` equal to `matvec` bit for bit.
+- `make bench` writes `bench/results/mv_bands-<date>.txt` and `compile-times-<date>.md`.
+- CI pinned to `ubuntu-24.04`, actions on Node 24 (`checkout@v7`, `setup-python@v7`, `cache@v6`,
+  `upload-artifact@v7`), and it runs on `devel` too.
+- Published `bend-ml-tensor-array@0.1.5.0`, hash `0x8c5737e1fd0b5ceef704ad97770f38ee`.
+
+### Not done
+
+- An idle-machine measurement: Renan's Android emulator and Gradle daemon ran the whole session (load average
+  1-4), and they are his to close. The README chart keeps v2's numbers; `make bench` on an idle machine, then
+  `docs/media/numbers.json` and `make media`, is the remaining step.
+- Cheaper concatenation (a tree of lists flattened once): not needed once one thread uses one band.
+- Loading in parallel: needs a pure parallel decode (for example splitting a band's `Array` by its `ANode`
+  halves and decoding each half in a parallel let); not tried.
+
+### For Renan to post upstream (he opens the issues or PRs himself, later)
+
+- `docs/upstream/erased-last-parameter.md` (the parallel let made sequential by an erased last parameter).
+- `docs/upstream/shared-readonly-array.md` (a read-only `Array` borrow without `@unsafe`).
+- New: `IO.fork` does not run pure work on several cores (exp. 12); worth a question or a guide fix, since
+  the guide says it does. Draft and repro: `docs/upstream/io-fork-parallel.md`, `io_fork_parallel.bend`.
