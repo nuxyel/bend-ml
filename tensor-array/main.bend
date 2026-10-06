@@ -868,3 +868,225 @@ def hits_checked(ok: Bool, +n: Nat, +c: Nat, z: Mat<n, c>, labels: List<&2, Nat>
 # like Mat.count_correct, but returns None unless labels has exactly n entries
 def Mat.count_correct_checked(+n: Nat, +c: Nat, z: Mat<n, c>, +labels: List<&2, Nat>) -> Maybe<&1, MHits<n, c>>:
   hits_checked(labels_len_is(labels, n), n, c, z, labels)
+
+# ---------------------------------------------------------------------
+# Bands<r, c>: a matrix cut into bands of rows, for matrix · vector in parallel
+# without copying the weights.
+#
+# Mat.matmul_nt with n = 1 can only run in parallel by cloning the whole weight
+# matrix for every task, and in matrix · vector each weight is read once, so the
+# copies cost more than the products (NOTES.md, exp. 9). Bands keeps each band in
+# its own Array: a task takes its band and nothing is copied except the input vector.
+#
+# A node with r rows has children with half(r) and r - half(r) rows. The split is
+# part of the type, so the row count of every band follows from r, and the law
+# half_cover says that the two halves always cover the r rows exactly.
+# ---------------------------------------------------------------------
+
+# n / 2 rounded down, by structural recursion (so that it can be reasoned about)
+def half(+n: Nat) -> Nat:
+  match n:
+    case 0n:
+      0n
+    case 1n+p:
+      match p:
+        case 0n:
+          0n
+        case 1n+q:
+          1n+half(q)
+
+# half(n) <= n
+def half_le(+n: Nat) -> {True{} == leb(half(n), n) : Bool}:
+  match n:
+    case 0n:
+      {==}
+    case 1n+p:
+      match p:
+        case 0n:
+          {==}
+        case 1n+q:
+          leb_succ(half(q), q, half_le(q))
+
+# a <= r  ->  r == a + (r - a)
+def add_sub(+a: Nat, +r: Nat, e: {True{} == leb(a, r) : Bool}) -> {r == Nat.add(a, Nat.sub(r, a)) : Nat}:
+  match a r:
+    case 0n 0n:
+      {==}
+    case 0n 1n+q:
+      {==}
+    case 1n+p 0n:
+      %e : BD(_, Unit, {0n == Nat.add(1n+p, Nat.sub(0n, 1n+p)) : Nat})
+      Unit{}
+    case 1n+p 1n+q:
+      %add_sub(p, q, e) : {1n+q == 1n+_ : Nat}
+      {==}
+
+# LAW (half_cover): the two bands of a node, half(r) rows and r - half(r) rows,
+# add up to exactly r rows: no row is lost and none is counted twice.
+law half_cover:
+  for +n: Nat
+  {n == Nat.add(half(n), Nat.sub(n, half(n))) : Nat}
+
+def half_cover(n):
+  add_sub(half(n), n, half_le(n))
+
+type Bands<-r: Nat, -c: Nat> is Type:
+  BLeaf{m: Mat<r, c>}
+  BNode{x: Bands<half(r), c>, y: Bands<Nat.sub(r, half(r)), c>}
+
+# r x c of zeros in 2^d bands (d = 0: a single band, the same as a Mat)
+def Bands.zeros(+d: Nat, +r: Nat, +c: Nat) -> Bands<r, c>:
+  match d:
+    case 0n:
+      BLeaf{Mat.zeros(r, c)}
+    case 1n+q:
+      BNode{Bands.zeros(q, half(r), c), Bands.zeros(q, Nat.sub(r, half(r)), c)}
+
+# the row counts of the two bands follow the row count of the node: if rr == r at run
+# time, the same holds for both halves (the bands carry r only in their type)
+def eq_half(-a: Nat, -b: Nat, e: {a == b : Nat}) -> {half(a) == half(b) : Nat}:
+  %e : {half(a) == half(_) : Nat}
+  {==}
+
+def eq_rest(-a: Nat, -b: Nat, e: {a == b : Nat}) -> {Nat.sub(a, half(a)) == Nat.sub(b, half(b)) : Nat}:
+  %e : {Nat.sub(a, half(a)) == Nat.sub(_, half(_)) : Nat}
+  {==}
+
+# does a block of n numbers starting at flat index i end before the second band of a
+# node with r rows? does it start in the second band?
+def bfill_l(+r: Nat, +c: Nat, +i: Nat, +n: Nat) -> Bool:
+  Nat.is_le(Nat.add(i, n), Nat.mul(half(r), c))
+
+def bfill_r(+r: Nat, +c: Nat, +i: Nat) -> Bool:
+  Nat.is_le(Nat.mul(half(r), c), i)
+
+# writes xs (n numbers) at flat index i; l and rt say which bands it touches (bfill_l,
+# bfill_r); rr is the row count r at run time
+def bfill(+c: Nat, -r: Nat, b: Bands<r, c>, l: Bool, rt: Bool, +rr: Nat, -e: {rr == r : Nat}, +i: Nat, +n: Nat, +xs: List<&2, F32>) -> Bands<r, c>:
+  match b l rt:
+    case BLeaf{m} _ _:
+      BLeaf{Mat.fill_at(r, c, U32.from_nat(i), xs, m)}
+    case BNode{x, y} True{} _:
+      BNode{bfill(c, half(r), x, bfill_l(half(rr), c, i, n), bfill_r(half(rr), c, i), half(rr), eq_half(rr, r, e), i, n, xs), y}
+    case BNode{x, y} False{} True{}:
+      BNode{x, bfill(c, Nat.sub(r, half(r)), y, bfill_l(Nat.sub(rr, half(rr)), c, Nat.sub(i, Nat.mul(half(rr), c)), n), bfill_r(Nat.sub(rr, half(rr)), c, Nat.sub(i, Nat.mul(half(rr), c))), Nat.sub(rr, half(rr)), eq_rest(rr, r, e), Nat.sub(i, Nat.mul(half(rr), c)), n, xs)}
+    case BNode{x, y} False{} False{}:
+      BNode{bfill(c, half(r), x, bfill_l(half(rr), c, i, Nat.sub(Nat.mul(half(rr), c), i)), bfill_r(half(rr), c, i), half(rr), eq_half(rr, r, e), i, Nat.sub(Nat.mul(half(rr), c), i), List.take(&2, F32, xs, Nat.sub(Nat.mul(half(rr), c), i))), bfill(c, Nat.sub(r, half(r)), y, bfill_l(Nat.sub(rr, half(rr)), c, 0n, Nat.sub(n, Nat.sub(Nat.mul(half(rr), c), i))), bfill_r(Nat.sub(rr, half(rr)), c, 0n), Nat.sub(rr, half(rr)), eq_rest(rr, r, e), 0n, Nat.sub(n, Nat.sub(Nat.mul(half(rr), c), i)), List.drop(&2, F32, xs, Nat.sub(Nat.mul(half(rr), c), i)))}
+
+def bfill_top(ok: Bool, +r: Nat, +c: Nat, b: Bands<r, c>, +i: Nat, +n: Nat, +xs: List<&2, F32>) -> Bands<r, c>:
+  match ok:
+    case True{}:
+      bfill(c, r, b, bfill_l(r, c, i, n), bfill_r(r, c, i), r, {==}, i, n, xs)
+    case False{}:
+      bfill(c, r, b, bfill_l(r, c, i, Nat.sub(Nat.mul(r, c), i)), bfill_r(r, c, i), r, {==}, i, Nat.sub(Nat.mul(r, c), i), List.take(&2, F32, xs, Nat.sub(Nat.mul(r, c), i)))
+
+# writes the n numbers of xs into b starting at flat index i (row-major, as Mat.fill_at);
+# numbers past r*c are dropped. For loading a large matrix block by block.
+def Bands.fill_at(+r: Nat, +c: Nat, +i: Nat, +n: Nat, +xs: List<&2, F32>, b: Bands<r, c>) -> Bands<r, c>:
+  bfill_top(Nat.is_le(Nat.add(i, n), Nat.mul(r, c)), r, c, b, i, n, xs)
+
+# ---- y = B · x for B with r rows of c numbers (a weight matrix stored out x in) ----
+
+type BV<-r: Nat, -c: Nat> is Type:
+  BV{b: Bands<r, c>, y: List<&2, F32>}
+
+def bv_leaf(-r: Nat, -c: Nat, st: S3) -> BV<r, c>:
+  match st:
+    case S3{a, b, out}:
+      BV{BLeaf{Mat{b}}, List.reverse(&2, F32, out)}
+
+# the rows of one band, one dot product each: the same kernel (and the same order of
+# additions) as Mat.matmul_nt, so the results are identical
+def bv_rows(-r: Nat, -c: Nat, rows: Nat, +k: Nat, x: Array<F32>, w: Array<F32>) -> BV<r, c>:
+  match rows:
+    case 0n:
+      BV{BLeaf{Mat{w}}, Nil{}}
+    case 1n+p:
+      bv_leaf(r, c, lcols(p, k, 0, 0, 1, 1, U32.from_nat(k), Nil{}, dotg(k, 0, 0, 1, 1, 0.0, Array.get(F32, x, 0), Array.get(F32, w, 0))))
+
+def bv_mat(-r: Nat, +c: Nat, +rr: Nat, x: Array<F32>, m: Mat<r, c>) -> BV<r, c>:
+  match m:
+    case Mat{w}:
+      bv_rows(r, c, rr, c, x, w)
+
+def bv_join(-r: Nat, -c: Nat, p: BV<half(r), c>, q: BV<Nat.sub(r, half(r)), c>) -> BV<r, c>:
+  match p q:
+    case BV{bx, yx} BV{by, yy}:
+      BV{BNode{bx, by}, List.append(&2, F32, yx, yy)}
+
+# the two bands of a node run in parallel, each with its own copy of x (c numbers);
+# xp is a pair of copies of x (a leaf uses one)
+def bmv(+c: Nat, -r: Nat, b: Bands<r, c>, xp: Array<F32> & Array<F32>, +rr: Nat, -e: {rr == r : Nat}) -> BV<r, c>:
+  match b xp:
+    case BLeaf{m} Tuple{x, x2}:
+      bv_mat(r, c, rr, x, m)
+    case BNode{bx, by} Tuple{x1, x2}:
+      p q = bmv(c, half(r), bx, Array.clone(F32, x1), half(rr), eq_half(rr, r, e)) bmv(c, Nat.sub(r, half(r)), by, Array.clone(F32, x2), Nat.sub(rr, half(rr)), eq_rest(rr, r, e))
+      bv_join(r, c, p, q)
+
+# y = B · x, with x of c numbers; returns B (intact) and y (r numbers, in row order)
+def Bands.matvec(+r: Nat, +c: Nat, b: Bands<r, c>, +x: List<&2, F32>) -> BV<r, c>:
+  bmv(c, r, b, Array.clone(F32, fill_list(x, 0, Array.new(F32, cap_depth(c), 0.0))), r, {==})
+
+# ---- reading rows and the whole matrix ----
+
+type BRow<-r: Nat, -c: Nat> is Type:
+  BRow{b: Bands<r, c>, row: List<&2, F32>}
+
+def brow_fin(-r: Nat, -c: Nat, al: AL) -> BRow<r, c>:
+  match al:
+    case AL{d, l}:
+      BRow{BLeaf{Mat{d}}, l}
+
+# n numbers starting at flat index i of one band (a band may have no rows)
+def brow_leaf2(-r: Nat, -c: Nat, n: Nat, +i: U32, d: Array<F32>) -> BRow<r, c>:
+  match n:
+    case 0n:
+      BRow{BLeaf{Mat{d}}, Nil{}}
+    case 1n+p:
+      brow_fin(r, c, read_l(p, i, Nil{}, Array.get(F32, d, i)))
+
+def brow_leaf(-r: Nat, -c: Nat, m: Mat<r, c>, +i: U32, n: Nat) -> BRow<r, c>:
+  match m:
+    case Mat{d}:
+      brow_leaf2(r, c, n, i, d)
+
+def brow_l(-r: Nat, -c: Nat, p: BRow<half(r), c>, y: Bands<Nat.sub(r, half(r)), c>) -> BRow<r, c>:
+  match p:
+    case BRow{bx, row}:
+      BRow{BNode{bx, y}, row}
+
+def brow_r(-r: Nat, -c: Nat, x: Bands<half(r), c>, q: BRow<Nat.sub(r, half(r)), c>) -> BRow<r, c>:
+  match q:
+    case BRow{by, row}:
+      BRow{BNode{x, by}, row}
+
+# row i; left says whether i is in the first band of the node (i < half(rr))
+def brow(+c: Nat, -r: Nat, b: Bands<r, c>, left: Bool, +rr: Nat, -e: {rr == r : Nat}, +i: Nat) -> BRow<r, c>:
+  match b left:
+    case BLeaf{m} _:
+      brow_leaf(r, c, m, U32.from_nat(Nat.mul(i, c)), c)
+    case BNode{x, y} True{}:
+      brow_l(r, c, brow(c, half(r), x, Nat.is_lt(i, half(half(rr))), half(rr), eq_half(rr, r, e), i), y)
+    case BNode{x, y} False{}:
+      brow_r(r, c, x, brow(c, Nat.sub(r, half(r)), y, Nat.is_lt(Nat.sub(i, half(rr)), half(Nat.sub(rr, half(rr)))), Nat.sub(rr, half(rr)), eq_rest(rr, r, e), Nat.sub(i, half(rr))))
+
+# row i (c numbers), for example an embedding lookup
+def Bands.read_row(+r: Nat, +c: Nat, b: Bands<r, c>, +i: Nat) -> BRow<r, c>:
+  brow(c, r, b, Nat.is_lt(i, half(r)), r, {==}, i)
+
+def bl_join(-r: Nat, -c: Nat, p: BRow<half(r), c>, q: BRow<Nat.sub(r, half(r)), c>) -> BRow<r, c>:
+  match p q:
+    case BRow{bx, xs} BRow{by, ys}:
+      BRow{BNode{bx, by}, List.append(&2, F32, xs, ys)}
+
+def blist(+c: Nat, -r: Nat, b: Bands<r, c>, +rr: Nat, -e: {rr == r : Nat}) -> BRow<r, c>:
+  match b:
+    case BLeaf{m}:
+      brow_leaf(r, c, m, 0, Nat.mul(rr, c))
+    case BNode{x, y}:
+      bl_join(r, c, blist(c, half(r), x, half(rr), eq_half(rr, r, e)), blist(c, Nat.sub(r, half(r)), y, Nat.sub(rr, half(rr)), eq_rest(rr, r, e)))
+
+# all r*c numbers in row order (in BRow.row)
+def Bands.to_list(+r: Nat, +c: Nat, b: Bands<r, c>) -> BRow<r, c>:
+  blist(c, r, b, r, {==})
