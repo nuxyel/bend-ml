@@ -26,7 +26,7 @@ def bad() -> TA.MMul<2n, 3n, 5n>:
   TA.Mat.matmul(2n, 3n, 5n, 0n, TA.Mat.zeros(2n, 3n), TA.Mat.zeros(4n, 5n))
 ```
 
-The same holds for every layer of a training step: the gradient of a weight matrix must have the shape of `Xᵀ·dY`, and a `reshape` only compiles with a proof that the number of elements does not change.
+The sizes do not have to be constants: in [`examples/runtime_batch.bend`](examples) the batch size comes from the input file, is checked once where the data enters, and every layer after that is checked for any batch size. The same holds for every layer of a training step: the gradient of a weight matrix must have the shape of `Xᵀ·dY`, and a `reshape` only compiles with a proof that the number of elements does not change.
 
 <details>
 <summary>the reshape case</summary>
@@ -92,8 +92,8 @@ Linux x86_64 (or WSL), clang ≥ 14, Python ≥ 3.12, `curl`, ~3 GB of disk, 8 G
 ```bash
 git clone https://github.com/nuxyel/bend-ml.git && cd bend-ml
 make setup          # Bend 2.0.35 (SHA256-checked), Lean 4.34.0, Python venv, data; no sudo
-make check          # 31 checks, about 1.5 min
-make check-full     # 36 checks with GPT-2 and MNIST, about 5 min
+make check          # 33 checks, about 1.5 min
+make check-full     # 38 checks with GPT-2 and MNIST, about 5 min
 make media          # regenerate the figures and the video on this page
 ```
 
@@ -115,6 +115,7 @@ make media          # regenerate the figures and the video on this page
 ```
 nat-lemmas/  bpe/  tensor/  tensor-array/  autograd/   packages (main.bend, README, LICENSE)
 demos/mnist  demos/gpt2                 demos with README and BENCHMARK
+examples/                               small programs, e.g. a batch size read at run time
 reference/                              PyTorch, tiktoken and check_all.py
 poc/  bench/                            proofs of concept and micro-benchmarks
 docs/                                   audit guide, launch material, media

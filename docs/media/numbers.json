@@ -17,6 +17,6 @@
   "gpt2_peak_rss_mb": { "before": 2326, "after": 1462, "source": "NOTES.md, stability work; scripts/peak_rss.sh" },
   "list_vs_array_speedup": { "value": 49, "source": "NOTES.md, experiment 1" },
   "gpu": { "compute_bound_speedup": 3.8, "memory_bound_slowdown_min": 3, "memory_bound_slowdown_max": 18, "source": "NOTES.md, experiment 10" },
-  "project": { "packages": 5, "laws": 24, "checks_quick": 31, "checks_full": 36, "bend": "2.0.35", "lean": "4.34.0" },
+  "project": { "packages": 5, "laws": 24, "checks_quick": 33, "checks_full": 38, "bend": "2.0.35", "lean": "4.34.0" },
   "ratios": { "mnist_pytorch_ahead_min": 25, "mnist_pytorch_ahead_max": 35, "gpt2_pytorch_ahead_min": 2, "gpt2_pytorch_ahead_max": 5 }
 }
