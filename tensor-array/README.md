@@ -4,11 +4,11 @@ Tensors in Bend 2 over a flat `Array<F32>`, **with the shape in the type**: the 
 
 - Bend: **2.0.35** · License: MIT.
 - `bend tensor-array/main.bend` and `--verdict` → `ALL PROOFS CHECK` (no `@unsafe`, no `?TODO`).
-- Tests against PyTorch: `reference/test_tensor_array.py` (52 checks, maximum error ≈ 1.4e-6).
+- Tests against PyTorch and NumPy: `reference/test_tensor_array.py` (240 checks, maximum error ≈ 1.4e-6; `Bands.matvec` equal to `Mat.matmul_nt` bit for bit).
 
 ```python
 import Base
-import bend-ml-tensor-array@0.1.3.0/main.bend as TA
+import bend-ml-tensor-array@0.1.4.0/main.bend as TA
 
 def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 128n>:
   TA.Mat.matmul(100n, 784n, 128n, 3n, a, w)   # 3n = 2^3 = 8 parallel blocks
@@ -36,6 +36,47 @@ def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 12
 | `Mat.count_correct` | argmax hits per row |
 | `Mat.read_row`, `Mat.write_row` | a row as a list |
 
+## Bands: matrix · vector in parallel without copying the weights
+
+In matrix · vector (one token through a layer of a language model) every weight is read once, so
+`Mat.matmul_nt` with `par > 0`, which clones the matrix for each block, is slower than the sequential
+product (10.4 ms against 0.79 ms for 2304 × 768). `Bands<r, c>` keeps the matrix as a tree of row bands,
+each band its own `Array`. Each task takes its band with a `match` (O(1), no `@unsafe`) and only the input
+vector is copied.
+
+```python
+w : TA.Bands<2304n, 768n> = TA.Bands.zeros(4n, 2304n, 768n)   # 2^4 bands, filled with Bands.fill_at
+TA.Bands.matvec(2304n, 768n, w, x)   # x : Mat<1, 768>  ->  BV{w, y : Mat<1, 2304>}
+```
+
+| Operation | Type |
+|---|---|
+| `Bands.zeros(d, r, c)` | `Bands<r,c>` in `2^d` bands |
+| `Bands.fill_at(r, c, i, n, xs, b)` | writes `n` numbers at flat index `i` (row-major); numbers past `r*c` are dropped |
+| `Bands.matvec` | `Bands<r,c> · Mat<1,c> = Mat<1,r>`, the bands in parallel; the same numbers as `Mat.matmul_nt`, bit for bit |
+| `Bands.read_row` | row `i` as a list (an embedding lookup) |
+| `Bands.to_list` | all `r*c` numbers in row order |
+
+A node with `r` rows has bands of `half(r)` and `r - half(r)` rows; the split is in the type, so the row
+count of every band follows from `r` without reading the tree. Time per product, 16 threads, Intel Core
+Ultra 7 155H (`bench/mv_bands.py`, `bench/results/`):
+
+| W | sequential | `par = 3` (clones W) | 2^4 bands |
+|---|---|---|---|
+| 2304 × 768 | 0.80 ms | 10.4 ms | 0.32 ms |
+| 3072 × 768 | 1.07 ms | 23.5 ms | 0.42 ms |
+| 50257 × 768 | 25.1 ms | 337 ms | 6.1 ms |
+
+## Laws
+
+| Law | In plain language |
+|---|---|
+| `cap_ok` | an `Array` with `2^cap_depth(n)` slots always has room for `n` numbers, so the constructors never allocate too little |
+| `half_cover` | the two bands of a node, `half(r)` rows and `r - half(r)` rows, add up to exactly `r` rows: no row is lost and none is counted twice |
+
+Inside `Bands`, every function that walks the tree carries an erased proof that the row count it computes
+with at run time equals the one in the type.
+
 ## A shape error is a type error
 
 `(2×3) · (4×5)` does not compile (`tensor-array/tests/bad_matmul.bend`):
@@ -45,6 +86,8 @@ Error:
 - expected : TA.Mat<3n, 5n>
 - observed : TA.Mat<4n, 5n>
 ```
+
+`Bands.matvec` with a vector of the wrong length does not compile either (`tests/bad_bands.bend`: `expected TA.Mat<1n, 768n>, observed TA.Mat<1n, 2304n>`).
 
 And a layer's gradient does not type-check with swapped dimensions (`tests/bad_grad.bend`): `matmul_tn(x, dy)` with `x: 100×784` and `dy: 100×128` is `784×128`; asking for `128×784` gives `expected MMulTN<128n,100n,784n>, observed MMulTN<784n,100n,128n>`.
 
@@ -65,6 +108,8 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 - `F32` numerics are validated by tests against PyTorch, not by proof.
 
 ## Versions
+
+- `0.1.4.0`: `Bands<r, c>` (row bands, a parallel matrix · vector that copies no weights), with the law `half_cover`.
 
 - `0.1.3.0`: `cap_depth` is now defined by `Nat` recursion and proved (`law cap_ok`); adds `Mat.softmax_ce_checked`, `Mat.count_correct_checked` and `Mat.fill_at` (load a matrix block by block).
 - `0.1.2.0`: the same API, with English comments and README.
