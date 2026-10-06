@@ -1,6 +1,6 @@
 # GPT-2 small: Bend vs PyTorch
 
-**Summary (v2):** GPT-2 small with 124 M parameters runs in Bend and **generates exactly the same tokens as PyTorch**, with logits equal to within 2e-4. In v1 it took ~3 s per token (~150x PyTorch); in v2 (matrix · vector products over `Array`) it takes **~0.1 s per token**: ~5x PyTorch with 16 threads (21 ms per forward pass of 11 tokens) and ~2x PyTorch with 1 thread (55 ms). What still weighs is loading the weights (9 s against ~1 s), because the 124 M numbers become trees of nodes (~1.5 GB of resident memory at the peak).
+**Summary (v2):** GPT-2 small with 124 M parameters runs in Bend and **generates exactly the same tokens as PyTorch**, with logits equal to within 6e-4 over 11 prompts (2e-4 on the first 3). In v1 it took ~3 s per token (~150x PyTorch); in v2 (matrix · vector products over `Array`) it takes **~0.1 s per token**: ~5x PyTorch with 16 threads (21 ms per forward pass of 11 tokens) and ~2x PyTorch with 1 thread (55 ms). What still weighs is loading the weights (9 s against ~1 s), because the 124 M numbers become trees of nodes (~1.5 GB of resident memory at the peak).
 
 ## v2: `demos/gpt2/fast.bend` (package `bend-ml-tensor-array@0.1.1.0`)
 

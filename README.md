@@ -76,7 +76,7 @@ Every package passes `bend X/main.bend --verdict`, the re-check by Bend's Lean-p
 | Demo | Result |
 |---|---|
 | [MNIST](demos/mnist), 784-128-10 MLP | about 7 s per epoch (v1: 544 s). Loss and hits identical to PyTorch with the same weights and batches: 0.5204771 / 9129, then 0.27043572 / 9298, then 0.2156194 / 9418. |
-| [GPT-2 small](demos/gpt2), 124 M | about 0.1 s per token (v1: 3 s). The same tokens as PyTorch on 11 prompts, logits within 2e-4; the tokenizer matches `tiktoken` on 79 texts. Loading takes ~7 s and ~1.5 GB. |
+| [GPT-2 small](demos/gpt2), 124 M | about 0.1 s per token (v1: 3 s). The same tokens as PyTorch on 11 prompts, logits within 6e-4 (they are of order 100); the tokenizer matches `tiktoken` on 79 texts. Loading takes ~7 s and ~1.5 GB. |
 
 ## 04 · Benchmarks
 

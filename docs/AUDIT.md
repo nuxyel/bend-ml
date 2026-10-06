@@ -54,7 +54,7 @@ Besides laws, **types** carry guarantees that no law restates: `Mat.matmul : Mat
 ## 4. What is tested but not proved
 
 - Numerical agreement of `F32` code with PyTorch: `reference/test_tensor*.py`, `test_autograd*.py`,
-  `test_gpt2.py` (logits within 2e-4), MNIST losses and hits.
+  `test_gpt2.py` (logits within 6e-4 over 11 prompts), MNIST losses and hits.
 - The tokenizer against `tiktoken`: `test_gpt2_tok.py`, plus the seeded fuzz test `test_fuzz_bpe.py`.
 - The packages **as published**: `test_published.py` imports each one from BendHub at the version in the README.
 - Everything above runs in CI on every push (`.github/workflows/ci.yml`).
