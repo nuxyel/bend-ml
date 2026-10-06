@@ -883,29 +883,65 @@ def Mat.count_correct_checked(+n: Nat, +c: Nat, z: Mat<n, c>, +labels: List<&2, 
 # half_cover says that the two halves always cover the r rows exactly.
 # ---------------------------------------------------------------------
 
-# n / 2 rounded down, by structural recursion (so that it can be reasoned about)
-def half(+n: Nat) -> Nat:
+# n / 2 rounded down. A tail loop with an accumulator: a non-tail recursion here would put a
+# continuation on every node of the band tree and keep the bands from running in parallel.
+def half.go(n: Nat, acc: Nat) -> Nat:
   match n:
     case 0n:
-      0n
+      acc
     case 1n+p:
       match p:
         case 0n:
-          0n
+          acc
         case 1n+q:
-          1n+half(q)
+          half.go(q, 1n+acc)
 
-# half(n) <= n
-def half_le(+n: Nat) -> {True{} == leb(half(n), n) : Bool}:
-  match n:
+def half(n: Nat) -> Nat:
+  half.go(n, 0n)
+
+# a <= a
+def leb_refl(+a: Nat) -> {True{} == leb(a, a) : Bool}:
+  match a:
     case 0n:
       {==}
     case 1n+p:
+      leb_refl(p)
+
+# 1 + (a + b) == a + (1 + b)
+def add_succ_r(+a: Nat, -b: Nat) -> {1n+Nat.add(a, b) == Nat.add(a, 1n+b) : Nat}:
+  match a:
+    case 0n:
+      {==}
+    case 1n+p:
+      %add_succ_r(p, b) : {2n+Nat.add(p, b) == 1n+_ : Nat}
+      {==}
+
+# a + 0 == a
+def add_zero_r(+a: Nat) -> {Nat.add(a, 0n) == a : Nat}:
+  match a:
+    case 0n:
+      {==}
+    case 1n+p:
+      %add_zero_r(p) : {1n+Nat.add(p, 0n) == 1n+_ : Nat}
+      {==}
+
+# half.go(n, acc) <= n + acc
+def half_go_le(+n: Nat, +acc: Nat) -> {True{} == leb(half.go(n, acc), Nat.add(n, acc)) : Bool}:
+  match n:
+    case 0n:
+      leb_refl(acc)
+    case 1n+p:
       match p:
         case 0n:
-          {==}
+          leb_succ(acc, acc, leb_refl(acc))
         case 1n+q:
-          leb_succ(half(q), q, half_le(q))
+          %Equal.sym(Nat, 1n+Nat.add(q, acc), Nat.add(q, 1n+acc), add_succ_r(q, acc)) : {True{} == leb(half.go(q, 1n+acc), 1n+_) : Bool}
+          leb_succ(half.go(q, 1n+acc), Nat.add(q, 1n+acc), half_go_le(q, 1n+acc))
+
+# half(n) <= n
+def half_le(+n: Nat) -> {True{} == leb(half(n), n) : Bool}:
+  %add_zero_r(n) : {True{} == leb(half(n), _) : Bool}
+  half_go_le(n, 0n)
 
 # a <= r  ->  r == a + (r - a)
 def add_sub(+a: Nat, +r: Nat, e: {True{} == leb(a, r) : Bool}) -> {r == Nat.add(a, Nat.sub(r, a)) : Nat}:
@@ -987,46 +1023,61 @@ def Bands.fill_at(+r: Nat, +c: Nat, +i: Nat, +n: Nat, +xs: List<&2, F32>, b: Ban
 
 # ---- y = B · x for B with r rows of c numbers (a weight matrix stored out x in) ----
 
+# B (intact) and y = B · x, typed like Mat.matmul_nt: x is 1 x c, y is 1 x r
 type BV<-r: Nat, -c: Nat> is Type:
-  BV{b: Bands<r, c>, y: List<&2, F32>}
+  BV{b: Bands<r, c>, y: Mat<1n, r>}
 
-def bv_leaf(-r: Nat, -c: Nat, st: S3) -> BV<r, c>:
+# internal: the bands and y as a list in row order
+type BL<-r: Nat, -c: Nat> is Type:
+  BL{b: Bands<r, c>, y: List<&2, F32>}
+
+def bv_leaf(-r: Nat, -c: Nat, st: S3) -> BL<r, c>:
   match st:
     case S3{a, b, out}:
-      BV{BLeaf{Mat{b}}, List.reverse(&2, F32, out)}
+      BL{BLeaf{Mat{b}}, List.reverse(&2, F32, out)}
 
 # the rows of one band, one dot product each: the same kernel (and the same order of
 # additions) as Mat.matmul_nt, so the results are identical
-def bv_rows(-r: Nat, -c: Nat, rows: Nat, +k: Nat, x: Array<F32>, w: Array<F32>) -> BV<r, c>:
+def bv_rows(-r: Nat, -c: Nat, rows: Nat, +k: Nat, x: Array<F32>, w: Array<F32>) -> BL<r, c>:
   match rows:
     case 0n:
-      BV{BLeaf{Mat{w}}, Nil{}}
+      BL{BLeaf{Mat{w}}, Nil{}}
     case 1n+p:
       bv_leaf(r, c, lcols(p, k, 0, 0, 1, 1, U32.from_nat(k), Nil{}, dotg(k, 0, 0, 1, 1, 0.0, Array.get(F32, x, 0), Array.get(F32, w, 0))))
 
-def bv_mat(-r: Nat, +c: Nat, +rr: Nat, x: Array<F32>, m: Mat<r, c>) -> BV<r, c>:
+def bv_mat(-r: Nat, +c: Nat, +rr: Nat, x: Array<F32>, m: Mat<r, c>) -> BL<r, c>:
   match m:
     case Mat{w}:
       bv_rows(r, c, rr, c, x, w)
 
-def bv_join(-r: Nat, -c: Nat, p: BV<half(r), c>, q: BV<Nat.sub(r, half(r)), c>) -> BV<r, c>:
+def bv_join(-r: Nat, -c: Nat, p: BL<half(r), c>, q: BL<Nat.sub(r, half(r)), c>) -> BL<r, c>:
   match p q:
-    case BV{bx, yx} BV{by, yy}:
-      BV{BNode{bx, by}, List.append(&2, F32, yx, yy)}
+    case BL{bx, yx} BL{by, yy}:
+      BL{BNode{bx, by}, List.append(&2, F32, yx, yy)}
 
 # the two bands of a node run in parallel, each with its own copy of x (c numbers);
-# xp is a pair of copies of x (a leaf uses one)
-def bmv(+c: Nat, -r: Nat, b: Bands<r, c>, xp: Array<F32> & Array<F32>, +rr: Nat, -e: {rr == r : Nat}) -> BV<r, c>:
+# xp is a pair of copies of x (a leaf uses one). xp comes after the erased e on purpose:
+# in Bend 2.0.35 an erased parameter at the end of the list turns the parallel let
+# into two sequential calls (NOTES.md, exp. 11).
+def bmv(+c: Nat, -r: Nat, b: Bands<r, c>, +rr: Nat, -e: {rr == r : Nat}, xp: Array<F32> & Array<F32>) -> BL<r, c>:
   match b xp:
     case BLeaf{m} Tuple{x, x2}:
       bv_mat(r, c, rr, x, m)
     case BNode{bx, by} Tuple{x1, x2}:
-      p q = bmv(c, half(r), bx, Array.clone(F32, x1), half(rr), eq_half(rr, r, e)) bmv(c, Nat.sub(r, half(r)), by, Array.clone(F32, x2), Nat.sub(rr, half(rr)), eq_rest(rr, r, e))
+      p q = bmv(c, half(r), bx, half(rr), eq_half(rr, r, e), Array.clone(F32, x1)) bmv(c, Nat.sub(r, half(r)), by, Nat.sub(rr, half(rr)), eq_rest(rr, r, e), Array.clone(F32, x2))
       bv_join(r, c, p, q)
 
-# y = B · x, with x of c numbers; returns B (intact) and y (r numbers, in row order)
-def Bands.matvec(+r: Nat, +c: Nat, b: Bands<r, c>, +x: List<&2, F32>) -> BV<r, c>:
-  bmv(c, r, b, Array.clone(F32, fill_list(x, 0, Array.new(F32, cap_depth(c), 0.0))), r, {==})
+def bv_fin(+r: Nat, -c: Nat, bl: BL<r, c>) -> BV<r, c>:
+  match bl:
+    case BL{b, y}:
+      BV{b, Mat.from_list(1n, r, y)}
+
+# y = B · x for B (r x c, one row per output) and x (1 x c); returns B intact and y (1 x r).
+# The same product as Mat.matmul_nt(1n, c, r, ..), and the same numbers, bit for bit.
+def Bands.matvec(+r: Nat, +c: Nat, b: Bands<r, c>, x: Mat<1n, c>) -> BV<r, c>:
+  match x:
+    case Mat{xa}:
+      bv_fin(r, c, bmv(c, r, b, r, {==}, Array.clone(F32, xa)))
 
 # ---- reading rows and the whole matrix ----
 
