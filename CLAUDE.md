@@ -10,12 +10,19 @@ use on BendHub, and a portfolio piece for HOC.
 
 - `NOTES.md`: every finding, measurement and discarded hypothesis, by date and experiment number. Read
   the relevant experiment before changing performance-sensitive code.
-- `docs/v3-plan.md`: the current plan and its stop criterion. Earlier plan: `docs/v2-plan.md`.
+- `docs/v3.1-plan.md`: the current plan and its stop criterion. Earlier plans: `docs/v3-plan.md`,
+  `docs/v2-plan.md`.
 - `docs/AUDIT.md`: the trust base and what is proved, tested or trusted.
 - `docs/upstream/`: drafts of reports for `bendlang/bend`. Renan posts them.
 - Plans after v3 (llama.bend, a training framework) live in the private repo `nuxyel/bend2-notes`.
 - `make check` / `make check-full` (`reference/check_all.py`) is the gate before a commit; CI runs the full
-  one on every push.
+  one on every push to `devel` and `main` and on pull requests.
+
+## Branches
+
+Work on `devel`: every commit and push goes there, and CI checks it. `main` only receives stable releases,
+through a pull request `devel` → `main` merged after its CI passes; the version tag (`vX.Y.Z`) and the GitHub
+release are made on `main` after that merge.
 
 ## About Renan
 
@@ -57,6 +64,10 @@ NOTES exp. 10).
   erased** (put a runtime parameter after it), and suffer from non-tail recursive helpers in the fork
   tree (use tail loops with an accumulator). Check scaling with `--threads 1` against `--threads 16`, and
   read the emitted C (`bend X.bend -o x.c`) when it does not scale. NOTES exp. 11.
+- `IO.fork` gives concurrency, not parallelism: forked computations run their pure code on one core
+  (NOTES exp. 12). Use parallel lets in pure code for several cores.
+- Proofs follow the affine rules too: a lemma about values that hold an `Array` cannot mention them twice at
+  run-time positions; pass the expression in an erased argument (`-s`) and the arrays once.
 - `Array` is a plain ADT (`ALeaf`/`ANode`): matching an owned array hands out its halves in O(1) and is
   safe; `Array.clone` is O(n); `Array.fork` is `@unsafe`. Indexes wrap around, so never write past a
   capacity.

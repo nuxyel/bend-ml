@@ -3,7 +3,7 @@ export BEND_NO_TELEMETRY := 1
 export PATH := $(HOME)/.bend/bin:$(HOME)/.elan/bin:$(PATH)
 PY := reference/.venv/bin/python
 
-.PHONY: setup setup-lite check check-full laws media clean
+.PHONY: setup setup-lite check check-full laws bench media clean
 
 setup:            ## Bend, Lean, Python venv, MNIST and GPT-2 data
 	scripts/setup.sh
@@ -19,6 +19,10 @@ check-full:       ## everything above plus GPT-2 and MNIST (about 2 min)
 
 laws:             ## print every law statement of every package
 	$(PY) reference/list_laws.py
+
+bench:            ## matrix · vector and compile-time benchmarks, saved in bench/results/ (about 30 min; use an idle machine)
+	$(PY) bench/mv_bands.py > bench/results/mv_bands-$$(date +%F).txt
+	$(PY) scripts/compile_times.py > bench/results/compile-times-$$(date +%F).md
 
 media:            ## regenerate the README images and the presentation video (needs Brave, node, ffmpeg)
 	scripts/make_media.sh

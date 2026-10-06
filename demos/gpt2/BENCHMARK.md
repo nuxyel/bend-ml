@@ -2,6 +2,26 @@
 
 **Summary (v2):** GPT-2 small with 124 M parameters runs in Bend and **generates exactly the same tokens as PyTorch**, with logits equal to within 6e-4 over 11 prompts (2e-4 on the first 3). In v1 it took ~3 s per token (~150x PyTorch); in v2 (matrix · vector products over `Array`) it takes **~0.1 s per token**: ~5x PyTorch with 16 threads (21 ms per forward pass of 11 tokens) and ~2x PyTorch with 1 thread (55 ms). What still weighs is loading the weights (9 s against ~1 s), because the 124 M numbers become trees of nodes (~1.5 GB of resident memory at the peak).
 
+## v3.1: faster loading, no one-thread cost (package `bend-ml-tensor-array@0.1.5.0`)
+
+- The weight files are decoded straight into the arrays (no list of `F32` in between), and each file's size
+  is checked before it is read.
+- With 2 threads or fewer the matrices stay in one band, which runs exactly v2.1's kernel; with more, 2^4
+  bands (2^5 for the embedding), and the products use `Bands.matvec_l` (no `Mat` conversions).
+
+"The capital of France is" + 32 tokens (36 forward passes), alternated 3 times each, background load
+(`bench/results/gpt2-v31-2026-10-06.txt`):
+
+| | load | 36 forward passes, 1 thread | 36 forward passes, 16 threads |
+|---|---|---|---|
+| v2.1 | 6-7 s | 4.7-5.0 s | 4.7 s |
+| v3.0 | 5.1-6.1 s | 5.2 s | 3.8-4.2 s |
+| **v3.1** | **3.9-5.1 s** | **4.8 s** | **3.6-3.8 s** |
+
+Over 36 positions the attention over the key/value cache (still lists) takes a growing share of each
+token, so the end-to-end gain is smaller than the gain on the matrix · vector products. The same ids and
+logits as v2.1 on the 11 prompts.
+
 ## v3: weights in `Bands`, products in parallel (package `bend-ml-tensor-array@0.1.4.0`)
 
 The five weight matrices of each product (qkv, projection, the two MLP matrices, and the 50257 × 768

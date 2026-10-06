@@ -6,7 +6,7 @@
   <a href="https://github.com/nuxyel/bend-ml/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/nuxyel/bend-ml/ci.yml?branch=main&style=flat-square&label=ci&labelColor=4d4a44&color=7e9a5e" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8b83b5?style=flat-square&labelColor=4d4a44" alt="MIT license"></a>
   <a href="https://bend-lang.com"><img src="https://img.shields.io/badge/Bend-2.0.35-8b83b5?style=flat-square&labelColor=4d4a44" alt="Bend 2.0.35"></a>
-  <img src="https://img.shields.io/badge/laws%20proved-25-7e9a5e?style=flat-square&labelColor=4d4a44" alt="25 laws proved">
+  <img src="https://img.shields.io/badge/laws%20proved-27-7e9a5e?style=flat-square&labelColor=4d4a44" alt="27 laws proved">
 </p>
 
 <p align="center">
@@ -55,11 +55,11 @@ dfdx's last release is v0.13.0 (July 2023).
 | [`bend-ml-nat-lemmas`](nat-lemmas) | 0.1.1.0 | `Nat` and `List` lemmas that Base does not have | `add_comm`, `add_assoc`, `mul_comm`, `mul_assoc`, `mul_dist`, `append_assoc`, `length_append`, `product_append`... (15) |
 | [`bend-ml-bpe-tokenizer`](bpe) | 0.1.2.0 | Byte-level BPE tokenizer (GPT-2 style) | **roundtrip** `decode(encode(s)) = s`, `vocab_bound`, `dec_append`, `train_wf`, `roundtrip_trained` |
 | [`bend-ml-tensor`](tensor) | 0.1.2.0 | `Vec<n>` and `Mat<r,c>` with the shape in the type, over lists | `reshape_swap`, `reshape_flat` |
-| [`bend-ml-tensor-array`](tensor-array) | 0.1.4.0 | the same guarantees over a flat `Array<F32>`, ~50x faster; `Bands<r,c>` for a parallel matrix · vector that copies no weights | `cap_ok`, `half_cover`; typed `matmul`, `matmul_nt`, `matmul_tn`, `Bands.matvec` |
+| [`bend-ml-tensor-array`](tensor-array) | 0.1.5.0 | the same guarantees over a flat `Array<F32>`, ~50x faster; `Bands<r,c>` for a parallel matrix · vector that copies no weights | `cap_ok`, `half_cover`, `leaf_len`, `band_len`; typed `matmul`, `matmul_nt`, `matmul_tn`, `Bands.matvec` |
 | [`bend-ml-autograd`](autograd) | 0.1.1.0 | Automatic differentiation and layers with typed backward | **`reverse_eq_forward`** |
 
 ```python
-import bend-ml-tensor-array@0.1.4.0/main.bend as TA
+import bend-ml-tensor-array@0.1.5.0/main.bend as TA
 import bend-ml-bpe-tokenizer@0.1.2.0/main.bend as BPE
 ```
 
@@ -76,7 +76,7 @@ Every package passes `bend X/main.bend --verdict`, the re-check by Bend's Lean-p
 | Demo | Result |
 |---|---|
 | [MNIST](demos/mnist), 784-128-10 MLP | about 7 s per epoch (v1: 544 s). Loss and hits identical to PyTorch with the same weights and batches: 0.5204771 / 9129, then 0.27043572 / 9298, then 0.2156194 / 9418. |
-| [GPT-2 small](demos/gpt2), 124 M | about 0.1 s per token sequential (v1: 3 s), 0.05 to 0.11 s with the weights in parallel bands (v3, 16 threads, depending on machine load). The same tokens as PyTorch on 11 prompts, logits within 6e-4 (they are of order 100); the tokenizer matches `tiktoken` on 79 texts. Loading takes ~7 s and ~1.5 GB. |
+| [GPT-2 small](demos/gpt2), 124 M | about 0.1 s per token sequential (v1: 3 s), 0.05 to 0.11 s with the weights in parallel bands (v3, 16 threads, depending on machine load). The same tokens as PyTorch on 11 prompts, logits within 6e-4 (they are of order 100); the tokenizer matches `tiktoken` on 79 texts. Loading takes ~4-5 s (v3.1; ~7 s in v2) and ~1.5 GB. |
 
 ## 04 · Benchmarks
 
@@ -93,7 +93,7 @@ Bend 2.0.35 generates scalar code, with no BLAS or SIMD: on the same matrix prod
 ## 05 · What we learned
 
 - Types can carry the shapes of a whole training step, and they cost nothing at run time: the dimensions are erased.
-- Proofs cover the structure, tests cover the numbers. Of the 25 laws, the ones that matter most are the tokenizer roundtrip, `reverse_eq_forward`, the reshape size and the array capacity.
+- Proofs cover the structure, tests cover the numbers. Of the 27 laws, the ones that matter most are the tokenizer roundtrip, `reverse_eq_forward`, the reshape size and the array capacity.
 - The trust base is small and written down: the kernel, Base's `F32` primitives, and the fact that `Array.new(d)` gives `2^d` slots.
 - Speed is bounded by the compiler, not by the types. Flat arrays gave ~49x, parallel blocks ~2x; what is left is BLAS and SIMD.
 - Copying is the hidden cost: splitting a matrix for parallel work by copying it costs more than the arithmetic of a matrix · vector. Splitting the data structure itself (row bands, each its own `Array`) costs nothing per call.
@@ -109,12 +109,12 @@ Linux x86_64 (or WSL), clang ≥ 14, Python ≥ 3.12, `curl`, ~3 GB of disk, 8 G
 ```bash
 git clone https://github.com/nuxyel/bend-ml.git && cd bend-ml
 make setup          # Bend 2.0.35 (SHA256-checked), Lean 4.34.0, Python venv, data; no sudo
-make check          # 37 checks, about 1.5 min
-make check-full     # 42 checks with GPT-2 and MNIST, about 5 min
+make check          # 38 checks, about 1.5 min
+make check-full     # 43 checks with GPT-2 and MNIST, about 5 min
 make media          # regenerate the figures and the video on this page
 ```
 
-`make setup-lite` skips the 550 MB GPT-2 download. CI runs `make check-full` on every push. The history was rewritten on 2026-10-04 (English messages, smaller commits), so clone again if you have an older copy.
+`make setup-lite` skips the 550 MB GPT-2 download. CI runs `make check-full` on every push. `main` holds the released versions; work in progress lives on the `devel` branch. The history was rewritten on 2026-10-04 (English messages, smaller commits), so clone again if you have an older copy.
 
 <details>
 <summary>limits</summary>

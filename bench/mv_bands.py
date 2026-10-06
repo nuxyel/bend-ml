@@ -1,4 +1,5 @@
-"""Time per matrix · vector product: Mat.matmul_nt (bench/mv.bend) against Bands (bench/mv_bands.bend).
+"""Time per matrix · vector product: Mat.matmul_nt (bench/mv.bend) against Bands with the typed API
+(bench/mv_bands.bend) and with the list API (bench/mv_bands_l.bend).
 
 For each shape and setting, builds the benchmark with REPS = 1 and REPS = 1 + N and reports
 (t(1 + N) - t(1)) / N, so building the matrix is not counted. Median of 3 runs per binary.
@@ -60,6 +61,7 @@ def main():
             settings = [("mv.bend", {"KN": f"{k}n", "MN": f"{m}n", "PAR": "0n"}, "matmul_nt, sequential")]
             settings += [("mv.bend", {"KN": f"{k}n", "MN": f"{m}n", "PAR": "3n"}, "matmul_nt, par = 3 (clones W)")]
             settings += [("mv_bands.bend", {"KN": f"{k}n", "MN": f"{m}n", "DEPTH": f"{dep}n"}, f"Bands, 2^{dep} bands") for dep in range(0, 7)]
+            settings += [("mv_bands_l.bend", {"KN": f"{k}n", "MN": f"{m}n", "DEPTH": f"{dep}n"}, f"Bands list API, 2^{dep} bands") for dep in (0, 4, 5)]
             for src, subs, label in settings:
                 rows = per_product(src, subs, d, N)
                 cells = "  ".join(f"{t:2d}t {ms:7.3f} ms" for t, ms, _ in rows)

@@ -7,17 +7,25 @@
 # Run from the repository root, after `reference/gpt2_prep.py --split`.
 
 import Base
-import bend-ml-tensor-array@0.1.4.0/main.bend as TA
+import bend-ml-tensor-array@0.1.5.0/main.bend as TA
 import bend-ml-tensor@0.1.2.0/main.bend as T
 import bend-ml-bpe-tokenizer@0.1.2.0/main.bend as BPE
 import ./load.bend as L
 import ./tok.bend as K
 
-# the weight matrices are kept in 2^DEPTH row bands (TA.Bands), and each matrix · vector product
-# runs its bands in parallel without copying the weights (NOTES.md, exp. 11). DEPTH = 0 is a single
-# band, which computes exactly what the sequential Mat.matmul_nt computes.
-def depth() -> Nat:
-  4n
+# the weight matrices are kept in 2^d row bands (TA.Bands), 2^(d + 1) for the 50257-row embedding, and
+# each matrix · vector product runs its bands in parallel without copying the weights (NOTES.md,
+# exp. 11). With 2 threads or fewer the bands cannot help and only cost (appending their results), so
+# d = 0: a single band, which computes exactly what the sequential Mat.matmul_nt computes.
+def depth_sel(few: Bool) -> Nat:
+  match few:
+    case True{}:
+      0n
+    case False{}:
+      4n
+
+def depth_for(+threads: U32) -> Nat:
+  depth_sel(U32.is_le(threads, 2))
 
 def slice64(xs: List<&2, F32>, off: Nat) -> List<&2, F32>:
   List.take(&2, F32, List.drop(&2, F32, xs, off), 64n)
@@ -199,8 +207,37 @@ type BR is Type:
 def nm(+i: Nat, f: String) -> String:
   "h" ++ Nat.show(i) ++ "." ++ f
 
-def get_list(name: String, +n: Nat) -> IO(List<&2, F32>):
-  L.read_floats("demos/gpt2/data/w/" ++ name ++ ".bin", n)
+# ---- the boundary: every weight file must hold exactly the numbers its shape needs ----
+
+def size_cmp(ok: Bool, +path: String, +got: U32, +want: Nat) -> IO(Unit):
+  match ok:
+    case True{}:
+      IO.pure(Unit, Unit{})
+    case False{}:
+      IO.die(Unit, 1, path ++ ": expected " ++ Nat.show(want) ++ " bytes, found " ++ U32.show(got) ++ "; run reference/gpt2_prep.py --split again")
+
+def size_ok(m: File & Result<&1, &1, U32 & String, U32>, +want: Nat, +path: String) -> IO(Unit):
+  match m:
+    case Tuple{f, r}:
+      do IO<Unit>:
+        +n : U32 <- IO.pass(U32, r)
+        File.close(f)
+        size_cmp(U32.is_eq(n, U32.from_nat(want)), path, n, want)
+
+# stops the program unless the file holds exactly n F32 numbers (n * 4 bytes)
+def check_size(+path: String, +n: Nat) -> IO(Unit):
+  do IO<Unit>:
+    f : File <- IO.try(File, File.open(path, "r"))
+    m : File & Result<&1, &1, U32 & String, U32> <- File.size(f)
+    size_ok(m, Nat.mul(n, 4n), path)
+
+def wpath(name: String) -> String:
+  "demos/gpt2/data/w/" ++ name ++ ".bin"
+
+def get_list(+name: String, +n: Nat) -> IO(List<&2, F32>):
+  do IO<List<&2, F32>>:
+    check_size(wpath(name), n)
+    L.read_floats(wpath(name), n)
 
 # reads the file in 1 MB blocks and writes each block straight into the matrix, so only one
 # block is a list at any time
@@ -222,10 +259,26 @@ def get_mat2(-r: Nat, -c: Nat, path: String, +n: Nat, z: TA.Mat<r, c>) -> IO(TA.
     m : File & Result<&1, &1, U32 & String, List<&2, U32>> <- File.read_at(f, 0, 1048576)
     stream_mat(r, c, L.blocks_of(Nat.mul(n, 4n), 1048576n), 0, 0, m, z)
 
-def get_mat(name: String, +r: Nat, +c: Nat) -> IO(TA.Mat<r, c>):
-  get_mat2(r, c, "demos/gpt2/data/w/" ++ name ++ ".bin", Nat.mul(r, c), TA.Mat.zeros(r, c))
+def get_mat(+name: String, +r: Nat, +c: Nat) -> IO(TA.Mat<r, c>):
+  do IO<TA.Mat<r, c>>:
+    check_size(wpath(name), Nat.mul(r, c))
+    get_mat2(r, c, wpath(name), Nat.mul(r, c), TA.Mat.zeros(r, c))
 
 # ---- matrices kept in bands: each band is read from its own range of the file ----
+
+# writes the little-endian F32 numbers held in bs (4 bytes each) at index i, without building a
+# list of F32 first
+def fill_bytes(bs: List<&2, U32>, +i: U32, a: Array<F32>) -> Array<F32>:
+  match bs:
+    case Con{+b0, Con{+b1, Con{+b2, Con{+b3, t}}}}:
+      fill_bytes(t, (i + 1 : U32), Array.set(F32, a, i, L.f32_le(b0, b1, b2, b3)))
+    case _:
+      a
+
+def fill_bytes_mat(-r: Nat, -c: Nat, +i: U32, bs: List<&2, U32>, m: TA.Mat<r, c>) -> TA.Mat<r, c>:
+  match m:
+    case TA.Mat{d}:
+      TA.Mat{fill_bytes(bs, i, d)}
 
 # reads blocks of at most 1 MB until rem bytes have been read, so a band never takes numbers
 # that belong to the next one
@@ -239,7 +292,7 @@ def stream_exact(k: Nat, -r: Nat, -c: Nat, +rem: Nat, +off: U32, +idx: U32, m: F
       do IO<TA.Mat<r, c>>:
         bs : List<&2, U32> <- IO.pass(List<&2, U32>, rs)
         m2 : File & Result<&1, &1, U32 & String, List<&2, U32>> <- File.read_at(f, (off + 1048576 : U32), U32.from_nat(Nat.min(1048576n, Nat.sub(rem, 1048576n))))
-        stream_exact(p, r, c, Nat.sub(rem, 1048576n), (off + 1048576 : U32), (idx + 262144 : U32), m2, TA.Mat.fill_at(r, c, idx, L.f32s(bs), acc))
+        stream_exact(p, r, c, Nat.sub(rem, 1048576n), (off + 1048576 : U32), (idx + 262144 : U32), m2, fill_bytes_mat(r, c, idx, bs, acc))
 
 # rr x c numbers starting at number `start` of the file, into a band of r rows (rr == r, see
 # load_tree; the Array is sized for rr * c numbers as Mat.zeros would size it)
@@ -262,39 +315,43 @@ def load_tree(+c: Nat, -r: Nat, b: TA.Bands<r, c>, +rr: Nat, -e: {rr == r : Nat}
         y2 : TA.Bands<Nat.sub(r, TA.half(r)), c> <- load_tree(c, Nat.sub(r, TA.half(r)), y, Nat.sub(rr, TA.half(rr)), TA.eq_rest(rr, r, e), path, Nat.add(start, Nat.mul(TA.half(rr), c)))
         return TA.BNode{x2, y2}
 
-def get_bands(name: String, +r: Nat, +c: Nat) -> IO(TA.Bands<r, c>):
-  load_tree(c, r, TA.Bands.zeros(depth(), r, c), r, {==}, "demos/gpt2/data/w/" ++ name ++ ".bin", 0n)
+def get_bands(+name: String, +d: Nat, +r: Nat, +c: Nat) -> IO(TA.Bands<r, c>):
+  do IO<TA.Bands<r, c>>:
+    check_size(wpath(name), Nat.mul(r, c))
+    load_tree(c, r, TA.Bands.zeros(d, r, c), r, {==}, wpath(name), 0n)
 
-def load_layer(+i: Nat) -> IO(Layer):
+def load_layer(+d: Nat, +i: Nat) -> IO(Layer):
   do IO<Layer>:
     ln1g : List<&2, F32> <- get_list(nm(i, "ln1_g"), 768n)
     ln1b : List<&2, F32> <- get_list(nm(i, "ln1_b"), 768n)
-    aw : TA.Bands<2304n, 768n> <- get_bands(nm(i, "aw"), 2304n, 768n)
+    aw : TA.Bands<2304n, 768n> <- get_bands(nm(i, "aw"), d, 2304n, 768n)
     ab : List<&2, F32> <- get_list(nm(i, "ab"), 2304n)
-    pw : TA.Bands<768n, 768n> <- get_bands(nm(i, "pw"), 768n, 768n)
+    pw : TA.Bands<768n, 768n> <- get_bands(nm(i, "pw"), d, 768n, 768n)
     pb : List<&2, F32> <- get_list(nm(i, "pb"), 768n)
     ln2g : List<&2, F32> <- get_list(nm(i, "ln2_g"), 768n)
     ln2b : List<&2, F32> <- get_list(nm(i, "ln2_b"), 768n)
-    fw : TA.Bands<3072n, 768n> <- get_bands(nm(i, "fw"), 3072n, 768n)
+    fw : TA.Bands<3072n, 768n> <- get_bands(nm(i, "fw"), d, 3072n, 768n)
     fb : List<&2, F32> <- get_list(nm(i, "fb"), 3072n)
-    mw : TA.Bands<768n, 3072n> <- get_bands(nm(i, "mw"), 768n, 3072n)
+    mw : TA.Bands<768n, 3072n> <- get_bands(nm(i, "mw"), d, 768n, 3072n)
     mb : List<&2, F32> <- get_list(nm(i, "mb"), 768n)
     return Layer{ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb}
 
-def load_layers(k: Nat, +i: Nat, acc: List<&1, Layer>) -> IO(List<&1, Layer>):
+def load_layers(k: Nat, +d: Nat, +i: Nat, acc: List<&1, Layer>) -> IO(List<&1, Layer>):
   match k:
     case 0n:
       IO.pure(List<&1, Layer>, List.reverse(&1, Layer, acc))
     case 1n+p:
       do IO<List<&1, Layer>>:
-        l : Layer <- load_layer(i)
-        load_layers(p, 1n+i, l <> acc)
+        l : Layer <- load_layer(d, i)
+        load_layers(p, d, 1n+i, l <> acc)
 
 def load_model() -> IO(Model):
   do IO<Model>:
-    wte : TA.Bands<50257n, 768n> <- get_bands("wte", 50257n, 768n)
+    threads : U32 <- IO.thread_count()
+    +d : Nat = depth_for(threads)
+    wte : TA.Bands<50257n, 768n> <- get_bands("wte", Nat.add(d, Nat.min(d, 1n)), 50257n, 768n)
     wpe : TA.Mat<1024n, 768n> <- get_mat("wpe", 1024n, 768n)
-    layers : List<&1, Layer> <- load_layers(12n, 0n, Nil{})
+    layers : List<&1, Layer> <- load_layers(12n, d, 0n, Nil{})
     lnfg : List<&2, F32> <- get_list("lnf_g", 768n)
     lnfb : List<&2, F32> <- get_list("lnf_b", 768n)
     return Model{wte, wpe, layers, lnfg, lnfb}
@@ -308,47 +365,41 @@ def ln(+xs: List<&2, F32>, +g: List<&2, F32>, +b: List<&2, F32>) -> List<&2, F32
 
 # 6. second MLP product and the block output
 
-def k6b(+x1: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, aw: TA.Bands<2304n, 768n>, +ab: List<&2, F32>, pw: TA.Bands<768n, 768n>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, fw: TA.Bands<3072n, 768n>, +fb: List<&2, F32>, mw: TA.Bands<768n, 3072n>, +mb: List<&2, F32>, r: TA.ML<1n, 768n>) -> BR:
-  match r:
-    case TA.ML{m, y}:
-      BR{T.zip_with.add(x1, T.zip_with.add(y, mb)), kv, Layer{ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb}}
+def k6b(+x1: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, aw: TA.Bands<2304n, 768n>, +ab: List<&2, F32>, pw: TA.Bands<768n, 768n>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, fw: TA.Bands<3072n, 768n>, +fb: List<&2, F32>, mw: TA.Bands<768n, 3072n>, +mb: List<&2, F32>, +y: List<&2, F32>) -> BR:
+  BR{T.zip_with.add(x1, T.zip_with.add(y, mb)), kv, Layer{ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb}}
 
 # 5. first MLP product (768 -> 3072), bias and GELU
 
-def k6(+x1: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, aw: TA.Bands<2304n, 768n>, +ab: List<&2, F32>, pw: TA.Bands<768n, 768n>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, fw: TA.Bands<3072n, 768n>, +fb: List<&2, F32>, +mb: List<&2, F32>, r: TA.BV<768n, 3072n>) -> BR:
+def k6(+x1: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, aw: TA.Bands<2304n, 768n>, +ab: List<&2, F32>, pw: TA.Bands<768n, 768n>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, fw: TA.Bands<3072n, 768n>, +fb: List<&2, F32>, +mb: List<&2, F32>, r: TA.BL<768n, 3072n>) -> BR:
   match r:
-    case TA.BV{mw, c}:
-      k6b(x1, kv, ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb, TA.Mat.to_list(1n, 768n, c))
+    case TA.BL{mw, c}:
+      k6b(x1, kv, ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb, c)
 
-def k5b(+x1: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, aw: TA.Bands<2304n, 768n>, +ab: List<&2, F32>, pw: TA.Bands<768n, 768n>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, fw: TA.Bands<3072n, 768n>, +fb: List<&2, F32>, mw: TA.Bands<768n, 3072n>, +mb: List<&2, F32>, r: TA.ML<1n, 3072n>) -> BR:
-  match r:
-    case TA.ML{m, y}:
-      k6(x1, kv, ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fw, fb, mb, TA.Bands.matvec(768n, 3072n, mw, TA.Mat.from_list(1n, 3072n, T.gelu.l(T.zip_with.add(y, fb)))))
+def k5b(+x1: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, aw: TA.Bands<2304n, 768n>, +ab: List<&2, F32>, pw: TA.Bands<768n, 768n>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, fw: TA.Bands<3072n, 768n>, +fb: List<&2, F32>, mw: TA.Bands<768n, 3072n>, +mb: List<&2, F32>, +y: List<&2, F32>) -> BR:
+  k6(x1, kv, ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fw, fb, mb, TA.Bands.matvec_l(768n, 3072n, mw, (T.gelu.l(T.zip_with.add(y, fb)))))
 
-def k5(+x1: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, aw: TA.Bands<2304n, 768n>, +ab: List<&2, F32>, pw: TA.Bands<768n, 768n>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, +fb: List<&2, F32>, mw: TA.Bands<768n, 3072n>, +mb: List<&2, F32>, r: TA.BV<3072n, 768n>) -> BR:
+def k5(+x1: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, aw: TA.Bands<2304n, 768n>, +ab: List<&2, F32>, pw: TA.Bands<768n, 768n>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, +fb: List<&2, F32>, mw: TA.Bands<768n, 3072n>, +mb: List<&2, F32>, r: TA.BL<3072n, 768n>) -> BR:
   match r:
-    case TA.BV{fw, c}:
-      k5b(x1, kv, ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb, TA.Mat.to_list(1n, 3072n, c))
+    case TA.BL{fw, c}:
+      k5b(x1, kv, ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb, c)
 
 # 4. attention projection, residual, second LayerNorm
 
 def k4c(+x1: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, aw: TA.Bands<2304n, 768n>, +ab: List<&2, F32>, pw: TA.Bands<768n, 768n>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, fw: TA.Bands<3072n, 768n>, +fb: List<&2, F32>, mw: TA.Bands<768n, 3072n>, +mb: List<&2, F32>) -> BR:
-  k5(x1, kv, ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fb, mw, mb, TA.Bands.matvec(3072n, 768n, fw, TA.Mat.from_list(1n, 768n, ln(x1, ln2g, ln2b))))
+  k5(x1, kv, ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fb, mw, mb, TA.Bands.matvec_l(3072n, 768n, fw, (ln(x1, ln2g, ln2b))))
 
-def k4b(+x: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, aw: TA.Bands<2304n, 768n>, +ab: List<&2, F32>, pw: TA.Bands<768n, 768n>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, fw: TA.Bands<3072n, 768n>, +fb: List<&2, F32>, mw: TA.Bands<768n, 3072n>, +mb: List<&2, F32>, r: TA.ML<1n, 768n>) -> BR:
-  match r:
-    case TA.ML{m, y}:
-      k4c(T.zip_with.add(x, T.zip_with.add(y, pb)), kv, ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb)
+def k4b(+x: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, aw: TA.Bands<2304n, 768n>, +ab: List<&2, F32>, pw: TA.Bands<768n, 768n>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, fw: TA.Bands<3072n, 768n>, +fb: List<&2, F32>, mw: TA.Bands<768n, 3072n>, +mb: List<&2, F32>, +y: List<&2, F32>) -> BR:
+  k4c(T.zip_with.add(x, T.zip_with.add(y, pb)), kv, ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb)
 
-def k4(+x: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, aw: TA.Bands<2304n, 768n>, +ab: List<&2, F32>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, fw: TA.Bands<3072n, 768n>, +fb: List<&2, F32>, mw: TA.Bands<768n, 3072n>, +mb: List<&2, F32>, r: TA.BV<768n, 768n>) -> BR:
+def k4(+x: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, aw: TA.Bands<2304n, 768n>, +ab: List<&2, F32>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, fw: TA.Bands<3072n, 768n>, +fb: List<&2, F32>, mw: TA.Bands<768n, 3072n>, +mb: List<&2, F32>, r: TA.BL<768n, 768n>) -> BR:
   match r:
-    case TA.BV{pw, c}:
-      k4b(x, kv, ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb, TA.Mat.to_list(1n, 768n, c))
+    case TA.BL{pw, c}:
+      k4b(x, kv, ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb, c)
 
 # 3. attention over the cache
 
 def k3b(+x: List<&2, F32>, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, aw: TA.Bands<2304n, 768n>, +ab: List<&2, F32>, pw: TA.Bands<768n, 768n>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, fw: TA.Bands<3072n, 768n>, +fb: List<&2, F32>, mw: TA.Bands<768n, 3072n>, +mb: List<&2, F32>, +q: List<&2, F32>, +nk: List<&2, List<&2, F32>>, +nv: List<&2, List<&2, F32>>) -> BR:
-  k4(x, KV{nk, nv}, ln1g, ln1b, aw, ab, pb, ln2g, ln2b, fw, fb, mw, mb, TA.Bands.matvec(768n, 768n, pw, TA.Mat.from_list(1n, 768n, attn(12n, 0n, q, nk, nv))))
+  k4(x, KV{nk, nv}, ln1g, ln1b, aw, ab, pb, ln2g, ln2b, fw, fb, mw, mb, TA.Bands.matvec_l(768n, 768n, pw, (attn(12n, 0n, q, nk, nv))))
 
 # 2. qkv: q (768), k (768), v (768)
 
@@ -360,20 +411,18 @@ def k3(+x: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, aw
 def k2b(+x: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, aw: TA.Bands<2304n, 768n>, +ab: List<&2, F32>, pw: TA.Bands<768n, 768n>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, fw: TA.Bands<3072n, 768n>, +fb: List<&2, F32>, mw: TA.Bands<768n, 3072n>, +mb: List<&2, F32>, +qkv: List<&2, F32>) -> BR:
   k3(x, kv, ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb, List.take(&2, F32, qkv, 768n), List.take(&2, F32, List.drop(&2, F32, qkv, 768n), 768n), List.drop(&2, F32, qkv, 1536n))
 
-def k2(+x: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, +ab: List<&2, F32>, pw: TA.Bands<768n, 768n>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, fw: TA.Bands<3072n, 768n>, +fb: List<&2, F32>, mw: TA.Bands<768n, 3072n>, +mb: List<&2, F32>, aw: TA.Bands<2304n, 768n>, r: TA.ML<1n, 2304n>) -> BR:
-  match r:
-    case TA.ML{m, y}:
-      k2b(x, kv, ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb, T.zip_with.add(y, ab))
+def k2(+x: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, +ab: List<&2, F32>, pw: TA.Bands<768n, 768n>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, fw: TA.Bands<3072n, 768n>, +fb: List<&2, F32>, mw: TA.Bands<768n, 3072n>, +mb: List<&2, F32>, aw: TA.Bands<2304n, 768n>, +y: List<&2, F32>) -> BR:
+  k2b(x, kv, ln1g, ln1b, aw, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb, T.zip_with.add(y, ab))
 
-def k1(+x: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, +ab: List<&2, F32>, pw: TA.Bands<768n, 768n>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, fw: TA.Bands<3072n, 768n>, +fb: List<&2, F32>, mw: TA.Bands<768n, 3072n>, +mb: List<&2, F32>, r: TA.BV<2304n, 768n>) -> BR:
+def k1(+x: List<&2, F32>, kv: KV, +ln1g: List<&2, F32>, +ln1b: List<&2, F32>, +ab: List<&2, F32>, pw: TA.Bands<768n, 768n>, +pb: List<&2, F32>, +ln2g: List<&2, F32>, +ln2b: List<&2, F32>, fw: TA.Bands<3072n, 768n>, +fb: List<&2, F32>, mw: TA.Bands<768n, 3072n>, +mb: List<&2, F32>, r: TA.BL<2304n, 768n>) -> BR:
   match r:
-    case TA.BV{aw, c}:
-      k2(x, kv, ln1g, ln1b, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb, aw, TA.Mat.to_list(1n, 2304n, c))
+    case TA.BL{aw, c}:
+      k2(x, kv, ln1g, ln1b, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb, aw, c)
 
 def block(l: Layer, kv: KV, +x: List<&2, F32>) -> BR:
   match l:
     case Layer{+ln1g, +ln1b, aw, +ab, pw, +pb, +ln2g, +ln2b, fw, +fb, mw, +mb}:
-      k1(x, kv, ln1g, ln1b, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb, TA.Bands.matvec(2304n, 768n, aw, TA.Mat.from_list(1n, 768n, ln(x, ln1g, ln1b))))
+      k1(x, kv, ln1g, ln1b, ab, pw, pb, ln2g, ln2b, fw, fb, mw, mb, TA.Bands.matvec_l(2304n, 768n, aw, (ln(x, ln1g, ln1b))))
 
 # ---------------------------------------------------------------------
 # layers, embedding and logits
@@ -404,20 +453,18 @@ type Out is Type:
 def f5(+id_row: List<&2, F32>, wte: TA.Bands<50257n, 768n>, wpe: TA.Mat<1024n, 768n>, layers: List<&1, Layer>, +lnfg: List<&2, F32>, +lnfb: List<&2, F32>, cs: List<&2, KV>) -> Out:
   Out{argmax(id_row), T.max.l(id_row), cs, Model{wte, wpe, layers, lnfg, lnfb}}
 
-def f4b(wte: TA.Bands<50257n, 768n>, wpe: TA.Mat<1024n, 768n>, layers: List<&1, Layer>, +lnfg: List<&2, F32>, +lnfb: List<&2, F32>, cs: List<&2, KV>, r: TA.ML<1n, 50257n>) -> Out:
-  match r:
-    case TA.ML{m, row}:
-      f5(row, wte, wpe, layers, lnfg, lnfb, cs)
+def f4b(wte: TA.Bands<50257n, 768n>, wpe: TA.Mat<1024n, 768n>, layers: List<&1, Layer>, +lnfg: List<&2, F32>, +lnfb: List<&2, F32>, cs: List<&2, KV>, +row: List<&2, F32>) -> Out:
+  f5(row, wte, wpe, layers, lnfg, lnfb, cs)
 
-def f4(wpe: TA.Mat<1024n, 768n>, layers: List<&1, Layer>, +lnfg: List<&2, F32>, +lnfb: List<&2, F32>, cs: List<&2, KV>, r: TA.BV<50257n, 768n>) -> Out:
+def f4(wpe: TA.Mat<1024n, 768n>, layers: List<&1, Layer>, +lnfg: List<&2, F32>, +lnfb: List<&2, F32>, cs: List<&2, KV>, r: TA.BL<50257n, 768n>) -> Out:
   match r:
-    case TA.BV{wte, c}:
-      f4b(wte, wpe, layers, lnfg, lnfb, cs, TA.Mat.to_list(1n, 50257n, c))
+    case TA.BL{wte, c}:
+      f4b(wte, wpe, layers, lnfg, lnfb, cs, c)
 
 def f3(wpe: TA.Mat<1024n, 768n>, +lnfg: List<&2, F32>, +lnfb: List<&2, F32>, wte: TA.Bands<50257n, 768n>, r: RunOut) -> Out:
   match r:
     case RunOut{x, layers, cs}:
-      f4(wpe, layers, lnfg, lnfb, cs, TA.Bands.matvec(50257n, 768n, wte, TA.Mat.from_list(1n, 768n, ln(x, lnfg, lnfb))))
+      f4(wpe, layers, lnfg, lnfb, cs, TA.Bands.matvec_l(50257n, 768n, wte, (ln(x, lnfg, lnfb))))
 
 def f3b(wpe: TA.Mat<1024n, 768n>, +lnfg: List<&2, F32>, +lnfb: List<&2, F32>, wte: TA.Bands<50257n, 768n>, r: RunOut) -> Out:
   f3(wpe, lnfg, lnfb, wte, r)

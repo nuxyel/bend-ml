@@ -1,6 +1,6 @@
 # bend-ml-tensor-array: tensors over a flat Array<F32>, with the shape in the type.
 #
-#   import bend-ml-tensor-array@0.1.4.0/main.bend as TA
+#   import bend-ml-tensor-array@0.1.5.0/main.bend as TA
 #
 # Mat<r, c> stores r*c numbers in an Array<F32>, row by row (index i*c + j). The
 # dimensions are erased type parameters: the same guarantee as bend-ml-tensor
@@ -1041,7 +1041,7 @@ def Bands.fill_at(+r: Nat, +c: Nat, +i: Nat, +n: Nat, +xs: List<&2, F32>, b: Ban
 type BV<-r: Nat, -c: Nat> is Type:
   BV{b: Bands<r, c>, y: Mat<1n, r>}
 
-# internal: the bands and y as a list in row order
+# the bands and y as a list in row order (the result of Bands.matvec_l)
 type BL<-r: Nat, -c: Nat> is Type:
   BL{b: Bands<r, c>, y: List<&2, F32>}
 
@@ -1092,6 +1092,11 @@ def Bands.matvec(+r: Nat, +c: Nat, b: Bands<r, c>, x: Mat<1n, c>) -> BV<r, c>:
   match x:
     case Mat{xa}:
       bv_fin(r, c, bmv(c, r, b, r, {==}, Array.clone(F32, xa)))
+
+# the same product with x and y as lists (x: c numbers, y: r numbers in row order), without the
+# Mat conversions of Bands.matvec: for callers that already hold the vector as a list
+def Bands.matvec_l(+r: Nat, +c: Nat, b: Bands<r, c>, +x: List<&2, F32>) -> BL<r, c>:
+  bmv(c, r, b, r, {==}, Array.clone(F32, fill_list(x, 0, Array.new(F32, cap_depth(c), 0.0))))
 
 # ---- reading rows and the whole matrix ----
 
@@ -1155,3 +1160,96 @@ def blist(+c: Nat, -r: Nat, b: Bands<r, c>, +rr: Nat, -e: {rr == r : Nat}) -> BR
 # all r*c numbers in row order (in BRow.row)
 def Bands.to_list(+r: Nat, +c: Nat, b: Bands<r, c>) -> BRow<r, c>:
   blist(c, r, b, r, {==})
+
+# ---- the list path returns exactly r numbers ----
+#
+# The numbers do not matter here, only how many there are: each lemma below counts the list a
+# function builds, following the function's own recursion.
+
+def bl_len(-r: Nat, -c: Nat, bl: BL<r, c>) -> Nat:
+  match bl:
+    case BL{b, y}:
+      List.length(&2, F32, y)
+
+# s == a + (1 + b)  ->  s == 1 + (a + b)
+def succ_out(-s: Nat, +a: Nat, +b: Nat, e: {s == Nat.add(a, 1n+b) : Nat}) -> {s == 1n+Nat.add(a, b) : Nat}:
+  %Equal.sym(Nat, 1n+Nat.add(a, b), Nat.add(a, 1n+b), add_succ_r(a, b)) : {s == _ : Nat}
+  e
+
+# s == 1 + (p + (1 + l))  ->  s == 2 + (p + l)
+def len_step(-s: Nat, +p: Nat, +l: Nat, e: {s == 1n+Nat.add(p, 1n+l) : Nat}) -> {s == 2n+Nat.add(p, l) : Nat}:
+  %Equal.sym(Nat, 1n+Nat.add(p, l), Nat.add(p, 1n+l), add_succ_r(p, l)) : {s == 1n+_ : Nat}
+  e
+
+# s == n + 0  ->  s == n
+def zero_out(-s: Nat, +n: Nat, e: {s == Nat.add(n, 0n) : Nat}) -> {s == n : Nat}:
+  %add_zero_r(n) : {s == _ : Nat}
+  e
+
+# reversing onto acc adds the lengths
+def rev_len(+xs: List<&2, F32>, +acc: List<&2, F32>) -> {List.length(&2, F32, List.reverse.go(&2, F32, xs, acc)) == Nat.add(List.length(&2, F32, xs), List.length(&2, F32, acc)) : Nat}:
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{h, t}:
+      succ_out(List.length(&2, F32, List.reverse.go(&2, F32, t, h <> acc)), List.length(&2, F32, t), List.length(&2, F32, acc), rev_len(t, h <> acc))
+
+# appending adds the lengths
+def app_len(+xs: List<&2, F32>, +ys: List<&2, F32>) -> {List.length(&2, F32, List.append(&2, F32, xs, ys)) == Nat.add(List.length(&2, F32, xs), List.length(&2, F32, ys)) : Nat}:
+  match xs:
+    case Nil{}:
+      {==}
+    case Con{h, t}:
+      %app_len(t, ys) : {1n+List.length(&2, F32, List.append(&2, F32, t, ys)) == 1n+_ : Nat}
+      {==}
+
+# a leaf's list: lcols puts mleft + 1 numbers on out, and bv_leaf reverses them
+law leaf_len:
+  for -r: Nat
+  for -c: Nat
+  for +mleft: Nat
+  for +kn: Nat
+  for +ia0: U32
+  for +ib0: U32
+  for +sa: U32
+  for +sb: U32
+  for +bcol: U32
+  for +out: List<&2, F32>
+  for rd: R
+  {bl_len(r, c, bv_leaf(r, c, lcols(mleft, kn, ia0, ib0, sa, sb, bcol, out, rd))) == Nat.add(1n+mleft, List.length(&2, F32, out)) : Nat}
+
+def leaf_len(r, c, mleft, kn, ia0, ib0, sa, sb, bcol, out, rd):
+  match mleft rd:
+    case 0n R{a, b, +x}:
+      zero_out(List.length(&2, F32, List.reverse.go(&2, F32, x <> out, Nil{})), 1n+List.length(&2, F32, out), rev_len(x <> out, Nil{}))
+    case 1n+p R{a, b, +x}:
+      len_step(bl_len(r, c, bv_leaf(r, c, lcols(p, kn, ia0, (ib0 + bcol : U32), sa, sb, bcol, x <> out, dotg(kn, ia0, (ib0 + bcol : U32), sa, sb, 0.0, Array.get(F32, a, ia0), Array.get(F32, b, (ib0 + bcol : U32)))))), p, List.length(&2, F32, out), leaf_len(r, c, p, kn, ia0, (ib0 + bcol : U32), sa, sb, bcol, x <> out, dotg(kn, ia0, (ib0 + bcol : U32), sa, sb, 0.0, Array.get(F32, a, ia0), Array.get(F32, b, (ib0 + bcol : U32)))))
+
+# LAW (band_len): the product of one band with `rows` rows gives exactly `rows` numbers.
+law band_len:
+  for -r: Nat
+  for -c: Nat
+  for +rows: Nat
+  for +k: Nat
+  for x: Array<F32>
+  for w: Array<F32>
+  {bl_len(r, c, bv_rows(r, c, rows, k, x, w)) == rows : Nat}
+
+def band_len(r, c, rows, k, x, w):
+  match rows:
+    case 0n:
+      {==}
+    case 1n+p:
+      zero_out(bl_len(r, c, bv_leaf(r, c, lcols(p, k, 0, 0, 1, 1, U32.from_nat(k), Nil{}, dotg(k, 0, 0, 1, 1, 0.0, Array.get(F32, x, 0), Array.get(F32, w, 0))))), 1n+p, leaf_len(r, c, p, k, 0, 0, 1, 1, U32.from_nat(k), Nil{}, dotg(k, 0, 0, 1, 1, 0.0, Array.get(F32, x, 0), Array.get(F32, w, 0))))
+
+# joining two halves of h1 and h2 numbers gives h1 + h2 numbers. (The statement for the whole tree,
+# "Bands.matvec_l gives r numbers", would apply this to the results of the two recursive calls and
+# to the induction hypotheses about the same calls; that uses each band's Array twice, which Bend's
+# affine rules refuse. It stays open, covered by tests: NOTES.md, v3.1.)
+def join_len(-r: Nat, -c: Nat, -h1: Nat, -h2: Nat, p: BL<half(r), c>, q: BL<Nat.sub(r, half(r)), c>, hp: {bl_len(half(r), c, p) == h1 : Nat}, hq: {bl_len(Nat.sub(r, half(r)), c, q) == h2 : Nat}) -> {bl_len(r, c, bv_join(r, c, p, q)) == Nat.add(h1, h2) : Nat}:
+  match p q:
+    case BL{bx, +yx} BL{by, +yy}:
+      %hp : {List.length(&2, F32, List.append(&2, F32, yx, yy)) == Nat.add(_, h2) : Nat}
+      %hq : {List.length(&2, F32, List.append(&2, F32, yx, yy)) == Nat.add(List.length(&2, F32, yx), _) : Nat}
+      app_len(yx, yy)
+
