@@ -516,3 +516,15 @@ logits as v3.0 and v2.1, digit for digit.
 - `docs/upstream/shared-readonly-array.md` (a read-only `Array` borrow without `@unsafe`).
 - New: `IO.fork` does not run pure work on several cores (exp. 12); worth a question or a guide fix, since
   the guide says it does. Draft and repro: `docs/upstream/io-fork-parallel.md`, `io_fork_parallel.bend`.
+
+### v3.1 measurements added at the end (2026-10-06)
+
+- `bench/results/mv_bands-2026-10-06.txt` (not idle, load 2-4): the list API (`matvec_l`) is a little faster
+  than the typed one with bands (50257 × 768, 2^5 bands, 16 threads: 5.1 ms against 6.7 ms). With **one band**,
+  on the 50257-row logits matrix, `matvec_l` takes 29.6 ms against 23.5 ms for `Mat.matmul_nt` (~25% slower; ~1%
+  on the smaller matrices). It is the residual one-thread cost (36 forward passes: 4.8 s against 4.7 s). Not
+  investigated; probable cause: the 50k-number result built as a list and reversed, against array writes.
+- Peak resident memory (`scripts/peak_rss.sh`, "Hi" + 1 token, 16 threads): v2.1 1462 MB, v3.0 895 MB,
+  v3.1 903 MB. The peak *virtual* size of v3.1 is 41 GB (v2.1 and v3.0: 10.6 GB): address space reserved, not
+  memory used; cause not investigated.
+- `IO.fork` control: the same loops as parallel lets scale (1.69 s → 0.85 s); `docs/upstream/io_fork_parallel_control.bend`.
