@@ -2,6 +2,28 @@
 
 **Summary (v2):** GPT-2 small with 124 M parameters runs in Bend and **generates exactly the same tokens as PyTorch**, with logits equal to within 6e-4 over 11 prompts (2e-4 on the first 3). In v1 it took ~3 s per token (~150x PyTorch); in v2 (matrix · vector products over `Array`) it takes **~0.1 s per token**: ~5x PyTorch with 16 threads (21 ms per forward pass of 11 tokens) and ~2x PyTorch with 1 thread (55 ms). What still weighs is loading the weights (9 s against ~1 s), because the 124 M numbers become trees of nodes (~1.5 GB of resident memory at the peak).
 
+## v3: weights in `Bands`, products in parallel (package `bend-ml-tensor-array@0.1.4.0`)
+
+The five weight matrices of each product (qkv, projection, the two MLP matrices, and the 50257 × 768
+embedding used for the logits) are kept in 2^4 row bands; each matrix · vector product runs its bands in
+parallel and copies no weights (`NOTES.md`, exp. 11). The ids and the logits are the same as v2's, digit for
+digit, on the 11 prompts.
+
+The machine had background load during these runs, so v2.1 and v3 were run alternately, 5 times each
+(`bench/results/gpt2-v21-vs-v3-2026-10-05.txt`); "The capital of France is" + 8 tokens, 13 forward passes:
+
+| | v2.1 (sequential) | v3, 16 threads | v3, 1 thread |
+|---|---|---|---|
+| 13 forward passes (median) | 1.7 s | 1.4 s | 1.9 s |
+| per token | ~0.13 s | ~0.11 s | ~0.15 s |
+
+In a quieter moment the same comparison gave 1.2 s against 0.7 s (~0.054 s per token, ~2.6x the 21 ms of
+16-thread PyTorch). On one thread v3 is ~12% slower than v2.1 (the typed result is converted to a `Mat` and
+back to a list, and the bands' lists are appended at every node). An idle re-measure is pending.
+
+Per product, with the matrix already built (`bench/mv_bands.py`, 16 threads): 2304 × 768 from 0.80 ms to
+0.32 ms; 50257 × 768 (the logits) from 25.1 ms to 6.1 ms.
+
 ## v2: `demos/gpt2/fast.bend` (package `bend-ml-tensor-array@0.1.1.0`)
 
 | GPT-2 small, "The capital of France is", 8 tokens | per token | total |

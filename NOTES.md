@@ -353,3 +353,93 @@ Goal: a stranger can clone the repository, reproduce every claim, and see it ver
 - The stale label "3 prompts" of the GPT-2 check was fixed: `test_gpt2.py` has always run all 11 prompts.
 - The MP4 (~10 MB) is attached to the v2.1.0 release instead of the repository, so it does not stay in the history forever.
 - Visual identity (second version, after the first looked like a generic terminal theme): the colours are bend-lang.com's own CSS tokens, the only typeface is a subset of iA Writer Mono S (SIL OFL; renamed "Bend ML Mono" because a modified font may not keep the reserved names "iA Writer" and "Plex"; license in `docs/media/fonts/LICENSE.md`), and the SVG figures embed it so GitHub renders them as designed. Charts use Bend's own style: vertical bars on a linear scale, Bend in violet, the rest in grey, values off the chart hatched.
+
+## v3: answering the launch feedback (2026-10-05)
+
+Plan: `docs/v3-plan.md`. The launch post (2026-10-05) asked: "dfdx already does compile-time shapes?",
+"compile times on deeper nets?", and kazzzz520 (Bend-Conv) pointed at copying as the real cost of
+parallel work. Plans after v3 (llama.bend, a training framework) are in the private repo `nuxyel/bend2-notes`.
+
+### Exp. 11: `Bands<r, c>`, matrix · vector in parallel without copying the weights
+
+- **Idea** (Bend-Conv's band storage, typed): keep the weight matrix as a tree of row bands, each band its
+  own `Array`. `Array` is a plain ADT in Base (`ALeaf`/`ANode`), so a `match` hands each task its band in
+  O(1), with no `@unsafe`; only the input vector (c numbers) is cloned per split.
+- **Types:** `BNode{x: Bands<half(r), c>, y: Bands<r - half(r), c>}`, an indexed type that Bend 2.0.35
+  accepts (a wrong row count does not compile). Law `half_cover`: `n == half(n) + (n - half(n))`, via
+  `half_le` and `add_sub`. Every function that walks the tree carries an erased proof `rr == r` tying the
+  row count used at run time to the type (`eq_half`, `eq_rest`).
+- **Two traps that kept it sequential** (found by reading the emitted C, `bend X.bend -o x.c`):
+  1. **An erased parameter at the end of the parameter list turns the parallel let into two sequential
+     calls.** `bmv(+c, -r, b, xp, +rr, -e)` had no join task in the C; `bmv(+c, -r, b, +rr, -e, xp)` has one.
+     Minimal repro: `docs/upstream/erased_last_{ok,bad}.bend` (16 leaves of a flat loop: ok 0.054 s → 0.011 s
+     with 16 threads; bad 0.053 s → 0.055 s). Draft report: `docs/upstream/erased-last-parameter.md`.
+  2. **A non-tail recursive helper in the fork tree halves the gain.** `half(n) = 1 + half(n - 2)` called at
+     every node: 50257 × 768, 40 products, 16 threads, 0.69 s; the same with a tail loop (or `Nat.div`)
+     0.36 s. `half` is now `half.go(n, acc)`, a flat loop.
+- **Result** (`bench/mv_bands.py`, per product with the matrix already built; full table with 1, 4, 8 and 16
+  threads in `bench/results/mv_bands-2026-10-05.txt`, measured with the list-in/list-out API; the typed
+  `Mat<1, c>` API adds a `from_list`/`to_list` per call: 0.39 ms against 0.32 ms in one run on 2304 × 768, 16 threads, 2^4 bands):
+
+| W | `matmul_nt` sequential | `matmul_nt`, par = 3 (clones W) | Bands 2^4, 16 threads | Bands 2^5, 16 threads |
+|---|---|---|---|---|
+| 2304 × 768 | 0.80 ms | 10.4 ms | 0.32 ms | 0.33 ms |
+| 768 × 768 | 0.26 ms | 4.76 ms | 0.16 ms | 0.15 ms |
+| 3072 × 768 | 1.07 ms | 23.5 ms | 0.42 ms | 0.40 ms |
+| 768 × 3072 | 1.26 ms | 22.7 ms | 0.45 ms | 0.42 ms |
+| 50257 × 768 | 25.1 ms | 337 ms | 6.1 ms | 4.5 ms |
+
+  2 bands never helped (the same time as 1); 4 bands give ~1.6x on 4 threads; 16 to 32 bands give 2.1x to
+  5.6x. Small products are dominated by waking the threads.
+- **Bit-identical:** each band runs the same dot-product kernel as `matmul_nt`, so `Bands.matvec` equals
+  `Mat.matmul_nt(1n, ..)` bit for bit (`reference/test_tensor_array.py` checks it on 15 shapes and all depths),
+  and GPT-2's 11 prompts give the same ids and the same logits as v2.1, digit for digit.
+- **Loading:** streaming 1 MB blocks through `Bands.fill_at` cost +1.2 s on the 48 layer matrices (a block
+  that crosses a band boundary is walked by both bands; ~720 crossings), while the logits matrix (15
+  crossings) was unaffected. The demo now reads each band from its own range of the file (`load_tree`,
+  `get_band`), so no block crosses a boundary.
+- **Published:** `bend-ml-tensor-array@0.1.4.0`, hash `0x1e52188e4a40cfe41a87f1688743dff4`.
+- **GPT-2** (`demos/gpt2/fast.bend`, weights in 2^4 bands): "The capital of France is" + 8 tokens, 13 forward
+  passes. The machine had background load (an Android emulator and a Gradle daemon), so v2.1 and v3 were run
+  alternately, 5 times each (`bench/results/gpt2-v21-vs-v3-2026-10-05.txt`):
+
+| | v2.1 (`Mat`, sequential) | v3 (`Bands`), 16 threads | v3 (`Bands`), 1 thread |
+|---|---|---|---|
+| 13 forward passes, median | 1.7 s | 1.4 s | 1.9 s |
+| per token | ~0.13 s | ~0.11 s | ~0.15 s |
+| loading (noisy) | 10-12 s | 8-12 s | 8-12 s |
+
+  In a quieter moment earlier the same comparison gave 1.2 s against 0.7 s (~0.09 s against ~0.054 s per
+  token). On one thread v3 is ~12% slower: the typed API converts y to a `Mat` and the demo converts it back
+  to a list, and the bands' lists are appended at every node. The README keeps the v2 numbers until an idle
+  re-measure.
+
+### Shape checking with run-time sizes (answer to "dfdx already does this?")
+
+dfdx (Rust, const generics; last release v0.13.0, July 2023) checks constant shapes at compile time and
+falls back to `assert_eq!` at run time once a size is a `usize` (matmul, `reshape_like`). New examples:
+`examples/symbolic_reshape.bend` (n from the command line, `Mat<n, 6>` → `Mat<n·2, 3>` with
+`mul_assoc` as the proof, for every n), `symbolic_reshape_bad.bend` (`Mat<n, 5>`: no proof, does not
+compile) and `square_transpose_bad.bend` (a 768 × 768 weight used as `X·W` instead of `X·Wᵀ`: compiles with
+constant sizes, does not compile when the layer is written for any `d_in`, `d_out`). All in `check_all.py`.
+README section 01 has the comparison with links to dfdx's source.
+
+### Compile times (answer to "how bad do compile times get on deeper nets?")
+
+`scripts/compile_times.py`, table in `bench/results/compile-times-2026-10-05.md` (the machine was not idle):
+checking takes 0.22 s for 8 distinct typed layers and 0.27 s for 128; the build (mostly clang) 1.1 s and
+4.7 s. GPT-2 checks in 0.38 s and builds in 5.5 s.
+
+### Corrections
+
+- The README said GPT-2's logits match PyTorch "within 2e-4" on 11 prompts. That bound came from v1's
+  3 prompts; over the 11 prompts the largest difference is 5.8e-4 (`import numpy as np\n\n`), in v2.1 and v3
+  alike (logits are of order 100; the test's tolerance is 5e-2). Fixed in the README, `docs/AUDIT.md` and
+  `demos/gpt2/BENCHMARK.md`.
+
+### Upstream drafts (Renan posts them)
+
+- `docs/upstream/erased-last-parameter.md`: the compiler bug above, with the repro.
+- `docs/upstream/shared-readonly-array.md`: a read-only `Array` borrow that does not need `@unsafe`
+  (`Array.fork`, the answer to #885, is `@unsafe`, and `--check-only` then reports
+  `SOME PROOFS FAIL: 1 def relies on unsafe or foreign code`).
