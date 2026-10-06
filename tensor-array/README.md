@@ -4,11 +4,11 @@ Tensors in Bend 2 over a flat `Array<F32>`, **with the shape in the type**: the 
 
 - Bend: **2.0.35** · License: MIT.
 - `bend tensor-array/main.bend` and `--verdict` → `ALL PROOFS CHECK` (no `@unsafe`, no `?TODO`).
-- Tests against PyTorch and NumPy: `reference/test_tensor_array.py` (240 checks, maximum error ≈ 1.4e-6; `Bands.matvec` equal to `Mat.matmul_nt` bit for bit).
+- Tests against PyTorch and NumPy: `reference/test_tensor_array.py` (280 checks, maximum error ≈ 1.4e-6; `Bands.matvec` equal to `Mat.matmul_nt` bit for bit).
 
 ```python
 import Base
-import bend-ml-tensor-array@0.1.4.0/main.bend as TA
+import bend-ml-tensor-array@0.1.5.0/main.bend as TA
 
 def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 128n>:
   TA.Mat.matmul(100n, 784n, 128n, 3n, a, w)   # 3n = 2^3 = 8 parallel blocks
@@ -54,6 +54,7 @@ TA.Bands.matvec(2304n, 768n, w, x)   # x : Mat<1, 768>  ->  BV{w, y : Mat<1, 230
 | `Bands.zeros(d, r, c)` | `Bands<r,c>` in `2^d` bands |
 | `Bands.fill_at(r, c, i, n, xs, b)` | writes `n` numbers at flat index `i` (row-major); numbers past `r*c` are dropped |
 | `Bands.matvec` | `Bands<r,c> · Mat<1,c> = Mat<1,r>`, the bands in parallel; the same numbers as `Mat.matmul_nt`, bit for bit |
+| `Bands.matvec_l` | the same product with `x` and `y` as lists (no `Mat` conversions): the fast path for a caller that already holds lists |
 | `Bands.read_row` | row `i` as a list (an embedding lookup) |
 | `Bands.to_list` | all `r*c` numbers in row order |
 
@@ -73,6 +74,13 @@ Ultra 7 155H (`bench/mv_bands.py`, `bench/results/`):
 |---|---|
 | `cap_ok` | an `Array` with `2^cap_depth(n)` slots always has room for `n` numbers, so the constructors never allocate too little |
 | `half_cover` | the two bands of a node, `half(r)` rows and `r - half(r)` rows, add up to exactly `r` rows: no row is lost and none is counted twice |
+| `leaf_len` | the kernel of one band (`lcols`, then `bv_leaf`) puts exactly one number per row it computes on the output list |
+| `band_len` | the product of one band with `rows` rows gives exactly `rows` numbers |
+
+Not proved yet: that the whole tree (`Bands.matvec_l`) gives exactly `r` numbers. The proof would apply the
+join lemma (`join_len`, proved) to the two recursive results and to the induction hypotheses about the same
+calls, which uses each band's `Array` twice; Bend's affine rules refuse that. `reference/test_tensor_array.py`
+checks the length (and every number) on 20 shapes and all depths.
 
 Inside `Bands`, every function that walks the tree carries an erased proof that the row count it computes
 with at run time equals the one in the type.
@@ -109,6 +117,7 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 
 ## Versions
 
+- `0.1.5.0`: `Bands.matvec_l` (lists in and out) and the laws `leaf_len` and `band_len`.
 - `0.1.4.0`: `Bands<r, c>` (row bands, a parallel matrix · vector that copies no weights), with the law `half_cover`.
 
 - `0.1.3.0`: `cap_depth` is now defined by `Nat` recursion and proved (`law cap_ok`); adds `Mat.softmax_ce_checked`, `Mat.count_correct_checked` and `Mat.fill_at` (load a matrix block by block).
