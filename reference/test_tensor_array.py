@@ -73,13 +73,19 @@ def main():
         # B · x must be bit-identical to the sequential Mat.matmul_nt (same kernel, same order).
         rb = np.random.default_rng(29)
         band_cases = [(1, 1, 0, 1), (2, 3, 1, 1), (7, 5, 3, 4), (9, 4, 5, 7), (16, 8, 2, 100)]
+        # degenerate shapes: more bands than rows (empty bands), one row, one column, blocks of one
+        # number, and a block larger than the whole matrix
+        band_cases += [(3, 4, 5, 2), (1, 7, 3, 3), (6, 1, 2, 1), (5, 5, 2, 1), (4, 3, 1, 1000)]
         band_cases += [(int(rb.integers(1, 70)), int(rb.integers(1, 60)), int(rb.integers(0, 6)), int(rb.integers(1, 200))) for _ in range(10)]
         for (r, c, dep, blk) in band_cases:
             Wb = rng.standard_normal((r, c)).astype(np.float32)
             xb = rng.standard_normal(c).astype(np.float32)
             i = int(rb.integers(0, r))
             out = bend("bands", dep, r, c, blk, i, w("w", Wb), w("x", xb))
-            y, row, full = out[:r], out[r:r + c], out[r + c:]
+            y, yl, row, full = out[:r], out[r:2 * r], out[2 * r:2 * r + c], out[2 * r + c:]
+            same = yl.shape == y.shape and np.array_equal(yl, y)
+            print(f"{'ok  ' if same else 'ERROR'} Bands.matvec_l {r}x{c} d={dep} equals Bands.matvec bit for bit")
+            failures += 0 if same else 1
             check(f"Bands.matvec {r}x{c} d={dep} blk={blk}", y, Wb @ xb)
             seq = bend("nt", 0, 1, c, r, w("x1", xb.reshape(1, c)), w("w1", Wb))
             exact = y.shape == seq.shape and np.array_equal(y, seq)
