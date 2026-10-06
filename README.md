@@ -109,8 +109,8 @@ Linux x86_64 (or WSL), clang ≥ 14, Python ≥ 3.12, `curl`, ~3 GB of disk, 8 G
 ```bash
 git clone https://github.com/nuxyel/bend-ml.git && cd bend-ml
 make setup          # Bend 2.0.35 (SHA256-checked), Lean 4.34.0, Python venv, data; no sudo
-make check          # 37 checks, about 1.5 min
-make check-full     # 42 checks with GPT-2 and MNIST, about 5 min
+make check          # 38 checks, about 1.5 min
+make check-full     # 43 checks with GPT-2 and MNIST, about 5 min
 make media          # regenerate the figures and the video on this page
 ```
 
