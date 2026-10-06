@@ -2,7 +2,7 @@
 # repeated REPS times. The bands run in parallel and no weight is copied.
 import Base
 import bend-ml-tensor@0.1.2.0/main.bend as T
-import ../tensor-array/main.bend as TA
+import bend-ml-tensor-array@0.1.4.0/main.bend as TA
 
 # list of n values ((i mod 13) / 10), the same data as bench/mv.bend
 

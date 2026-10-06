@@ -29,6 +29,9 @@ def law_bpe(+n: Nat, +corpus: List<&2, Nat>, +bs: List<&2, Nat>) -> {{BPE.decode
 def law_tensor(+r: Nat, +c: Nat) -> {{Nat.mul(r, c) == Nat.mul(c, r) : Nat}}:
   T.reshape_swap(r, c)
 
+def law_bands(+n: Nat) -> {{n == Nat.add(TA.half(n), Nat.sub(n, TA.half(n))) : Nat}}:
+  TA.half_cover(n)
+
 def law_ad(+e: AG.NE, +x: Nat) -> {{AG.nbwd(e, x, 1n) == AG.nfwd(e, x) : Nat}}:
   AG.reverse_eq_forward(e, x)
 
@@ -46,8 +49,14 @@ def after(x: TA.MMul<2n, 3n, 4n>) -> Nat:
     case TA.MMul{{a, b, c}}:
       len_of(2n, 4n, TA.Mat.to_list(2n, 4n, c))
 
+# 6 x 3 in 2^2 bands, times a vector of 3 numbers: 6 numbers
+def bands_len(x: TA.BV<6n, 3n>) -> Nat:
+  match x:
+    case TA.BV{{b, y}}:
+      len_of(1n, 6n, TA.Mat.to_list(1n, 6n, y))
+
 def main() -> Nat:
-  after(prod())
+  Nat.add(after(prod()), bands_len(TA.Bands.matvec(6n, 3n, TA.Bands.zeros(2n, 6n, 3n), TA.Mat.fill(1n, 3n, 1.0))))
 """
 
 
@@ -65,7 +74,7 @@ def main():
         open(f, "w").write(src)
         r = subprocess.run([BEND, f], capture_output=True, text=True, env=ENV, cwd=d)
     out = (r.stdout + r.stderr).strip()
-    ok = r.returncode == 0 and out == "8n"
+    ok = r.returncode == 0 and out == "14n"
     print(("ok   " if ok else "ERROR ") + "published packages " + ", ".join(f"{k.replace('bend-ml-', '')}@{v}" for k, v in VERS.items() if k in NEED))
     if not ok:
         print(out[:800])

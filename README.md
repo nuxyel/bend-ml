@@ -6,7 +6,7 @@
   <a href="https://github.com/nuxyel/bend-ml/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/nuxyel/bend-ml/ci.yml?branch=main&style=flat-square&label=ci&labelColor=4d4a44&color=7e9a5e" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8b83b5?style=flat-square&labelColor=4d4a44" alt="MIT license"></a>
   <a href="https://bend-lang.com"><img src="https://img.shields.io/badge/Bend-2.0.35-8b83b5?style=flat-square&labelColor=4d4a44" alt="Bend 2.0.35"></a>
-  <img src="https://img.shields.io/badge/laws%20proved-24-7e9a5e?style=flat-square&labelColor=4d4a44" alt="24 laws proved">
+  <img src="https://img.shields.io/badge/laws%20proved-25-7e9a5e?style=flat-square&labelColor=4d4a44" alt="25 laws proved">
 </p>
 
 <p align="center">
@@ -55,11 +55,11 @@ dfdx's last release is v0.13.0 (July 2023).
 | [`bend-ml-nat-lemmas`](nat-lemmas) | 0.1.1.0 | `Nat` and `List` lemmas that Base does not have | `add_comm`, `add_assoc`, `mul_comm`, `mul_assoc`, `mul_dist`, `append_assoc`, `length_append`, `product_append`... (15) |
 | [`bend-ml-bpe-tokenizer`](bpe) | 0.1.2.0 | Byte-level BPE tokenizer (GPT-2 style) | **roundtrip** `decode(encode(s)) = s`, `vocab_bound`, `dec_append`, `train_wf`, `roundtrip_trained` |
 | [`bend-ml-tensor`](tensor) | 0.1.2.0 | `Vec<n>` and `Mat<r,c>` with the shape in the type, over lists | `reshape_swap`, `reshape_flat` |
-| [`bend-ml-tensor-array`](tensor-array) | 0.1.3.0 | the same guarantees over a flat `Array<F32>`, ~50x faster | `cap_ok`; typed `matmul`, `matmul_nt`, `matmul_tn` |
+| [`bend-ml-tensor-array`](tensor-array) | 0.1.4.0 | the same guarantees over a flat `Array<F32>`, ~50x faster; `Bands<r,c>` for a parallel matrix · vector that copies no weights | `cap_ok`, `half_cover`; typed `matmul`, `matmul_nt`, `matmul_tn`, `Bands.matvec` |
 | [`bend-ml-autograd`](autograd) | 0.1.1.0 | Automatic differentiation and layers with typed backward | **`reverse_eq_forward`** |
 
 ```python
-import bend-ml-tensor-array@0.1.3.0/main.bend as TA
+import bend-ml-tensor-array@0.1.4.0/main.bend as TA
 import bend-ml-bpe-tokenizer@0.1.2.0/main.bend as BPE
 ```
 
@@ -93,7 +93,7 @@ Bend 2.0.35 generates scalar code, with no BLAS or SIMD: on the same matrix prod
 ## 05 · What we learned
 
 - Types can carry the shapes of a whole training step, and they cost nothing at run time: the dimensions are erased.
-- Proofs cover the structure, tests cover the numbers. Of the 24 laws, the ones that matter most are the tokenizer roundtrip, `reverse_eq_forward`, the reshape size and the array capacity.
+- Proofs cover the structure, tests cover the numbers. Of the 25 laws, the ones that matter most are the tokenizer roundtrip, `reverse_eq_forward`, the reshape size and the array capacity.
 - The trust base is small and written down: the kernel, Base's `F32` primitives, and the fact that `Array.new(d)` gives `2^d` slots.
 - Speed is bounded by the compiler, not by the types. Flat arrays gave ~49x, parallel blocks ~2x; what is left is BLAS and SIMD.
 - Copying is the hidden cost: splitting a matrix for parallel work by copying it costs more than the arithmetic of a matrix · vector.
