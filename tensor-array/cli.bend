@@ -239,16 +239,21 @@ def b_out2(+r: Nat, +c: Nat, y: List<&2, F32>, br: TA.BRow<r, c>) -> IO(Unit):
     case TA.BRow{b, row}:
       b_out3(r, c, y, row, TA.Bands.to_list(r, c, b))
 
+def b_out1(+r: Nat, +c: Nat, +i: Nat, b: TA.Bands<r, c>, ml: TA.ML<1n, r>) -> IO(Unit):
+  match ml:
+    case TA.ML{m, y}:
+      b_out2(r, c, y, TA.Bands.read_row(r, c, b, i))
+
 def b_out(+r: Nat, +c: Nat, +i: Nat, bv: TA.BV<r, c>) -> IO(Unit):
   match bv:
     case TA.BV{b, y}:
-      b_out2(r, c, y, TA.Bands.read_row(r, c, b, i))
+      b_out1(r, c, i, b, TA.Mat.to_list(1n, r, y))
 
 def r_bands(+d: Nat, +r: Nat, +c: Nat, +blk: Nat, +i: Nat, fa: String, fx: String) -> IO(Unit):
   do IO<Unit>:
     ba : List<&2, U32> <- read_bytes(fa)
     bx : List<&2, U32> <- read_bytes(fx)
-    b_out(r, c, i, TA.Bands.matvec(r, c, b_fill(Nat.add(Nat.div(Nat.mul(r, c), blk), 1n), r, c, blk, 0n, floats(ba), TA.Bands.zeros(d, r, c)), floats(bx)))
+    b_out(r, c, i, TA.Bands.matvec(r, c, b_fill(Nat.add(Nat.div(Nat.mul(r, c), blk), 1n), r, c, blk, 0n, floats(ba), TA.Bands.zeros(d, r, c)), TA.Mat.from_list(1n, c, floats(bx))))
 
 def dispatch2(a1: Bool, a2: Bool, a3: Bool, a4: Bool, a5: Bool, a6: Bool, a7: Bool, a8: Bool, a9: Bool, a10: Bool, a11: Bool, args: List<String>) -> IO(Unit):
   match a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 args:
