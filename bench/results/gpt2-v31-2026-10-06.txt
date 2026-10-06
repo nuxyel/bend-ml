@@ -1,0 +1,23 @@
+GPT-2 small, "The capital of France is" + 32 tokens (36 forward passes), 2026-10-06 00:13, load average ~1.8
+(an Android emulator and a Gradle daemon running). a = v2.1 (Mat, sequential), v3 = v3.0.0 (16 bands,
+typed matvec), m = v3.1 (bands chosen from the thread count, matvec_l, bytes decoded into the arrays).
+"t=" is the time of the 36 forward passes; "weights loaded" is the load time.
+
+a t=1: weights loaded in 7s   pos 35  t=4.7s
+v3 t=1: weights loaded in 5.4s   pos 35  t=5.2s
+m t=1: weights loaded in 5.0s   pos 35  t=4.8s
+a t=16: weights loaded in 7s   pos 35  t=4.7s
+v3 t=16: weights loaded in 5.4s   pos 35  t=3.8s
+m t=16: weights loaded in 4.0s   pos 35  t=3.8s
+a t=1: weights loaded in 6s   pos 35  t=5.0s
+v3 t=1: weights loaded in 5.8s   pos 35  t=5.2s
+m t=1: weights loaded in 5.1s   pos 35  t=4.8s
+a t=16: weights loaded in 6s   pos 35  t=4.7s
+v3 t=16: weights loaded in 5.1s   pos 35  t=3.9s
+m t=16: weights loaded in 4.1s   pos 35  t=3.7s
+a t=1: weights loaded in 7s   pos 35  t=4.7s
+v3 t=1: weights loaded in 5.6s   pos 35  t=5.2s
+m t=1: weights loaded in 4.6s   pos 35  t=4.8s
+a t=16: weights loaded in 7s   pos 35  t=4.7s
+v3 t=16: weights loaded in 6.1s   pos 35  t=4.2s
+m t=16: weights loaded in 3.9s   pos 35  t=3.6s
