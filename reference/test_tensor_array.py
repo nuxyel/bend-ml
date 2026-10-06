@@ -69,6 +69,25 @@ def main():
             hits = int((L.detach().argmax(1) == y).sum())
             check(f"count_correct n={n} c={c}", bend("hits", n, c, w("l", L.detach().numpy()), w("y", y.numpy().astype(np.float32))), [hits])
 
+        # Bands: filled in blocks of random size, then B · x, one row and the whole matrix.
+        # B · x must be bit-identical to the sequential Mat.matmul_nt (same kernel, same order).
+        rb = np.random.default_rng(29)
+        band_cases = [(1, 1, 0, 1), (2, 3, 1, 1), (7, 5, 3, 4), (9, 4, 5, 7), (16, 8, 2, 100)]
+        band_cases += [(int(rb.integers(1, 70)), int(rb.integers(1, 60)), int(rb.integers(0, 6)), int(rb.integers(1, 200))) for _ in range(10)]
+        for (r, c, dep, blk) in band_cases:
+            Wb = rng.standard_normal((r, c)).astype(np.float32)
+            xb = rng.standard_normal(c).astype(np.float32)
+            i = int(rb.integers(0, r))
+            out = bend("bands", dep, r, c, blk, i, w("w", Wb), w("x", xb))
+            y, row, full = out[:r], out[r:r + c], out[r + c:]
+            check(f"Bands.matvec {r}x{c} d={dep} blk={blk}", y, Wb @ xb)
+            seq = bend("nt", 0, 1, c, r, w("x1", xb.reshape(1, c)), w("w1", Wb))
+            exact = y.shape == seq.shape and np.array_equal(y, seq)
+            print(f"{'ok  ' if exact else 'ERROR'} Bands.matvec {r}x{c} d={dep} equals matmul_nt bit for bit")
+            failures += 0 if exact else 1
+            check(f"Bands.read_row {r}x{c} d={dep} row {i}", row, Wb[i])
+            check(f"Bands.to_list {r}x{c} d={dep} blk={blk}", full, Wb)
+
     print("FAILURES:", failures)
     sys.exit(1 if failures else 0)
 

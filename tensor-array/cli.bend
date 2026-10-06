@@ -220,6 +220,36 @@ def f32b(m: Maybe<&2, F32>) -> F32:
 def f32(s: String) -> F32:
   f32b(F32.read(s))
 
+# ---- Bands: fill in blocks of blk numbers, then B · x, row i and the whole matrix ----
+
+def b_fill(k: Nat, +r: Nat, +c: Nat, +blk: Nat, +i: Nat, +xs: List<&2, F32>, b: TA.Bands<r, c>) -> TA.Bands<r, c>:
+  match k:
+    case 0n:
+      b
+    case 1n+p:
+      b_fill(p, r, c, blk, Nat.add(i, blk), List.drop(&2, F32, xs, blk), TA.Bands.fill_at(r, c, i, Nat.min(blk, List.length(&2, F32, xs)), List.take(&2, F32, xs, blk), b))
+
+def b_out3(-r: Nat, -c: Nat, y: List<&2, F32>, row: List<&2, F32>, al: TA.BRow<r, c>) -> IO(Unit):
+  match al:
+    case TA.BRow{b, all}:
+      IO.print(fshow(y) ++ fshow(row) ++ fshow(all))
+
+def b_out2(+r: Nat, +c: Nat, y: List<&2, F32>, br: TA.BRow<r, c>) -> IO(Unit):
+  match br:
+    case TA.BRow{b, row}:
+      b_out3(r, c, y, row, TA.Bands.to_list(r, c, b))
+
+def b_out(+r: Nat, +c: Nat, +i: Nat, bv: TA.BV<r, c>) -> IO(Unit):
+  match bv:
+    case TA.BV{b, y}:
+      b_out2(r, c, y, TA.Bands.read_row(r, c, b, i))
+
+def r_bands(+d: Nat, +r: Nat, +c: Nat, +blk: Nat, +i: Nat, fa: String, fx: String) -> IO(Unit):
+  do IO<Unit>:
+    ba : List<&2, U32> <- read_bytes(fa)
+    bx : List<&2, U32> <- read_bytes(fx)
+    b_out(r, c, i, TA.Bands.matvec(r, c, b_fill(Nat.add(Nat.div(Nat.mul(r, c), blk), 1n), r, c, blk, 0n, floats(ba), TA.Bands.zeros(d, r, c)), floats(bx)))
+
 def dispatch2(a1: Bool, a2: Bool, a3: Bool, a4: Bool, a5: Bool, a6: Bool, a7: Bool, a8: Bool, a9: Bool, a10: Bool, a11: Bool, args: List<String>) -> IO(Unit):
   match a1 a2 a3 a4 a5 a6 a7 a8 a9 a10 a11 args:
     case True{} _ _ _ _ _ _ _ _ _ _ Con{p, Con{n, Con{k, Con{m, Con{fa, Con{fb, Nil{}}}}}}}:
@@ -247,10 +277,19 @@ def dispatch2(a1: Bool, a2: Bool, a3: Bool, a4: Bool, a5: Bool, a6: Bool, a7: Bo
     case _ _ _ _ _ _ _ _ _ _ _ _:
       IO.print("invalid usage")
 
+def dispatch1(isb: Bool, +mode: String, rest: List<String>) -> IO(Unit):
+  match isb rest:
+    case True{} Con{d, Con{r, Con{c, Con{blk, Con{i, Con{fa, Con{fx, Nil{}}}}}}}}:
+      r_bands(nat(d), nat(r), nat(c), nat(blk), nat(i), fa, fx)
+    case True{} _:
+      IO.print("invalid usage")
+    case False{} xs:
+      dispatch2(String.eq(mode, "nn"), String.eq(mode, "nt"), String.eq(mode, "tn"), String.eq(mode, "bias"), String.eq(mode, "relu"), String.eq(mode, "relu_bwd"), String.eq(mode, "sgd"), String.eq(mode, "add"), String.eq(mode, "colsum"), String.eq(mode, "ce"), String.eq(mode, "hits"), xs)
+
 def dispatch(args: List<String>) -> IO(Unit):
   match args:
     case Con{prog, Con{+mode, rest}}:
-      dispatch2(String.eq(mode, "nn"), String.eq(mode, "nt"), String.eq(mode, "tn"), String.eq(mode, "bias"), String.eq(mode, "relu"), String.eq(mode, "relu_bwd"), String.eq(mode, "sgd"), String.eq(mode, "add"), String.eq(mode, "colsum"), String.eq(mode, "ce"), String.eq(mode, "hits"), rest)
+      dispatch1(String.eq(mode, "bands"), mode, rest)
     case _:
       IO.print("invalid usage")
 
