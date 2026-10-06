@@ -48,7 +48,7 @@ def main():
         print(f"{'ok  ' if clean else 'ERROR'} {f}: no @unsafe or ?TODO")
 
     # 2. shape errors that MUST fail to check
-    for f, msg in [("tensor/tests/bad_matmul.bend", "expected"), ("tensor/tests/bad_reshape.bend", "expected"), ("tensor-array/tests/bad_matmul.bend", "expected"), ("tensor-array/tests/bad_grad.bend", "expected")]:
+    for f, msg in [("tensor/tests/bad_matmul.bend", "expected"), ("tensor/tests/bad_reshape.bend", "expected"), ("tensor-array/tests/bad_matmul.bend", "expected"), ("tensor-array/tests/bad_grad.bend", "expected"), ("examples/runtime_batch_bad.bend", "expected")]:
         run(f"{f} must be a type error", [BEND, f], lambda o, c, m=msg: "SOME PROOFS FAIL" in o and m in o)
     run("tensor/tests/ok.bend compiles and runs", [BEND, "tensor/tests/ok.bend"], lambda o, c: "18 18 18 18" in o)
     run("tensor-array/tests/ok.bend compiles and runs", [BEND, "tensor-array/tests/ok.bend"], lambda o, c: o.strip() == "8n")
@@ -58,6 +58,7 @@ def main():
     run("bpe vs Python reference (train/encode/decode)", [PY, "reference/test_bpe.py"])
     run("tensor vs PyTorch", [PY, "reference/test_tensor.py"])
     run("tensor-array vs PyTorch", [PY, "reference/test_tensor_array.py"])
+    run("runtime batch size (examples/runtime_batch.bend) vs NumPy", [PY, "reference/test_runtime_batch.py"])
     run("autograd vs PyTorch (gradient checking)", [PY, "reference/test_autograd.py"])
     cases = "80" if FULL else "30"
     run(f"autograd on {120 if FULL else 30} random expression trees vs PyTorch", [PY, "reference/test_autograd_random.py"], extra_env={"FUZZ_CASES": "120" if FULL else "30"})
