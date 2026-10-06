@@ -33,6 +33,21 @@ The sizes do not have to be constants: in [`examples/runtime_batch.bend`](exampl
 <p align="center"><img src="docs/media/shots/reshape-error.png" alt="bend rejects a reshape from 2x6 to 5x3: expected 12n, observed 15n" width="80%"></p>
 </details>
 
+<details>
+<summary>how is this different from const generics (Rust's dfdx)?</summary>
+
+[dfdx](https://github.com/coreylowman/dfdx) checks shapes with const generics: `Tensor<Rank2<3, 10>>` · `Tensor<Rank2<10, 5>>` is checked when it compiles. A size known only at run time is a `usize`, and from then on dfdx checks it when the program runs: a product asserts `assert_eq!(self.shape.1, rhs.shape.0)` ([matmul](https://github.com/coreylowman/dfdx/blob/4722a99d303f347d6088d95867d007c75ca6dd78/dfdx-core/src/tensor_ops/matmul/mod.rs#L191-L192)), and a reshape to a run-time shape asserts the number of elements ([reshape_like](https://github.com/coreylowman/dfdx/blob/4722a99d303f347d6088d95867d007c75ca6dd78/dfdx-core/src/tensor_ops/reshape_to/mod.rs#L91)). Only fully constant reshapes are checked at compile time ([`AssertSameNumel`](https://github.com/coreylowman/dfdx/blob/4722a99d303f347d6088d95867d007c75ca6dd78/dfdx-core/src/shapes/same_numel.rs#L13)).
+
+In Bend a run-time size is still a variable in the type, and the checker reasons about it:
+
+- [`examples/symbolic_reshape.bend`](examples/symbolic_reshape.bend) reads `n` from the command line and reshapes `Mat<n, 6>` into `Mat<n·2, 3>`. It compiles once, for every `n`, with a proof that `n·(2·3) = (n·2)·3` (`mul_assoc` from `bend-ml-nat-lemmas`). Asking for `Mat<n, 5>` instead ([`symbolic_reshape_bad.bend`](examples/symbolic_reshape_bad.bend)) does not compile: no proof of `n·6 = n·5` exists.
+- [`examples/runtime_batch.bend`](examples/runtime_batch.bend) takes the batch size from its input file; every layer after the one check at the boundary is typed for any batch size.
+- [`examples/square_transpose_bad.bend`](examples/square_transpose_bad.bend) is the bug that fits by accident: a 768 × 768 weight used as `X·W` instead of `X·Wᵀ`. With the sizes written as constants it compiles, in Bend as in any shape checker. Written once for any `d_in` and `d_out`, the two sizes have different names and it does not compile, even though it is only ever called with 768 and 768.
+- The structural guarantees are laws checked by the kernel (section 02), not tests.
+
+dfdx's last release is v0.13.0 (July 2023).
+</details>
+
 ## 02 · Laws, not trust
 
 | Package | Version | What it is | Proved LAWS |
