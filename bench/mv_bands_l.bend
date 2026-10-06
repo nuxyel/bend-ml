@@ -2,7 +2,7 @@
 # y(MN) = W(MN x KN) · x(KN) with W in 2^DEPTH row bands, repeated REPS times.
 import Base
 import bend-ml-tensor@0.1.2.0/main.bend as T
-import ../tensor-array/main.bend as TA
+import bend-ml-tensor-array@0.1.5.0/main.bend as TA
 
 # list of n values ((i mod 13) / 10), the same data as bench/mv.bend
 

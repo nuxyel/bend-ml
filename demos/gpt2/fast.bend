@@ -7,7 +7,7 @@
 # Run from the repository root, after `reference/gpt2_prep.py --split`.
 
 import Base
-import ../../tensor-array/main.bend as TA
+import bend-ml-tensor-array@0.1.5.0/main.bend as TA
 import bend-ml-tensor@0.1.2.0/main.bend as T
 import bend-ml-bpe-tokenizer@0.1.2.0/main.bend as BPE
 import ./load.bend as L
