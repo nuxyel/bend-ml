@@ -53,6 +53,10 @@ def main():
     run("tensor/tests/ok.bend compiles and runs", [BEND, "tensor/tests/ok.bend"], lambda o, c: "18 18 18 18" in o)
     run("tensor-array/tests/ok.bend compiles and runs", [BEND, "tensor-array/tests/ok.bend"], lambda o, c: o.strip() == "8n")
     run("examples/symbolic_reshape.bend reshapes Mat<3, 6> into Mat<6, 3>", [BEND, "examples/symbolic_reshape.bend", "--", "3"], lambda o, c: "regroup(x) : Mat<6, 3>" in o and "15 16 17" in o)
+    with tempfile.TemporaryDirectory() as d:
+        c_out = os.path.join(d, "par_bands.c")
+        run("Bands.matvec compiles to a parallel join (no sequential fallback)", [BEND, "tensor-array/tests/par_bands.bend", "-o", c_out],
+            lambda o, c: c == 0 and os.path.exists(c_out) and re.search(r"FID_\w*_BMV_J\d+", open(c_out).read()) is not None)
     run("tensor-array/tests/checked.bend rejects wrong label counts", [BEND, "tensor-array/tests/checked.bend"], lambda o, c: o.strip() == "[1n, 0n, 0n, 1n, 0n, 0n]")
 
     # 3. tests against the Python references
