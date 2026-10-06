@@ -996,25 +996,39 @@ def bfill_l(+r: Nat, +c: Nat, +i: Nat, +n: Nat) -> Bool:
 def bfill_r(+r: Nat, +c: Nat, +i: Nat) -> Bool:
   Nat.is_le(Nat.mul(half(r), c), i)
 
-# writes xs (n numbers) at flat index i; l and rt say which bands it touches (bfill_l,
-# bfill_r); rr is the row count r at run time
+# writes the first n numbers of xs at index i (and nothing past them)
+def fill_n(n: Nat, xs: List<&2, F32>, +i: U32, a: Array<F32>) -> Array<F32>:
+  match n xs:
+    case 1n+p Con{h, t}:
+      fill_n(p, t, (i + 1 : U32), Array.set(F32, a, i, h))
+    case _ _:
+      a
+
+def fill_band(-r: Nat, -c: Nat, n: Nat, xs: List<&2, F32>, +i: U32, m: Mat<r, c>) -> Mat<r, c>:
+  match m:
+    case Mat{d}:
+      Mat{fill_n(n, xs, i, d)}
+
+# writes the first n numbers of xs at flat index i; l and rt say which bands they touch
+# (bfill_l, bfill_r); rr is the row count r at run time. A block that crosses into the second
+# band is not copied: the first band writes only its part, the second gets the rest by List.drop.
 def bfill(+c: Nat, -r: Nat, b: Bands<r, c>, l: Bool, rt: Bool, +rr: Nat, -e: {rr == r : Nat}, +i: Nat, +n: Nat, +xs: List<&2, F32>) -> Bands<r, c>:
   match b l rt:
     case BLeaf{m} _ _:
-      BLeaf{Mat.fill_at(r, c, U32.from_nat(i), xs, m)}
+      BLeaf{fill_band(r, c, n, xs, U32.from_nat(i), m)}
     case BNode{x, y} True{} _:
       BNode{bfill(c, half(r), x, bfill_l(half(rr), c, i, n), bfill_r(half(rr), c, i), half(rr), eq_half(rr, r, e), i, n, xs), y}
     case BNode{x, y} False{} True{}:
       BNode{x, bfill(c, Nat.sub(r, half(r)), y, bfill_l(Nat.sub(rr, half(rr)), c, Nat.sub(i, Nat.mul(half(rr), c)), n), bfill_r(Nat.sub(rr, half(rr)), c, Nat.sub(i, Nat.mul(half(rr), c))), Nat.sub(rr, half(rr)), eq_rest(rr, r, e), Nat.sub(i, Nat.mul(half(rr), c)), n, xs)}
     case BNode{x, y} False{} False{}:
-      BNode{bfill(c, half(r), x, bfill_l(half(rr), c, i, Nat.sub(Nat.mul(half(rr), c), i)), bfill_r(half(rr), c, i), half(rr), eq_half(rr, r, e), i, Nat.sub(Nat.mul(half(rr), c), i), List.take(&2, F32, xs, Nat.sub(Nat.mul(half(rr), c), i))), bfill(c, Nat.sub(r, half(r)), y, bfill_l(Nat.sub(rr, half(rr)), c, 0n, Nat.sub(n, Nat.sub(Nat.mul(half(rr), c), i))), bfill_r(Nat.sub(rr, half(rr)), c, 0n), Nat.sub(rr, half(rr)), eq_rest(rr, r, e), 0n, Nat.sub(n, Nat.sub(Nat.mul(half(rr), c), i)), List.drop(&2, F32, xs, Nat.sub(Nat.mul(half(rr), c), i)))}
+      BNode{bfill(c, half(r), x, bfill_l(half(rr), c, i, Nat.sub(Nat.mul(half(rr), c), i)), bfill_r(half(rr), c, i), half(rr), eq_half(rr, r, e), i, Nat.sub(Nat.mul(half(rr), c), i), xs), bfill(c, Nat.sub(r, half(r)), y, bfill_l(Nat.sub(rr, half(rr)), c, 0n, Nat.sub(n, Nat.sub(Nat.mul(half(rr), c), i))), bfill_r(Nat.sub(rr, half(rr)), c, 0n), Nat.sub(rr, half(rr)), eq_rest(rr, r, e), 0n, Nat.sub(n, Nat.sub(Nat.mul(half(rr), c), i)), List.drop(&2, F32, xs, Nat.sub(Nat.mul(half(rr), c), i)))}
 
 def bfill_top(ok: Bool, +r: Nat, +c: Nat, b: Bands<r, c>, +i: Nat, +n: Nat, +xs: List<&2, F32>) -> Bands<r, c>:
   match ok:
     case True{}:
       bfill(c, r, b, bfill_l(r, c, i, n), bfill_r(r, c, i), r, {==}, i, n, xs)
     case False{}:
-      bfill(c, r, b, bfill_l(r, c, i, Nat.sub(Nat.mul(r, c), i)), bfill_r(r, c, i), r, {==}, i, Nat.sub(Nat.mul(r, c), i), List.take(&2, F32, xs, Nat.sub(Nat.mul(r, c), i)))
+      bfill(c, r, b, bfill_l(r, c, i, Nat.sub(Nat.mul(r, c), i)), bfill_r(r, c, i), r, {==}, i, Nat.sub(Nat.mul(r, c), i), xs)
 
 # writes the n numbers of xs into b starting at flat index i (row-major, as Mat.fill_at);
 # numbers past r*c are dropped. For loading a large matrix block by block.
