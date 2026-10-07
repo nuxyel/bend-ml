@@ -1,6 +1,6 @@
 # Draft issue for bendlang/bend: an erased last parameter turns a parallel let into sequential calls
 
-Status: draft, not posted. Renan posts it. Checked for duplicates on 2026-10-06 (searched "erased",
+Status: posted as https://github.com/bendlang/bend/issues/1374 (2026-10-06). Checked for duplicates on 2026-10-06 (searched "erased",
 "parallel let", "fork join"): none. Reproduced on 2.0.35 and on main 0ad47fc.
 
 ---

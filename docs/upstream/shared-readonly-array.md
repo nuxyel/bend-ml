@@ -1,6 +1,6 @@
 # Draft issue for bendlang/bend: a safe read-only borrow of an `Array` across a parallel let
 
-Status: draft, not posted. Renan posts it. Checked for duplicates on 2026-10-06: #885 asked for a
+Status: posted as https://github.com/bendlang/bend/issues/1376 (2026-10-06). Checked for duplicates on 2026-10-06: #885 asked for a
 bang to borrow an `Array` and was answered with `Array.fork` / `Array.join`, which are `@unsafe` (still on
 main 0ad47fc).
 

@@ -1,6 +1,6 @@
 # Draft for bendlang/bend: IO.fork does not run pure work on several cores
 
-Status: draft, not posted. Renan posts it. Checked for duplicates on 2026-10-06: none found.
+Status: posted as https://github.com/bendlang/bend/issues/1375 (2026-10-06). Checked for duplicates on 2026-10-06: none found.
 Reproduced on 2.0.35 and on main 0ad47fc.
 
 ---

@@ -528,3 +528,9 @@ logits as v3.0 and v2.1, digit for digit.
   v3.1 903 MB. The peak *virtual* size of v3.1 is 41 GB (v2.1 and v3.0: 10.6 GB): address space reserved, not
   memory used; cause not investigated.
 - `IO.fork` control: the same loops as parallel lets scale (1.69 s → 0.85 s); `docs/upstream/io_fork_parallel_control.bend`.
+
+### Upstream issues opened (2026-10-06, by Renan)
+
+- [bendlang/bend#1374](https://github.com/bendlang/bend/issues/1374): an erased last parameter makes a parallel let sequential (`docs/upstream/erased-last-parameter.md`).
+- [bendlang/bend#1375](https://github.com/bendlang/bend/issues/1375): `IO.fork` computations run their pure work on one core (`docs/upstream/io-fork-parallel.md`; not a duplicate of #831, which was about parallel lets after closure calls and is fixed in 2.0.13).
+- [bendlang/bend#1376](https://github.com/bendlang/bend/issues/1376): a read-only `Array` borrow without `@unsafe` (`docs/upstream/shared-readonly-array.md`).
