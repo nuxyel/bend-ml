@@ -1,6 +1,10 @@
 # Draft issue for bendlang/bend: an erased last parameter turns a parallel let into sequential calls
 
-Status: posted as https://github.com/bendlang/bend/issues/1374 (2026-10-06). Checked for duplicates on 2026-10-06 (searched "erased",
+Status: posted as https://github.com/bendlang/bend/issues/1374 (2026-10-06). Fix proposed in
+https://github.com/bendlang/bend/pull/1377 (2026-10-07): `anf` cut the call prefix before an erased argument too, so
+`tree(q, i)` was split off as a sequential let; now only a live argument cuts it (NOTES.md, "Upstream PR for #1374").
+The sibling reports are https://github.com/bendlang/bend/issues/1375 (`io-fork-parallel.md`) and
+https://github.com/bendlang/bend/issues/1376 (`shared-readonly-array.md`). Checked for duplicates on 2026-10-06 (searched "erased",
 "parallel let", "fork join"): none. Reproduced on 2.0.35 and on main 0ad47fc.
 
 ---

@@ -373,7 +373,9 @@ parallel work. Plans after v3 (llama.bend, a training framework) are in the priv
   1. **An erased parameter at the end of the parameter list turns the parallel let into two sequential
      calls.** `bmv(+c, -r, b, xp, +rr, -e)` had no join task in the C; `bmv(+c, -r, b, +rr, -e, xp)` has one.
      Minimal repro: `docs/upstream/erased_last_{ok,bad}.bend` (16 leaves of a flat loop: ok 0.054 s → 0.011 s
-     with 16 threads; bad 0.053 s → 0.055 s). Draft report: `docs/upstream/erased-last-parameter.md`.
+     with 16 threads; bad 0.053 s → 0.055 s). Draft report: `docs/upstream/erased-last-parameter.md`, posted as
+     [bendlang/bend#1374](https://github.com/bendlang/bend/issues/1374); cause and fix in
+     [bendlang/bend#1377](https://github.com/bendlang/bend/pull/1377) (open; see "Upstream issues opened").
   2. **A non-tail recursive helper in the fork tree halves the gain.** `half(n) = 1 + half(n - 2)` called at
      every node: 50257 × 768, 40 products, 16 threads, 0.69 s; the same with a tail loop (or `Nat.div`)
      0.36 s. `half` is now `half.go(n, acc)`, a flat loop.
@@ -439,8 +441,9 @@ checking takes 0.22 s for 8 distinct typed layers and 0.27 s for 128; the build 
 
 ### Upstream drafts (Renan posts them)
 
-- `docs/upstream/erased-last-parameter.md`: the compiler bug above, with the repro.
-- `docs/upstream/shared-readonly-array.md`: a read-only `Array` borrow that does not need `@unsafe`
+- `docs/upstream/erased-last-parameter.md`: the compiler bug above, with the repro. Posted as
+  [bendlang/bend#1374](https://github.com/bendlang/bend/issues/1374); fix in [#1377](https://github.com/bendlang/bend/pull/1377).
+- `docs/upstream/shared-readonly-array.md` ([bendlang/bend#1376](https://github.com/bendlang/bend/issues/1376)): a read-only `Array` borrow that does not need `@unsafe`
   (`Array.fork`, the answer to #885, is `@unsafe`, and `--check-only` then reports
   `SOME PROOFS FAIL: 1 def relies on unsafe or foreign code`).
 
@@ -461,7 +464,8 @@ v3.0 profile: `wte` (38.6 M numbers) 1.9 s, the 12 layers (85 M) 4.8 s, ~50 ns p
   (`docs/upstream/io_fork_parallel.bend`: 4 forks of a flat loop of 4 G steps seeded at run time): 1.86 s with 1 thread,
   1.73 s with 16, user time equal to real time. In Bend 2.0.35 `IO.fork` interleaves computations on one core;
   the guide's "each runs its pure code (in parallel, on every core)" does not hold across forks. Parallelism
-  across cores comes from parallel lets in pure code. Reverted; noted for Renan (upstream, below).
+  across cores comes from parallel lets in pure code. Reverted; reported as
+  [bendlang/bend#1375](https://github.com/bendlang/bend/issues/1375) (`docs/upstream/io-fork-parallel.md`).
 - **Size check at the boundary:** every weight file must hold exactly `r*c*4` bytes (`check_size` with
   `File.size`), otherwise the program stops: `h3.fw.bin: expected 9437184 bytes, found 1000000; run
   reference/gpt2_prep.py --split again` (tested with a truncated copy in a temporary tree of links).
@@ -510,12 +514,14 @@ logits as v3.0 and v2.1, digit for digit.
 - Loading in parallel: needs a pure parallel decode (for example splitting a band's `Array` by its `ANode`
   halves and decoding each half in a parallel let); not tried.
 
-### For Renan to post upstream (he opens the issues or PRs himself, later)
+### For Renan to post upstream (all three posted on 2026-10-06; see "Upstream issues opened" below)
 
-- `docs/upstream/erased-last-parameter.md` (the parallel let made sequential by an erased last parameter).
-- `docs/upstream/shared-readonly-array.md` (a read-only `Array` borrow without `@unsafe`).
-- New: `IO.fork` does not run pure work on several cores (exp. 12); worth a question or a guide fix, since
-  the guide says it does. Draft and repro: `docs/upstream/io-fork-parallel.md`, `io_fork_parallel.bend`.
+- `docs/upstream/erased-last-parameter.md` (the parallel let made sequential by an erased last parameter):
+  [bendlang/bend#1374](https://github.com/bendlang/bend/issues/1374), fix in [#1377](https://github.com/bendlang/bend/pull/1377).
+- `docs/upstream/shared-readonly-array.md` (a read-only `Array` borrow without `@unsafe`):
+  [bendlang/bend#1376](https://github.com/bendlang/bend/issues/1376).
+- `IO.fork` does not run pure work on several cores (exp. 12), although the guide says it does. Draft and
+  repro: `docs/upstream/io-fork-parallel.md`, `io_fork_parallel.bend`: [bendlang/bend#1375](https://github.com/bendlang/bend/issues/1375).
 
 ### v3.1 measurements added at the end (2026-10-06)
 
@@ -534,3 +540,26 @@ logits as v3.0 and v2.1, digit for digit.
 - [bendlang/bend#1374](https://github.com/bendlang/bend/issues/1374): an erased last parameter makes a parallel let sequential (`docs/upstream/erased-last-parameter.md`).
 - [bendlang/bend#1375](https://github.com/bendlang/bend/issues/1375): `IO.fork` computations run their pure work on one core (`docs/upstream/io-fork-parallel.md`; not a duplicate of #831, which was about parallel lets after closure calls and is fixed in 2.0.13).
 - [bendlang/bend#1376](https://github.com/bendlang/bend/issues/1376): a read-only `Array` borrow without `@unsafe` (`docs/upstream/shared-readonly-array.md`).
+
+### Upstream PR for #1374 (2026-10-07, by Renan)
+
+- [bendlang/bend#1377](https://github.com/bendlang/bend/pull/1377) (open, from `nuxyel/bend`, branch
+  `fix/1374-erased-last-fork`), announced on [#1374](https://github.com/bendlang/bend/issues/1374#issuecomment-6030940652).
+  #1375 and #1376 stay with the Bend team.
+- **Cause** (found with temporary logs in `anf`, `bend2/comp.ts`): `anf`'s `spine` cut the call prefix before
+  every argument, live or erased. In `tree(q, i, z)` with `z` erased, the prefix `tree(q, i)` already carries
+  every live argument, so `term_spine` reads it as a complete call; `anf` cut it into a sequential
+  `h = tree(q, i)`, and the parallel let's values became plain variables (continuations, no join). With the
+  erased parameter in the middle, the prefix before it is not a complete call, so nothing was cut.
+- **Fix** (5 lines, +9 ttok, `comp.ts` 63,858 of its 64,000 cap): only a live argument over-applies a call, so
+  the prefix is cut only before one. Side effect: a tail call into a non-flat def with an erased last
+  parameter is a tail call again (`Word.add_comm.go` → `Word.add_comm.arm` lost 8 continuations).
+- **Measured** (this machine, main 0ad47fc): the #1374 repro 1.013 s → 0.169 s on 16 threads; bend-ml's `bmv`
+  with `-e` last gets its join (`BMV_J27`). No regression found: C/JS/.mjs/binaries for all 1,659 files under
+  Bend's `tests/`, `bench/runtime/` and `demos/` byte-identical except `proof/word_add_comm` and one renamed
+  local; the three lanes print the same on all 1,593 tests; the 17 runtime benches build identical binaries
+  (SEQ 0.999, PAR 1.004 geomean); compile time 1.007; checker benches 0.97-1.00. Cluster gates not run.
+- **Test** `tests/compile/fork_erased_last.bend`: its C gains the join, but stdout can't see a fork, so it does
+  not catch a revert (said in its header and in the PR, following Bend's review practice).
+- Once a Bend release carries the fix, bend-ml's workaround (a runtime parameter after `-e` in `bmv`) is no
+  longer needed, but the CI check on the join stays; a version bump goes in this file (CLAUDE.md rule 1).

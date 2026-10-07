@@ -97,7 +97,7 @@ Bend 2.0.35 generates scalar code, with no BLAS or SIMD: on the same matrix prod
 - The trust base is small and written down: the kernel, Base's `F32` primitives, and the fact that `Array.new(d)` gives `2^d` slots.
 - Speed is bounded by the compiler, not by the types. Flat arrays gave ~49x, parallel blocks ~2x; what is left is BLAS and SIMD.
 - Copying is the hidden cost: splitting a matrix for parallel work by copying it costs more than the arithmetic of a matrix · vector. Splitting the data structure itself (row bands, each its own `Array`) costs nothing per call.
-- Read the generated C when parallel code does not scale: in Bend 2.0.35 an erased parameter at the end of a def's parameter list turns its parallel let into two sequential calls ([report draft](docs/upstream/erased-last-parameter.md)).
+- Read the generated C when parallel code does not scale: in Bend 2.0.35 an erased parameter at the end of a def's parameter list turns its parallel let into two sequential calls ([bendlang/bend#1374](https://github.com/bendlang/bend/issues/1374), fix proposed in [#1377](https://github.com/bendlang/bend/pull/1377); [repro](docs/upstream/erased-last-parameter.md)).
 - Types do not slow the checker down with depth: 128 dense layers of distinct sizes check in 0.27 s (8 layers: 0.22 s); building, mostly clang, takes 4.7 s ([table](bench/results/compile-times-2026-10-05.md)).
 - The GPU only helps compute-bound work; our kernels are chains of dependent pointer loads.
 - Measuring corrected some of my early claims: PyTorch takes 21 ms per token, not 150 ms; the GPU is not "slower everywhere"; and the "~10 GB" of GPT-2 memory was virtual size (the resident peak is ~1.5 GB).
