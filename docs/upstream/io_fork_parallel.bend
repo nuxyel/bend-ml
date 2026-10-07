@@ -1,5 +1,7 @@
-# Four IO.fork computations of a flat loop, seeded at run time so nothing is folded at compile time.
-# Bend 2.0.35: 1.86 s with --threads 1, 1.73 s with --threads 16, user time equal to real time.
+# Four IO.fork computations. Each reads the clock INSIDE the fork and then runs a flat loop seeded with it,
+# so the work can only happen in the forked computation (not when the action is built, and not in the
+# joiner). On Bend 2.0.35 and on main (0ad47fc) this takes the same time with --threads 1 and --threads 16,
+# and the same time as io_fork_sequential.bend, which runs the four jobs one after another.
 #
 #   bend io_fork_parallel.bend -o f && time ./f --threads 1 && time ./f --threads 16
 import Base
@@ -11,8 +13,13 @@ def work(n: Nat, acc: U32) -> U32:
     case 1n+p:
       work(p, (acc * 1103515245 + 12345 : U32))
 
+# the forked computation needs the value for its own effect, so it cannot leave the work to the joiner
 def job(+seed: U32) -> IO(U32):
-  IO.pure(U32, work(4000000000n, seed))
+  do IO<U32>:
+    +now : Nat <- IO.now()
+    +v : U32 = work(4000000000n, (seed + U32.from_nat(now) : U32))
+    IO.print(U32.show(v))
+    return v
 
 def main() -> IO(Unit):
   do IO<Unit>:

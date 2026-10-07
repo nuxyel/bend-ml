@@ -1,7 +1,8 @@
 # Draft issue for bendlang/bend: a safe read-only borrow of an `Array` across a parallel let
 
-Status: draft, not posted. Renan posts it. Checked for duplicates on 2026-10-05: #885 asked for a
-bang to borrow an `Array` and was answered with `Array.fork` / `Array.join`, which are `@unsafe`.
+Status: draft, not posted. Renan posts it. Checked for duplicates on 2026-10-06: #885 asked for a
+bang to borrow an `Array` and was answered with `Array.fork` / `Array.join`, which are `@unsafe` (still on
+main 0ad47fc).
 
 ---
 
@@ -39,6 +40,11 @@ All with `--threads 16`; the full table, with 1, 4 and 8 threads, is `bench/resu
 is cloned. It is safe and proved (`half_cover`), and it is the workaround we use. But the bands are
 decided when the matrix is loaded, and every operation that needs the whole matrix (an embedding lookup,
 a transposed product for training) has to walk the tree.
+
+The guide's Ownership section (`guide/SHADERS.md`) describes the borrow the compiler already does: "The
+compiler borrows a boxed parameter (not an `Array`) that the def only matches or passes to a borrower".
+Arrays are the one kind of data that a library cannot share read-only between tasks without either copying
+or `@unsafe`.
 
 ## Request
 

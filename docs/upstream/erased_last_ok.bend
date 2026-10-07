@@ -14,7 +14,7 @@ def work(n: Nat, acc: U32) -> U32:
 def tree(+d: Nat, +i: U32) -> U32:
   match d:
     case 0n:
-      work(30000000n, i)
+      work(600000000n, i)
     case 1n+q:
       a b = tree(q, (i * 2 : U32)) tree(q, (i * 2 + 1 : U32))
       (a + b : U32)
