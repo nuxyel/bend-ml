@@ -375,7 +375,7 @@ parallel work. Plans after v3 (llama.bend, a training framework) are in the priv
      Minimal repro: `docs/upstream/erased_last_{ok,bad}.bend` (16 leaves of a flat loop: ok 0.054 s → 0.011 s
      with 16 threads; bad 0.053 s → 0.055 s). Draft report: `docs/upstream/erased-last-parameter.md`, posted as
      [bendlang/bend#1374](https://github.com/bendlang/bend/issues/1374); cause and fix in
-     [bendlang/bend#1377](https://github.com/bendlang/bend/pull/1377) (open; see "Upstream issues opened").
+     [bendlang/bend#1377](https://github.com/bendlang/bend/pull/1377) (merged 2026-10-07; see "Upstream PR for #1374").
   2. **A non-tail recursive helper in the fork tree halves the gain.** `half(n) = 1 + half(n - 2)` called at
      every node: 50257 × 768, 40 products, 16 threads, 0.69 s; the same with a tail loop (or `Nat.div`)
      0.36 s. `half` is now `half.go(n, acc)`, a flat loop.
@@ -543,9 +543,12 @@ logits as v3.0 and v2.1, digit for digit.
 
 ### Upstream PR for #1374 (2026-10-07, by Renan)
 
-- [bendlang/bend#1377](https://github.com/bendlang/bend/pull/1377) (open, from `nuxyel/bend`, branch
+- [bendlang/bend#1377](https://github.com/bendlang/bend/pull/1377) (from `nuxyel/bend`, branch
   `fix/1374-erased-last-fork`), announced on [#1374](https://github.com/bendlang/bend/issues/1374#issuecomment-6030940652).
   #1375 and #1376 stay with the Bend team.
+- **Merged** 2026-10-07 12:29 UTC as `f76c251a`, approved by a maintainer with no requested changes; the diff
+  is the one submitted, and #1374 is closed. Not in a release yet: 2.0.36 was cut before the merge, so
+  bend-ml stays on 2.0.35 with its workaround until a release carries the fix.
 - **Cause** (found with temporary logs in `anf`, `bend2/comp.ts`): `anf`'s `spine` cut the call prefix before
   every argument, live or erased. In `tree(q, i, z)` with `z` erased, the prefix `tree(q, i)` already carries
   every live argument, so `term_spine` reads it as a complete call; `anf` cut it into a sequential
