@@ -619,7 +619,7 @@ time printed by `demos/gpt2/fast.bend`, alternated runs; prototypes in `.scratch
    version); the C join check stays.
 5. `make check-full`, `make bench` and the GPT-2 timings on an idle machine; a short entry here.
 6. Packages: republish only if their source changes (the `Bend:` line alone is not a reason); then the
-   release PR `devel` → `main`, tag `v3.2.0` on `main`.
+   release PR `devel` → `main`, tag `v1.2.1` on `main` (numbering: `docs/VERSIONING.md`).
 
 ### Idle measurement (2026-10-08, pending since v3.1)
 
@@ -634,3 +634,12 @@ Nothing else running (Brave closed by Renan), on AC power, `performance` profile
   (`compile-times-2026-10-08.md`) are lower than under load: 128 layers check in 0.14 s and build in 3.3 s.
 - Peak resident memory of the current demo: 894 MB (`scripts/peak_rss.sh`).
 - README, `demos/gpt2/BENCHMARK.md` and `docs/media/numbers.json` updated (the figure now says 27 laws).
+
+## Renumbering of the releases (2026-10-09)
+
+Renan's call: a major version must mean a large change in what bend-ml is, not every big step. The rule and
+the old → new table are in `docs/VERSIONING.md` (v2.1 → v1.0, v3.0 → v1.1, v3.1 → v1.2; the next is v1.2.1).
+New tags on the same commits; the GitHub releases moved to them with a "formerly" line; the old tags stay, and
+the old `v1.0.0` is the only tag that moved (to the old v2.1.0 commit). The old `v2.1.0` tag keeps a pre-release
+with only `bend-ml.mp4`, so posted links to the video still work (both URLs checked: 200). Dated entries in this
+file keep the names they were written with.
