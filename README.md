@@ -55,11 +55,11 @@ dfdx's last release is v0.13.0 (July 2023).
 | [`bend-ml-nat-lemmas`](nat-lemmas) | 0.1.1.0 | `Nat` and `List` lemmas that Base does not have | `add_comm`, `add_assoc`, `mul_comm`, `mul_assoc`, `mul_dist`, `append_assoc`, `length_append`, `product_append`... (15) |
 | [`bend-ml-bpe-tokenizer`](bpe) | 0.1.2.0 | Byte-level BPE tokenizer (GPT-2 style) | **roundtrip** `decode(encode(s)) = s`, `vocab_bound`, `dec_append`, `train_wf`, `roundtrip_trained` |
 | [`bend-ml-tensor`](tensor) | 0.1.2.0 | `Vec<n>` and `Mat<r,c>` with the shape in the type, over lists | `reshape_swap`, `reshape_flat` |
-| [`bend-ml-tensor-array`](tensor-array) | 0.1.5.0 | the same guarantees over a flat `Array<F32>`, ~50x faster; `Bands<r,c>` for a parallel matrix · vector that copies no weights | `cap_ok`, `half_cover`, `leaf_len`, `band_len`; typed `matmul`, `matmul_nt`, `matmul_tn`, `Bands.matvec` |
+| [`bend-ml-tensor-array`](tensor-array) | 0.1.6.0 | the same guarantees over a flat `Array<F32>`, ~50x faster; `Bands<r,c>` for a parallel matrix · vector that copies no weights | `cap_ok`, `half_cover`, `leaf_len`, `band_len`; typed `matmul`, `matmul_nt`, `matmul_tn`, `Bands.matvec` |
 | [`bend-ml-autograd`](autograd) | 0.1.1.0 | Automatic differentiation and layers with typed backward | **`reverse_eq_forward`** |
 
 ```python
-import bend-ml-tensor-array@0.1.5.0/main.bend as TA
+import bend-ml-tensor-array@0.1.6.0/main.bend as TA
 import bend-ml-bpe-tokenizer@0.1.2.0/main.bend as BPE
 ```
 
@@ -76,7 +76,7 @@ Every package passes `bend X/main.bend --verdict`, the re-check by Bend's Lean-p
 | Demo | Result |
 |---|---|
 | [MNIST](demos/mnist), 784-128-10 MLP | about 7 s per epoch (v0.2: 544 s). Loss and hits identical to PyTorch with the same weights and batches: 0.5204771 / 9129, then 0.27043572 / 9298, then 0.2156194 / 9418. |
-| [GPT-2 small](demos/gpt2), 124 M | about 0.1 s per token sequential (v0.2: 3 s). With the weights in parallel bands (v1.2, 16 threads), 36 forward passes take 3.7-4.3 s against 4.8-5.2 s for v1.0, alternated on an idle machine. The same tokens as PyTorch on 11 prompts, logits within 6e-4 (they are of order 100); the tokenizer matches `tiktoken` on 79 texts. Loading takes 4-5 s (v1.2; 5-7 s in v1.0), with a resident peak of ~0.9 GB. |
+| [GPT-2 small](demos/gpt2), 124 M | about 0.1 s per token sequential (v0.2: 3 s). With the weights in parallel bands (v1.2.1, 16 threads), 36 forward passes take 3.7 s against 5.2 s for v1.0, measured in one session on an idle machine. The same tokens as PyTorch on 11 prompts, logits within 6e-4 (they are of order 100); the tokenizer matches `tiktoken` on 79 texts. Loading takes 4-5 s (v1.2.1; 5-7 s in v1.0), with a resident peak of ~0.9 GB. |
 
 ## 04 · Benchmarks
 
