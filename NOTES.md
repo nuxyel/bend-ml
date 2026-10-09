@@ -579,3 +579,24 @@ logits as v3.0 and v2.1, digit for digit.
   [#1377](https://github.com/bendlang/bend/pull/1377), merged 2026-10-07; 2.0.36 (2026-10-07 04:53 UTC) was cut
   before the merge, so it waits for the next release.
 - [bendlang/bend#1376](https://github.com/bendlang/bend/issues/1376) (read-only `Array` borrow): open.
+
+### Exp. 13: a pure parallel decode for loading (negative, 2026-10-08)
+
+With `IO.fork` ruled out (#1415), the remaining route was to read the bytes sequentially and decode them in
+parallel lets. Measured on this machine (load average 1.5-2.2, background load), "Hi" + 1 token, the load
+time printed by `demos/gpt2/fast.bend`, alternated runs; prototypes in `.scratch/e13/` (not committed).
+
+- **Where the time goes.** A variant that walks each 1 MB block 4 bytes at a time without building any `F32`
+  or writing the array loads in 4.2-5.0 s, the same as the real loader (4.1-5.1 s). Building the numbers and
+  `Array.set` cost next to nothing; the cost is producing and walking the byte lists (`File.read_at` builds a
+  `List<U32>` with one cons per byte in C, `io_list`). A variant that drops each list unread is much slower
+  (11.3-13.8 s): erasing a 1 M-cell list costs more than walking it.
+- **Two-phase loading** (`load_tree` reads the byte blocks of every band of a subtree into a tree shaped like
+  the bands, then `decode` fills the bands with a parallel let per node; a subtree is split while its bytes
+  exceed a budget). The C has the join (`FID_DECODE_J404`). Load times: budget 4 MB 4.8-5.2 s with 1 thread,
+  5.7-5.9 s with 16; 16 MB 4.7-5.2 s / 5.2-5.4 s; 64 MB 5.0-5.2 s / 4.9-5.5 s. Current loader: 5.0-5.2 s /
+  4.2-4.7 s. Peak resident memory with 64 MB: 1725 MB (current: 894 MB).
+- **Conclusion:** no gain and twice the memory, so the stop criterion of the plan applies; the demo keeps the
+  streaming loader. The walk that a parallel decode can split is a small part; the per-byte list built by the
+  host and held across the IO steps is the cost. The lever left is upstream: a read that gives denser data
+  (for example `File.read_at` into an `Array<U32>`, or 4 bytes per `U32`). An idea, not a draft yet.
