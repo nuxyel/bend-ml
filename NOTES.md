@@ -646,3 +646,32 @@ file keep the names they were written with.
 
 From here on this file is written in the first person (I measured, my call), like the README; the entries
 above keep "Renan" as they were written.
+
+### Exp. 14: the one-thread gap against v1.0 (2026-10-09)
+
+v1.2 (old v3.1) was 3-6% slower than v1.0 on one thread, although with ≤ 2 threads it uses one band, which was
+meant to be v1.0's kernel. My earlier guess (`matvec_l` on the logits matrix) did not hold: the idle per-product
+bench shows the list API with one band within a few percent of `Mat.matmul_nt`, worth ~1 ms of the ~7 ms per pass.
+
+- **Harness** (`.scratch/e14/`, not committed): local copies of each demo printing times in ms, alternated runs,
+  one thread pinned to a performance core with `taskset -c 3`. Unpinned, two copies of the same binary differed
+  by 1.7% and runs spread 10% (the 155H mixes P- and E-cores); pinned, the spread is ~1-2%.
+- **Bisect**, each variant puts one v1.0 piece back into the v1.2 demo (36 passes, 1 thread, median of 5):
+  v1.0 4856 ms, v1.2 5134; loader of v1.0 (`get_mat`, `Mat.fill_at`) 5165; no `Array.clone` of `x` on one band
+  5154; `Mat.read_row` for the embedding 5165; **products through `Mat.matmul_nt` 4961**. Only the products move it.
+  Products through `matmul_nt` for the logits only: 4956; for the layers only: 4924. The two effects do not add
+  up (both: 4913), and putting a single 1 × 1 `matmul_nt` in the program off the hot path gives 5161, so most of
+  the gain comes from the kernel itself (writing into an `Array`, then `read_l`), not from code layout.
+- **Fix** in `bend-ml-tensor-array@0.1.6.0` (hash `0x793d6e22f8bd33acb2636b33544424bc`): `bv_mat` runs `gemm`
+  with n = 1 into a fresh `Array` and reads it back (`bv_gemm`, `bv_g`, `bv_g2`); `bv_rows`/`bv_leaf` are gone.
+  The laws were proved again over the new code: `leaf_len` (reading `m + 1` numbers back gives `m + 1`, by
+  induction on `m`), `band_len` (a band of `rows` rows gives `rows` numbers; `g_len` opens the single-constructor
+  `G` so the gemm's result need not be computed). 27 laws, `--verdict` ok. A first try with
+  `Nat.sub(1 + p, 1)` did not reduce to `p` in the checker; passing `p` directly fixed it.
+- **Results** (one session, idle, `bench/results/gpt2-versions-2026-10-09.txt`): 1 thread v1.0 5168, v1.1 5777,
+  v1.2 5509, v1.2.1 5280 ms; 16 threads v1.0 5198, v1.1 3986, v1.2 3815, v1.2.1 3689 ms; load and resident peak
+  unchanged (932 MB). Per product (`mv_bands-2026-10-09.txt`): 16 threads, 2^4 bands, list API 19-32% faster;
+  one band within noise. Same ids and logits; 280 tensor-array checks bit for bit.
+- **Open:** ~2% on one thread against v1.0. Skipping the clone of `x` gave 0.6%, within noise.
+- A correction: I first read a drop of the peak *virtual* size (41 GB → 10.6 GB) as an effect of the fix; it came
+  from a shorter prompt. With the same prompt v1.1, v1.2 and v1.2.1 all reserve 41 GB.

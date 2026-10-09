@@ -4,6 +4,29 @@ Versions follow [`docs/VERSIONING.md`](../../docs/VERSIONING.md) (renumbered on 
 
 **Summary (v0.3):** GPT-2 small with 124 M parameters runs in Bend and **generates exactly the same tokens as PyTorch**, with logits equal to within 6e-4 over 11 prompts (2e-4 on the first 3). In v0.2 it took ~3 s per token (~150x PyTorch); in v0.3 (matrix · vector products over `Array`) it takes **~0.1 s per token**: ~5x PyTorch with 16 threads (21 ms per forward pass of 11 tokens) and ~2x PyTorch with 1 thread (55 ms). What still weighs is loading the weights (9 s against ~1 s), because the 124 M numbers become trees of nodes (~1.5 GB of resident memory at the peak).
 
+## v1.2.1: one band computes like `Mat.matmul_nt` (package `bend-ml-tensor-array@0.1.6.0`)
+
+Each band of a matrix · vector product now runs the `gemm` of `Mat.matmul_nt`, writing its rows into an `Array`
+and reading them back, instead of building the result list row by row (`lcols`). The numbers are the same bit
+for bit; the ids and logits match PyTorch on the 11 prompts. I found the cause by swapping one v1.0 piece at a
+time into the v1.2 demo (`NOTES.md`, exp. 14): the loader, the copy of `x` and the row lookup changed nothing;
+the product kernel was the whole gap.
+
+All four versions measured in one session on an idle machine, "The capital of France is" + 32 tokens (36
+forward passes), median of 5 alternated runs; one thread pinned to a performance core
+(`bench/results/gpt2-versions-2026-10-09.txt`):
+
+| | 36 passes, 1 thread | 36 passes, 16 threads | load, 16 threads | peak resident |
+|---|---|---|---|---|
+| v1.0 | **5.17 s** | 5.20 s | 6.8 s | 1462 MB |
+| v1.1 | 5.78 s (+12%) | 3.99 s | 5.6 s | 965 MB |
+| v1.2 | 5.51 s (+7%) | 3.82 s | 4.3 s | 932 MB |
+| **v1.2.1** | 5.28 s (+2%) | **3.69 s** | **4.3 s** | **932 MB** |
+
+On one thread v1.2.1 is still ~2% behind v1.0; I have not found where that last part goes. Per product on 16
+threads with 2^4 bands (`bench/results/mv_bands-2026-10-09.txt`), the list API is 19-32% faster than in
+0.1.5.0; the logits product goes from 5.6 ms to 4.0 ms.
+
 ## v1.2: faster loading, no one-thread cost (package `bend-ml-tensor-array@0.1.5.0`)
 
 - The weight files are decoded straight into the arrays (no list of `F32` in between), and each file's size
@@ -28,8 +51,7 @@ Re-measured on an idle machine on 2026-10-08 (nothing else running, on AC power)
 | v1.0 | 5-7 s | 4.9-5.3 s | 4.8-5.2 s |
 | **v1.2** | **3.8-5.4 s** | **5.2-5.5 s** | **3.7-4.3 s** |
 
-On one thread v1.2 is 3-6% slower than v1.0 in this run (the residual cost of `matvec_l` on the 50257-row
-matrix, NOTES.md, section "v3.1"). Per product, with the matrix already built (`bench/results/mv_bands-2026-10-08.txt`,
+On one thread v1.2 is 3-6% slower than v1.0 in this run (the product kernel of the bands, fixed in v1.2.1). Per product, with the matrix already built (`bench/results/mv_bands-2026-10-08.txt`,
 16 threads, list API): 2304 × 768 from 0.78 ms to 0.29 ms (2^5 bands); 50257 × 768 from 31.8 ms to 5.5 ms. These
 match the numbers taken under load on 2026-10-06 within a few percent.
 

@@ -1,0 +1,24 @@
+GPT-2 small, "The capital of France is" + 32 tokens (36 forward passes), 2026-10-08 23:50, nothing else running,
+AC power, performance profile. Times printed in ms (tsec2 patched in local copies of each demo). 1 thread pinned to
+P-core 3 (taskset -c 3); 16 threads unpinned. Median of 5 alternated runs, (min, max). Last lines: peak memory
+(scripts/peak_rss.sh, 16 threads). v21 = v1.0 (old v2.1), v30 = v1.1 (old v3.0), cur = v1.2 (old v3.1),
+new = v1.2 demo with bend-ml-tensor-array 0.1.6.0 (the v1.2.1 candidate).
+
+ 23:50:05 up  2:44,  1 user,  load average: 0.48, 0.94, 1.30
+--- 1 thread (P-core)
+v21  passes 5168 (min 5056, max 5310)   load 6410 (min 5644, max 6711)
+v30  passes 5777 (min 5668, max 6079)   load 5136 (min 5021, max 6691)
+cur  passes 5509 (min 5223, max 5606)   load 4905 (min 4562, max 5372)
+new  passes 5280 (min 5167, max 5309)   load 4973 (min 4449, max 5813)
+--- 16 threads
+v21  passes 5198 (min 5131, max 5263)   load 6828 (min 6034, max 7082)
+v30  passes 3986 (min 3906, max 4563)   load 5597 (min 5126, max 6714)
+cur  passes 3815 (min 3775, max 4192)   load 4266 (min 3991, max 5017)
+new  passes 3689 (min 3625, max 4141)   load 4260 (min 4196, max 4947)
+v21 peak RSS: 1462 MB (peak virtual: 10635 MB)
+v30 peak RSS: 965 MB (peak virtual: 41095 MB)
+cur peak RSS: 932 MB (peak virtual: 41095 MB)
+new peak RSS: 932 MB (peak virtual: 41095 MB)
+ 23:57:38 up  2:51,  1 user,  load average: 2.65, 1.98, 1.62
+
+[exited with code 0]
