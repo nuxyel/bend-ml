@@ -512,7 +512,7 @@ logits as v3.0 and v2.1, digit for digit.
   `docs/media/numbers.json` and `make media`, is the remaining step.
 - Cheaper concatenation (a tree of lists flattened once): not needed once one thread uses one band.
 - Loading in parallel: needs a pure parallel decode (for example splitting a band's `Array` by its `ANode`
-  halves and decoding each half in a parallel let); not tried.
+  halves and decoding each half in a parallel let); not tried in v3.1, see exp. 13.
 
 ### For Renan to post upstream (all three posted on 2026-10-06; see "Upstream issues opened" below)
 
@@ -566,3 +566,16 @@ logits as v3.0 and v2.1, digit for digit.
   not catch a revert (said in its header and in the PR, following Bend's review practice).
 - Once a Bend release carries the fix, bend-ml's workaround (a runtime parameter after `-e` in `bmv`) is no
   longer needed, but the CI check on the join stays; a version bump goes in this file (CLAUDE.md rule 1).
+
+## Upstream outcome (2026-10-08)
+
+- [bendlang/bend#1375](https://github.com/bendlang/bend/issues/1375) closed by
+  [#1415](https://github.com/bendlang/bend/pull/1415), a guide change, not a scheduler change: IO computations
+  take turns on one event loop, `IO.fork` returns a result channel and is not a CPU-parallel job, and pure work
+  goes on several cores only through parallel lets. The maintainers re-ran our repro: 4 forks 1.79 s with 1 and
+  16 threads, the same jobs one after another 1.80 s, two parallel lets 0.90 s with 16. So parallel loading
+  has to be a pure parallel decode (exp. 13).
+- [bendlang/bend#1374](https://github.com/bendlang/bend/issues/1374): fixed by
+  [#1377](https://github.com/bendlang/bend/pull/1377), merged 2026-10-07; 2.0.36 (2026-10-07 04:53 UTC) was cut
+  before the merge, so it waits for the next release.
+- [bendlang/bend#1376](https://github.com/bendlang/bend/issues/1376) (read-only `Array` borrow): open.

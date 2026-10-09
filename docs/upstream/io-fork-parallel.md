@@ -1,6 +1,9 @@
 # Draft for bendlang/bend: IO.fork does not run pure work on several cores
 
 Status: posted as https://github.com/bendlang/bend/issues/1375 (2026-10-06). Checked for duplicates on 2026-10-06: none found.
+Closed on 2026-10-08 by https://github.com/bendlang/bend/pull/1415, a guide change: `IO.fork` computations take
+turns on one event loop by design, and pure work only spreads over cores through parallel lets. The PR re-ran
+this repro (4 forks: 1.79 s with 1 and 16 threads; parallel lets: 0.90 s with 16).
 Reproduced on 2.0.35 and on main 0ad47fc.
 
 ---

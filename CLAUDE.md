@@ -61,11 +61,12 @@ NOTES exp. 10).
 - `%e : P` rewrites: `_` marks where the right-hand side of `e` sits in the current goal, and the new goal
   has the left-hand side there; use `Equal.sym` to go the other way.
 - Parallel lets (`a b = f(..) g(..)`) silently become sequential when the def's **last parameter is
-  erased** (put a runtime parameter after it), and suffer from non-tail recursive helpers in the fork
-  tree (use tail loops with an accumulator). Check scaling with `--threads 1` against `--threads 16`, and
+  erased** (put a runtime parameter after it; fixed upstream by bendlang/bend#1377, not in a release
+  yet), and suffer from non-tail recursive helpers in the fork tree (use tail loops with an accumulator). Check scaling with `--threads 1` against `--threads 16`, and
   read the emitted C (`bend X.bend -o x.c`) when it does not scale. NOTES exp. 11.
-- `IO.fork` gives concurrency, not parallelism: forked computations run their pure code on one core
-  (NOTES exp. 12). Use parallel lets in pure code for several cores.
+- `IO.fork` gives concurrency, not parallelism: forked computations take turns on one event loop
+  (NOTES exp. 12). This is intended; the guide says so since bendlang/bend#1415. Use parallel lets in pure
+  code for several cores.
 - Proofs follow the affine rules too: a lemma about values that hold an `Array` cannot mention them twice at
   run-time positions; pass the expression in an erased argument (`-s`) and the arrays once.
 - `Array` is a plain ADT (`ALeaf`/`ANode`): matching an owned array hands out its halves in O(1) and is
