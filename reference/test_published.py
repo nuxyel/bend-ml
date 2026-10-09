@@ -32,8 +32,8 @@ def law_tensor(+r: Nat, +c: Nat) -> {{Nat.mul(r, c) == Nat.mul(c, r) : Nat}}:
 def law_bands(+n: Nat) -> {{n == Nat.add(TA.half(n), Nat.sub(n, TA.half(n))) : Nat}}:
   TA.half_cover(n)
 
-def law_band(-r: Nat, -c: Nat, +rows: Nat, +k: Nat, x: Array<F32>, w: Array<F32>) -> {{TA.bl_len(r, c, TA.bv_rows(r, c, rows, k, x, w)) == rows : Nat}}:
-  TA.band_len(r, c, rows, k, x, w)
+def law_band(-r: Nat, +c: Nat, +rows: Nat, x: Array<F32>, w: Array<F32>) -> {{TA.bl_len(r, c, TA.bv_gemm(r, c, rows, rows, x, w)) == rows : Nat}}:
+  TA.band_len(r, c, rows, x, w)
 
 def law_ad(+e: AG.NE, +x: Nat) -> {{AG.nbwd(e, x, 1n) == AG.nfwd(e, x) : Nat}}:
   AG.reverse_eq_forward(e, x)

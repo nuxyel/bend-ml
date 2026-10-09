@@ -1,0 +1,25 @@
+GPT-2 small, "The capital of France is" + 32 tokens (36 forward passes), 2026-10-08 21:58, nothing else running
+(load average 0.69 at the start, 1.35 at the end: the runs themselves), on AC power, performance profile.
+a = v2.1.0 (Mat, sequential), m = devel e4592b7 (same demo code as v3.1.0). Alternated 5 times.
+"t=" is the time of the 36 forward passes; "weights loaded" is the load time.
+
+a t=1: weights loaded in 6s   pos 35  t=5.2s
+m t=1: weights loaded in 5.0s   pos 35  t=5.5s
+a t=16: weights loaded in 6s   pos 35  t=5.2s
+m t=16: weights loaded in 5.1s   pos 35  t=4.3s
+a t=1: weights loaded in 7s   pos 35  t=5.3s
+m t=1: weights loaded in 5.4s   pos 35  t=5.4s
+a t=16: weights loaded in 6s   pos 35  t=5.2s
+m t=16: weights loaded in 4.9s   pos 35  t=4.3s
+a t=1: weights loaded in 6s   pos 35  t=5.2s
+m t=1: weights loaded in 5.2s   pos 35  t=5.5s
+a t=16: weights loaded in 6s   pos 35  t=5.2s
+m t=16: weights loaded in 5.1s   pos 35  t=3.7s
+a t=1: weights loaded in 6s   pos 35  t=4.9s
+m t=1: weights loaded in 5.0s   pos 35  t=5.2s
+a t=16: weights loaded in 7s   pos 35  t=4.9s
+m t=16: weights loaded in 4.2s   pos 35  t=3.7s
+a t=1: weights loaded in 5s   pos 35  t=4.9s
+m t=1: weights loaded in 5.1s   pos 35  t=5.2s
+a t=16: weights loaded in 6s   pos 35  t=4.8s
+m t=16: weights loaded in 3.8s   pos 35  t=3.7s

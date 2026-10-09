@@ -22,7 +22,8 @@ use on BendHub, and a portfolio piece for HOC.
 
 Work on `devel`: every commit and push goes there, and CI checks it. `main` only receives stable releases,
 through a pull request `devel` → `main` merged after its CI passes; the version tag (`vX.Y.Z`) and the GitHub
-release are made on `main` after that merge.
+release are made on `main` after that merge. Version numbers follow `docs/VERSIONING.md` (major only for a change in
+what bend-ml is; renumbered on 2026-10-09, old tags kept).
 
 ## About Renan
 
@@ -49,6 +50,10 @@ NOTES exp. 10).
    idle machine before they go into the README.
 8. Everything in the repository is in English. Commits are small, with clear messages and no
    attribution lines (no `Co-Authored-By`, no "Generated with").
+9. Public text (READMEs, `NOTES.md`, `docs/`, release notes) is written in Renan's first person singular:
+   "I measured", "my PR", never "we"/"our". Where a name is needed: "Renan Vinícius (@nuxyel)". This file
+   stays in the third person: it tells agents whose decisions are whose. Drafts already posted upstream and
+   dated entries are left as written.
 
 ## Bend 2.0.35 pitfalls we paid for
 
@@ -61,11 +66,12 @@ NOTES exp. 10).
 - `%e : P` rewrites: `_` marks where the right-hand side of `e` sits in the current goal, and the new goal
   has the left-hand side there; use `Equal.sym` to go the other way.
 - Parallel lets (`a b = f(..) g(..)`) silently become sequential when the def's **last parameter is
-  erased** (put a runtime parameter after it), and suffer from non-tail recursive helpers in the fork
-  tree (use tail loops with an accumulator). Check scaling with `--threads 1` against `--threads 16`, and
+  erased** (put a runtime parameter after it; fixed upstream by bendlang/bend#1377, not in a release
+  yet), and suffer from non-tail recursive helpers in the fork tree (use tail loops with an accumulator). Check scaling with `--threads 1` against `--threads 16`, and
   read the emitted C (`bend X.bend -o x.c`) when it does not scale. NOTES exp. 11.
-- `IO.fork` gives concurrency, not parallelism: forked computations run their pure code on one core
-  (NOTES exp. 12). Use parallel lets in pure code for several cores.
+- `IO.fork` gives concurrency, not parallelism: forked computations take turns on one event loop
+  (NOTES exp. 12). This is intended; the guide says so since bendlang/bend#1415. Use parallel lets in pure
+  code for several cores.
 - Proofs follow the affine rules too: a lemma about values that hold an `Array` cannot mention them twice at
   run-time positions; pass the expression in an erased argument (`-s`) and the arrays once.
 - `Array` is a plain ADT (`ALeaf`/`ANode`): matching an owned array hands out its halves in O(1) and is

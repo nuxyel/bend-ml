@@ -373,7 +373,9 @@ parallel work. Plans after v3 (llama.bend, a training framework) are in the priv
   1. **An erased parameter at the end of the parameter list turns the parallel let into two sequential
      calls.** `bmv(+c, -r, b, xp, +rr, -e)` had no join task in the C; `bmv(+c, -r, b, +rr, -e, xp)` has one.
      Minimal repro: `docs/upstream/erased_last_{ok,bad}.bend` (16 leaves of a flat loop: ok 0.054 s → 0.011 s
-     with 16 threads; bad 0.053 s → 0.055 s). Draft report: `docs/upstream/erased-last-parameter.md`.
+     with 16 threads; bad 0.053 s → 0.055 s). Draft report: `docs/upstream/erased-last-parameter.md`, posted as
+     [bendlang/bend#1374](https://github.com/bendlang/bend/issues/1374); cause and fix in
+     [bendlang/bend#1377](https://github.com/bendlang/bend/pull/1377) (merged 2026-10-07; see "Upstream PR for #1374").
   2. **A non-tail recursive helper in the fork tree halves the gain.** `half(n) = 1 + half(n - 2)` called at
      every node: 50257 × 768, 40 products, 16 threads, 0.69 s; the same with a tail loop (or `Nat.div`)
      0.36 s. `half` is now `half.go(n, acc)`, a flat loop.
@@ -439,8 +441,9 @@ checking takes 0.22 s for 8 distinct typed layers and 0.27 s for 128; the build 
 
 ### Upstream drafts (Renan posts them)
 
-- `docs/upstream/erased-last-parameter.md`: the compiler bug above, with the repro.
-- `docs/upstream/shared-readonly-array.md`: a read-only `Array` borrow that does not need `@unsafe`
+- `docs/upstream/erased-last-parameter.md`: the compiler bug above, with the repro. Posted as
+  [bendlang/bend#1374](https://github.com/bendlang/bend/issues/1374); fix in [#1377](https://github.com/bendlang/bend/pull/1377).
+- `docs/upstream/shared-readonly-array.md` ([bendlang/bend#1376](https://github.com/bendlang/bend/issues/1376)): a read-only `Array` borrow that does not need `@unsafe`
   (`Array.fork`, the answer to #885, is `@unsafe`, and `--check-only` then reports
   `SOME PROOFS FAIL: 1 def relies on unsafe or foreign code`).
 
@@ -461,7 +464,8 @@ v3.0 profile: `wte` (38.6 M numbers) 1.9 s, the 12 layers (85 M) 4.8 s, ~50 ns p
   (`docs/upstream/io_fork_parallel.bend`: 4 forks of a flat loop of 4 G steps seeded at run time): 1.86 s with 1 thread,
   1.73 s with 16, user time equal to real time. In Bend 2.0.35 `IO.fork` interleaves computations on one core;
   the guide's "each runs its pure code (in parallel, on every core)" does not hold across forks. Parallelism
-  across cores comes from parallel lets in pure code. Reverted; noted for Renan (upstream, below).
+  across cores comes from parallel lets in pure code. Reverted; reported as
+  [bendlang/bend#1375](https://github.com/bendlang/bend/issues/1375) (`docs/upstream/io-fork-parallel.md`).
 - **Size check at the boundary:** every weight file must hold exactly `r*c*4` bytes (`check_size` with
   `File.size`), otherwise the program stops: `h3.fw.bin: expected 9437184 bytes, found 1000000; run
   reference/gpt2_prep.py --split again` (tested with a truncated copy in a temporary tree of links).
@@ -508,14 +512,16 @@ logits as v3.0 and v2.1, digit for digit.
   `docs/media/numbers.json` and `make media`, is the remaining step.
 - Cheaper concatenation (a tree of lists flattened once): not needed once one thread uses one band.
 - Loading in parallel: needs a pure parallel decode (for example splitting a band's `Array` by its `ANode`
-  halves and decoding each half in a parallel let); not tried.
+  halves and decoding each half in a parallel let); not tried in v3.1, see exp. 13.
 
-### For Renan to post upstream (he opens the issues or PRs himself, later)
+### For Renan to post upstream (all three posted on 2026-10-06; see "Upstream issues opened" below)
 
-- `docs/upstream/erased-last-parameter.md` (the parallel let made sequential by an erased last parameter).
-- `docs/upstream/shared-readonly-array.md` (a read-only `Array` borrow without `@unsafe`).
-- New: `IO.fork` does not run pure work on several cores (exp. 12); worth a question or a guide fix, since
-  the guide says it does. Draft and repro: `docs/upstream/io-fork-parallel.md`, `io_fork_parallel.bend`.
+- `docs/upstream/erased-last-parameter.md` (the parallel let made sequential by an erased last parameter):
+  [bendlang/bend#1374](https://github.com/bendlang/bend/issues/1374), fix in [#1377](https://github.com/bendlang/bend/pull/1377).
+- `docs/upstream/shared-readonly-array.md` (a read-only `Array` borrow without `@unsafe`):
+  [bendlang/bend#1376](https://github.com/bendlang/bend/issues/1376).
+- `IO.fork` does not run pure work on several cores (exp. 12), although the guide says it does. Draft and
+  repro: `docs/upstream/io-fork-parallel.md`, `io_fork_parallel.bend`: [bendlang/bend#1375](https://github.com/bendlang/bend/issues/1375).
 
 ### v3.1 measurements added at the end (2026-10-06)
 
@@ -528,3 +534,144 @@ logits as v3.0 and v2.1, digit for digit.
   v3.1 903 MB. The peak *virtual* size of v3.1 is 41 GB (v2.1 and v3.0: 10.6 GB): address space reserved, not
   memory used; cause not investigated.
 - `IO.fork` control: the same loops as parallel lets scale (1.69 s → 0.85 s); `docs/upstream/io_fork_parallel_control.bend`.
+
+### Upstream issues opened (2026-10-06, by Renan)
+
+- [bendlang/bend#1374](https://github.com/bendlang/bend/issues/1374): an erased last parameter makes a parallel let sequential (`docs/upstream/erased-last-parameter.md`).
+- [bendlang/bend#1375](https://github.com/bendlang/bend/issues/1375): `IO.fork` computations run their pure work on one core (`docs/upstream/io-fork-parallel.md`; not a duplicate of #831, which was about parallel lets after closure calls and is fixed in 2.0.13).
+- [bendlang/bend#1376](https://github.com/bendlang/bend/issues/1376): a read-only `Array` borrow without `@unsafe` (`docs/upstream/shared-readonly-array.md`).
+
+### Upstream PR for #1374 (2026-10-07, by Renan)
+
+- [bendlang/bend#1377](https://github.com/bendlang/bend/pull/1377) (from `nuxyel/bend`, branch
+  `fix/1374-erased-last-fork`), announced on [#1374](https://github.com/bendlang/bend/issues/1374#issuecomment-6030940652).
+  #1375 and #1376 stay with the Bend team.
+- **Merged** 2026-10-07 12:29 UTC as `f76c251a`, approved by a maintainer with no requested changes; the diff
+  is the one submitted, and #1374 is closed. Not in a release yet: 2.0.36 was cut before the merge, so
+  bend-ml stays on 2.0.35 with its workaround until a release carries the fix.
+- **Cause** (found with temporary logs in `anf`, `bend2/comp.ts`): `anf`'s `spine` cut the call prefix before
+  every argument, live or erased. In `tree(q, i, z)` with `z` erased, the prefix `tree(q, i)` already carries
+  every live argument, so `term_spine` reads it as a complete call; `anf` cut it into a sequential
+  `h = tree(q, i)`, and the parallel let's values became plain variables (continuations, no join). With the
+  erased parameter in the middle, the prefix before it is not a complete call, so nothing was cut.
+- **Fix** (5 lines, +9 ttok, `comp.ts` 63,858 of its 64,000 cap): only a live argument over-applies a call, so
+  the prefix is cut only before one. Side effect: a tail call into a non-flat def with an erased last
+  parameter is a tail call again (`Word.add_comm.go` → `Word.add_comm.arm` lost 8 continuations).
+- **Measured** (this machine, main 0ad47fc): the #1374 repro 1.013 s → 0.169 s on 16 threads; bend-ml's `bmv`
+  with `-e` last gets its join (`BMV_J27`). No regression found: C/JS/.mjs/binaries for all 1,659 files under
+  Bend's `tests/`, `bench/runtime/` and `demos/` byte-identical except `proof/word_add_comm` and one renamed
+  local; the three lanes print the same on all 1,593 tests; the 17 runtime benches build identical binaries
+  (SEQ 0.999, PAR 1.004 geomean); compile time 1.007; checker benches 0.97-1.00. Cluster gates not run.
+- **Test** `tests/compile/fork_erased_last.bend`: its C gains the join, but stdout can't see a fork, so it does
+  not catch a revert (said in its header and in the PR, following Bend's review practice).
+- Once a Bend release carries the fix, bend-ml's workaround (a runtime parameter after `-e` in `bmv`) is no
+  longer needed, but the CI check on the join stays; a version bump goes in this file (CLAUDE.md rule 1).
+
+## Upstream outcome (2026-10-08)
+
+- [bendlang/bend#1375](https://github.com/bendlang/bend/issues/1375) closed by
+  [#1415](https://github.com/bendlang/bend/pull/1415), a guide change, not a scheduler change: IO computations
+  take turns on one event loop, `IO.fork` returns a result channel and is not a CPU-parallel job, and pure work
+  goes on several cores only through parallel lets. The maintainers re-ran our repro: 4 forks 1.79 s with 1 and
+  16 threads, the same jobs one after another 1.80 s, two parallel lets 0.90 s with 16. So parallel loading
+  has to be a pure parallel decode (exp. 13).
+- [bendlang/bend#1374](https://github.com/bendlang/bend/issues/1374): fixed by
+  [#1377](https://github.com/bendlang/bend/pull/1377), merged 2026-10-07; 2.0.36 (2026-10-07 04:53 UTC) was cut
+  before the merge, so it waits for the next release.
+- [bendlang/bend#1376](https://github.com/bendlang/bend/issues/1376) (read-only `Array` borrow): open.
+
+### Exp. 13: a pure parallel decode for loading (negative, 2026-10-08)
+
+With `IO.fork` ruled out (#1415), the remaining route was to read the bytes sequentially and decode them in
+parallel lets. Measured on this machine (load average 1.5-2.2, background load), "Hi" + 1 token, the load
+time printed by `demos/gpt2/fast.bend`, alternated runs; prototypes in `.scratch/e13/` (not committed).
+
+- **Where the time goes.** A variant that walks each 1 MB block 4 bytes at a time without building any `F32`
+  or writing the array loads in 4.2-5.0 s, the same as the real loader (4.1-5.1 s). Building the numbers and
+  `Array.set` cost next to nothing; the cost is producing and walking the byte lists (`File.read_at` builds a
+  `List<U32>` with one cons per byte in C, `io_list`). A variant that drops each list unread is much slower
+  (11.3-13.8 s): erasing a 1 M-cell list costs more than walking it.
+- **Two-phase loading** (`load_tree` reads the byte blocks of every band of a subtree into a tree shaped like
+  the bands, then `decode` fills the bands with a parallel let per node; a subtree is split while its bytes
+  exceed a budget). The C has the join (`FID_DECODE_J404`). Load times: budget 4 MB 4.8-5.2 s with 1 thread,
+  5.7-5.9 s with 16; 16 MB 4.7-5.2 s / 5.2-5.4 s; 64 MB 5.0-5.2 s / 4.9-5.5 s. Current loader: 5.0-5.2 s /
+  4.2-4.7 s. Peak resident memory with 64 MB: 1725 MB (current: 894 MB).
+- **Conclusion:** no gain and twice the memory, so the stop criterion of the plan applies; the demo keeps the
+  streaming loader. The walk that a parallel decode can split is a small part; the per-byte list built by the
+  host and held across the IO steps is the cost. The lever left is upstream: a read that gives denser data
+  (for example `File.read_at` into an `Array<U32>`, or 4 bytes per `U32`). An idea, not a draft yet.
+
+### Bend main checked ahead of the release (2026-10-08)
+
+- `make check-full` against Bend main `60fa05d` (2026-10-08, carries #1377; run with `bun bend2/main.ts`
+  through a copy of `check_all.py` whose `BEND` points at it and whose version pin is skipped): **43/43 ok**,
+  including the C join check of `bmv`, GPT-2 against PyTorch on 11 prompts and `--verdict` on every package.
+  Nothing to fix before the bump.
+
+### Checklist for the bump to the release that carries #1377
+
+1. Read the release notes and `bend guide` for changes; `bend update`, then `bend version`.
+2. `scripts/setup.sh`: `BEND_VERSION` and the two SHA256 sums (from the release's checksums).
+3. `reference/check_all.py` (`check_toolchain`), `.github/workflows/ci.yml` (step name), the README badge and
+   setup line, the `Bend:` line of each package README, CLAUDE.md rule 1 and the pitfalls title, this file's
+   "Pinned version".
+4. CLAUDE.md pitfall and README section 05: the erased-last-parameter bug becomes history (fixed in the new
+   version); the C join check stays.
+5. `make check-full`, `make bench` and the GPT-2 timings on an idle machine; a short entry here.
+6. Packages: republish only if their source changes (the `Bend:` line alone is not a reason); then the
+   release PR `devel` → `main`, tag `v1.2.1` on `main` (numbering: `docs/VERSIONING.md`).
+
+### Idle measurement (2026-10-08, pending since v3.1)
+
+Nothing else running (I closed Brave first), on AC power, `performance` profile; the load average of
+1.2-1.5 comes from the runs themselves.
+
+- GPT-2, 36 forward passes, alternated 5 times (`bench/results/gpt2-idle-2026-10-08.txt`): v2.1 load 5-7 s,
+  1 thread 4.9-5.3 s, 16 threads 4.8-5.2 s; v3.1 load 3.8-5.4 s, 1 thread 5.2-5.5 s, 16 threads 3.7-4.3 s. On one
+  thread v3.1 is 3-6% slower than v2.1 here (under load on 2026-10-06 it looked equal: 4.8 against 4.7 s).
+- `make bench` (`mv_bands-2026-10-08.txt`): within a few percent of the 2026-10-06 numbers taken under load;
+  logits 50257 × 768 sequential 31.8 ms, list API with 2^5 bands on 16 threads 5.5 ms. Compile times
+  (`compile-times-2026-10-08.md`) are lower than under load: 128 layers check in 0.14 s and build in 3.3 s.
+- Peak resident memory of the current demo: 894 MB (`scripts/peak_rss.sh`).
+- README, `demos/gpt2/BENCHMARK.md` and `docs/media/numbers.json` updated (the figure now says 27 laws).
+
+## Renumbering of the releases (2026-10-09)
+
+My call: a major version must mean a large change in what bend-ml is, not every big step. The rule and
+the old → new table are in `docs/VERSIONING.md` (v2.1 → v1.0, v3.0 → v1.1, v3.1 → v1.2; the next is v1.2.1).
+New tags on the same commits; the GitHub releases moved to them with a "formerly" line; the old tags stay, and
+the old `v1.0.0` is the only tag that moved (to the old v2.1.0 commit). The old `v2.1.0` tag keeps a pre-release
+with only `bend-ml.mp4`, so posted links to the video still work (both URLs checked: 200). Dated entries in this
+file keep the names they were written with.
+
+From here on this file is written in the first person (I measured, my call), like the README; the entries
+above keep "Renan" as they were written.
+
+### Exp. 14: the one-thread gap against v1.0 (2026-10-09)
+
+v1.2 (old v3.1) was 3-6% slower than v1.0 on one thread, although with ≤ 2 threads it uses one band, which was
+meant to be v1.0's kernel. My earlier guess (`matvec_l` on the logits matrix) did not hold: the idle per-product
+bench shows the list API with one band within a few percent of `Mat.matmul_nt`, worth ~1 ms of the ~7 ms per pass.
+
+- **Harness** (`.scratch/e14/`, not committed): local copies of each demo printing times in ms, alternated runs,
+  one thread pinned to a performance core with `taskset -c 3`. Unpinned, two copies of the same binary differed
+  by 1.7% and runs spread 10% (the 155H mixes P- and E-cores); pinned, the spread is ~1-2%.
+- **Bisect**, each variant puts one v1.0 piece back into the v1.2 demo (36 passes, 1 thread, median of 5):
+  v1.0 4856 ms, v1.2 5134; loader of v1.0 (`get_mat`, `Mat.fill_at`) 5165; no `Array.clone` of `x` on one band
+  5154; `Mat.read_row` for the embedding 5165; **products through `Mat.matmul_nt` 4961**. Only the products move it.
+  Products through `matmul_nt` for the logits only: 4956; for the layers only: 4924. The two effects do not add
+  up (both: 4913), and putting a single 1 × 1 `matmul_nt` in the program off the hot path gives 5161, so most of
+  the gain comes from the kernel itself (writing into an `Array`, then `read_l`), not from code layout.
+- **Fix** in `bend-ml-tensor-array@0.1.6.0` (hash `0x793d6e22f8bd33acb2636b33544424bc`): `bv_mat` runs `gemm`
+  with n = 1 into a fresh `Array` and reads it back (`bv_gemm`, `bv_g`, `bv_g2`); `bv_rows`/`bv_leaf` are gone.
+  The laws were proved again over the new code: `leaf_len` (reading `m + 1` numbers back gives `m + 1`, by
+  induction on `m`), `band_len` (a band of `rows` rows gives `rows` numbers; `g_len` opens the single-constructor
+  `G` so the gemm's result need not be computed). 27 laws, `--verdict` ok. A first try with
+  `Nat.sub(1 + p, 1)` did not reduce to `p` in the checker; passing `p` directly fixed it.
+- **Results** (one session, idle, `bench/results/gpt2-versions-2026-10-09.txt`): 1 thread v1.0 5168, v1.1 5777,
+  v1.2 5509, v1.2.1 5280 ms; 16 threads v1.0 5198, v1.1 3986, v1.2 3815, v1.2.1 3689 ms; load and resident peak
+  unchanged (932 MB). Per product (`mv_bands-2026-10-09.txt`): 16 threads, 2^4 bands, list API 19-32% faster;
+  one band within noise. Same ids and logits; 280 tensor-array checks bit for bit.
+- **Open:** ~2% on one thread against v1.0. Skipping the clone of `x` gave 0.6%, within noise.
+- A correction: I first read a drop of the peak *virtual* size (41 GB → 10.6 GB) as an effect of the fix; it came
+  from a shorter prompt. With the same prompt v1.1, v1.2 and v1.2.1 all reserve 41 GB.

@@ -17,7 +17,7 @@ Automatic differentiation in Bend 2, with a **proved law**: the reverse mode (wh
 |---|---|
 | `reverse_eq_forward` | For any expression made of constants, `X`, sums and products, and for any `x`: the reverse-mode gradient, starting with gradient 1 at the output, equals the forward-mode derivative. |
 
-The idea of the proof (the comments in `main.bend` give the details): we prove something stronger, `reverse(e, g) = g × forward(e)`, by induction on the expression. For a sum, distributivity joins the two halves; for a product, `(g·vb)·fa + (g·va)·fb = g·(fa·vb + va·fb)` follows from associativity, commutativity and distributivity, all coming from `nat-lemmas`. The case `g = 1` gives the law.
+The idea of the proof (the comments in `main.bend` give the details): I prove something stronger, `reverse(e, g) = g × forward(e)`, by induction on the expression. For a sum, distributivity joins the two halves; for a product, `(g·vb)·fa + (g·va)·fb = g·(fa·vb + va·fb)` follows from associativity, commutativity and distributivity, all coming from `nat-lemmas`. The case `g = 1` gives the law.
 
 ## What is NOT proved (and how it is verified)
 
