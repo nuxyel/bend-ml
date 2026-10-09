@@ -50,6 +50,10 @@ NOTES exp. 10).
    idle machine before they go into the README.
 8. Everything in the repository is in English. Commits are small, with clear messages and no
    attribution lines (no `Co-Authored-By`, no "Generated with").
+9. Public text (READMEs, `NOTES.md`, `docs/`, release notes) is written in Renan's first person singular:
+   "I measured", "my PR", never "we"/"our". Where a name is needed: "Renan Vinícius (@nuxyel)". This file
+   stays in the third person: it tells agents whose decisions are whose. Drafts already posted upstream and
+   dated entries are left as written.
 
 ## Bend 2.0.35 pitfalls we paid for
 

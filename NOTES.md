@@ -623,7 +623,7 @@ time printed by `demos/gpt2/fast.bend`, alternated runs; prototypes in `.scratch
 
 ### Idle measurement (2026-10-08, pending since v3.1)
 
-Nothing else running (Brave closed by Renan), on AC power, `performance` profile; the load average of
+Nothing else running (I closed Brave first), on AC power, `performance` profile; the load average of
 1.2-1.5 comes from the runs themselves.
 
 - GPT-2, 36 forward passes, alternated 5 times (`bench/results/gpt2-idle-2026-10-08.txt`): v2.1 load 5-7 s,
@@ -637,9 +637,12 @@ Nothing else running (Brave closed by Renan), on AC power, `performance` profile
 
 ## Renumbering of the releases (2026-10-09)
 
-Renan's call: a major version must mean a large change in what bend-ml is, not every big step. The rule and
+My call: a major version must mean a large change in what bend-ml is, not every big step. The rule and
 the old → new table are in `docs/VERSIONING.md` (v2.1 → v1.0, v3.0 → v1.1, v3.1 → v1.2; the next is v1.2.1).
 New tags on the same commits; the GitHub releases moved to them with a "formerly" line; the old tags stay, and
 the old `v1.0.0` is the only tag that moved (to the old v2.1.0 commit). The old `v2.1.0` tag keeps a pre-release
 with only `bend-ml.mp4`, so posted links to the video still work (both URLs checked: 200). Dated entries in this
 file keep the names they were written with.
+
+From here on this file is written in the first person (I measured, my call), like the README; the entries
+above keep "Renan" as they were written.
