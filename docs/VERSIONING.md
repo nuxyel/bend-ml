@@ -1,6 +1,6 @@
 # Versioning
 
-bend-ml releases use `MAJOR.MINOR.PATCH`, tagged `vX.Y.Z` on `main` (see "Branches" in `CLAUDE.md`).
+I number bend-ml releases `MAJOR.MINOR.PATCH`, tagged `vX.Y.Z` on `main` (see "Branches" in `CLAUDE.md`).
 
 | Part | When it changes | Example |
 |---|---|---|
@@ -13,10 +13,10 @@ independent of the project's version. A release lists the package versions it us
 
 ## Renumbering of 2026-10-09
 
-Until 2026-10-06 every large step got a new major, so the project reached "v3.1" in four days without a change
-that big. On 2026-10-09 the releases were renumbered with the rules above. The new tags point to the same
-commits; the GitHub releases moved to the new tags and say "formerly …". The old tags stay, so links that use
-them keep working (the old `v1.0.0` is the only one that moved, because its name is now taken).
+Until 2026-10-06 I gave every large step a new major, so the project reached "v3.1" in four days without a change
+that big. On 2026-10-09 I renumbered the releases with the rules above. The new tags point to the same commits;
+the GitHub releases moved to the new tags and say "formerly …". I kept the old tags, so links that use them keep
+working (the old `v1.0.0` is the only one that moved, because its name is now taken).
 
 | Old | New | What it was |
 |---|---|---|
@@ -31,7 +31,7 @@ Notes:
 
 - Tools that sort tags as versions will see the old `v3.1.0` as newer than `v1.2.0`; the GitHub "Latest" release
   is the one to follow.
-- The old `v2.1.0` tag keeps a pre-release holding only `bend-ml.mp4`, so links posted before the renumbering
-  still play the video. The video itself shows the old names (v1, v2).
-- Dated entries in `NOTES.md`, the `docs/*-plan.md` files and `bench/results/` keep the names they were written
-  with; read them with the table above.
+- The old `v2.1.0` tag keeps a pre-release holding only `bend-ml.mp4`, so the links I posted before the
+  renumbering still play the video. The video itself shows the old names (v1, v2).
+- I left the dated entries in `NOTES.md`, the `docs/*-plan.md` files and `bench/results/` with the names they were
+  written with; read them with the table above.

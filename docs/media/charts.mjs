@@ -70,7 +70,7 @@ const m = N.mnist_epoch_seconds, g = N.gpt2_seconds_per_token, R = N.ratios;
     [`${N.list_vs_array_speedup.value}×`, "faster", C.vio, "lists → one flat Array", "one thread, same matrix product"],
     ["1.8×", "faster", C.vio, "parallel row blocks", "the MNIST product, 8 threads"],
     [`${N.gpu.compute_bound_speedup}×`, "faster", C.vio, "GPU on a flat numeric loop", "16384 leaves, compute-bound"],
-    [`${N.gpu.memory_bound_slowdown_min}–${N.gpu.memory_bound_slowdown_max}×`, "slower", C.red, "GPU on our matrix kernels", "memory-bound: pointer chasing"],
+    [`${N.gpu.memory_bound_slowdown_min}–${N.gpu.memory_bound_slowdown_max}×`, "slower", C.red, "GPU on my matrix kernels", "memory-bound: pointer chasing"],
     ["10×", "slower", C.red, "copying the matrix per task", "the copy costs more than the arithmetic"],
   ];
   let b = T(50, 58, "what moved the needle", { size: 17, fill: C.b02, weight: 700 }) + T(970, 58, "each line is an experiment in NOTES.md", { size: 13, fill: C.b1, anchor: "end" });

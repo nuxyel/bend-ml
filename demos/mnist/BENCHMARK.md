@@ -13,7 +13,7 @@ Versions follow [`docs/VERSIONING.md`](../../docs/VERSIONING.md) (renumbered on 
 | PyTorch, 16 threads | 0.19 to 0.21 s | 0.520477 / 9129 · 0.270433 / 9298 · 0.215613 / 9418 |
 | PyTorch, 1 thread | 0.30 s | |
 
-Every product, every gradient and every update has its shape checked by the type (a `dW` requested with swapped dimensions does not compile: `docs/shape-error-array-bad_grad.txt`). How we got here, step by step (every number is in `NOTES.md`, experiments 1 to 9):
+Every product, every gradient and every update has its shape checked by the type (a `dW` requested with swapped dimensions does not compile: `docs/shape-error-array-bad_grad.txt`). How I got here, step by step (every number is in `NOTES.md`, experiments 1 to 9):
 
 | step | epoch |
 |---|---|
