@@ -13,10 +13,10 @@
     "pytorch_16_threads": 0.021,
     "source": "demos/gpt2/BENCHMARK.md; v2 re-measured on 2026-10-04 (0.1 s per token after a 7 s load)"
   },
-  "gpt2_load_seconds": { "bend": 7, "source": "re-measured 2026-10-04 with the streaming loader" },
+  "gpt2_load_seconds": { "bend": 5, "source": "v3.1, re-measured 2026-10-08 on an idle machine: 3.8-5.4 s (bench/results/gpt2-idle-2026-10-08.txt); v2.1 5-7 s" },
   "gpt2_peak_rss_mb": { "before": 2326, "after": 1462, "source": "NOTES.md, stability work; scripts/peak_rss.sh" },
   "list_vs_array_speedup": { "value": 49, "source": "NOTES.md, experiment 1" },
   "gpu": { "compute_bound_speedup": 3.8, "memory_bound_slowdown_min": 3, "memory_bound_slowdown_max": 18, "source": "NOTES.md, experiment 10" },
-  "project": { "packages": 5, "laws": 24, "checks_quick": 33, "checks_full": 38, "bend": "2.0.35", "lean": "4.34.0" },
+  "project": { "packages": 5, "laws": 27, "checks_quick": 38, "checks_full": 43, "bend": "2.0.35", "lean": "4.34.0" },
   "ratios": { "mnist_pytorch_ahead_min": 25, "mnist_pytorch_ahead_max": 35, "gpt2_pytorch_ahead_min": 2, "gpt2_pytorch_ahead_max": 5 }
 }

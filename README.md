@@ -76,7 +76,7 @@ Every package passes `bend X/main.bend --verdict`, the re-check by Bend's Lean-p
 | Demo | Result |
 |---|---|
 | [MNIST](demos/mnist), 784-128-10 MLP | about 7 s per epoch (v1: 544 s). Loss and hits identical to PyTorch with the same weights and batches: 0.5204771 / 9129, then 0.27043572 / 9298, then 0.2156194 / 9418. |
-| [GPT-2 small](demos/gpt2), 124 M | about 0.1 s per token sequential (v1: 3 s), 0.05 to 0.11 s with the weights in parallel bands (v3, 16 threads, depending on machine load). The same tokens as PyTorch on 11 prompts, logits within 6e-4 (they are of order 100); the tokenizer matches `tiktoken` on 79 texts. Loading takes ~4-5 s (v3.1; ~7 s in v2) and ~1.5 GB. |
+| [GPT-2 small](demos/gpt2), 124 M | about 0.1 s per token sequential (v1: 3 s). With the weights in parallel bands (v3.1, 16 threads), 36 forward passes take 3.7-4.3 s against 4.8-5.2 s for v2.1, alternated on an idle machine. The same tokens as PyTorch on 11 prompts, logits within 6e-4 (they are of order 100); the tokenizer matches `tiktoken` on 79 texts. Loading takes 4-5 s (v3.1; 5-7 s in v2.1), with a resident peak of ~0.9 GB. |
 
 ## 04 · Benchmarks
 
@@ -87,7 +87,7 @@ Every package passes `bend X/main.bend --verdict`, the re-check by Bend's Lean-p
 <details>
 <summary>why PyTorch is still ahead</summary>
 
-Bend 2.0.35 generates scalar code, with no BLAS or SIMD: on the same matrix product PyTorch does 62 G multiply-adds/s on one thread and Bend with an `Array` ~2.3 G/s. Parallelism adds ~2 to 4x on this hybrid CPU. The GPU (a user-local CUDA 12 makes `!` run on the RTX 4050, see `docs/gpu-setup.md`) is 3.8x faster on compute-bound flat loops but 3 to 18x slower on our memory-bound kernels, so the benchmarks use the CPU. v3 keeps a weight matrix as a tree of row bands (`Bands`), so each task of a matrix · vector product takes its band without copying it: the 50257 × 768 logits product goes from 25 ms to 6 ms on 16 threads, with the same numbers bit for bit. Full tables: [MNIST](demos/mnist/BENCHMARK.md), [GPT-2](demos/gpt2/BENCHMARK.md), and `NOTES.md`, experiments 1 to 11.
+Bend 2.0.35 generates scalar code, with no BLAS or SIMD: on the same matrix product PyTorch does 62 G multiply-adds/s on one thread and Bend with an `Array` ~2.3 G/s. Parallelism adds ~2 to 4x on this hybrid CPU. The GPU (a user-local CUDA 12 makes `!` run on the RTX 4050, see `docs/gpu-setup.md`) is 3.8x faster on compute-bound flat loops but 3 to 18x slower on our memory-bound kernels, so the benchmarks use the CPU. v3 keeps a weight matrix as a tree of row bands (`Bands`), so each task of a matrix · vector product takes its band without copying it: the 50257 × 768 logits product goes from 25 ms to 6 ms on 16 threads, with the same numbers bit for bit. Full tables: [MNIST](demos/mnist/BENCHMARK.md), [GPT-2](demos/gpt2/BENCHMARK.md), and `NOTES.md`, experiments 1 to 13.
 </details>
 
 ## 05 · What we learned
@@ -99,7 +99,7 @@ Bend 2.0.35 generates scalar code, with no BLAS or SIMD: on the same matrix prod
 - Copying is the hidden cost: splitting a matrix for parallel work by copying it costs more than the arithmetic of a matrix · vector. Splitting the data structure itself (row bands, each its own `Array`) costs nothing per call.
 - Read the generated C when parallel code does not scale: in Bend 2.0.35 an erased parameter at the end of a def's parameter list turns its parallel let into two sequential calls ([bendlang/bend#1374](https://github.com/bendlang/bend/issues/1374); I traced it to the compiler and my fix, [#1377](https://github.com/bendlang/bend/pull/1377), is merged and will ship in the next release).
 - `IO.fork` gives concurrency, not parallelism: forked computations take turns on one core. Loading the weights with one fork per layer took 6.6-7.1 s instead of 5.1-5.6 s. I reported it ([#1375](https://github.com/bendlang/bend/issues/1375)), and the Bend guide now says so ([#1415](https://github.com/bendlang/bend/pull/1415)). Work that should use every core goes in parallel lets.
-- Types do not slow the checker down with depth: 128 dense layers of distinct sizes check in 0.27 s (8 layers: 0.22 s); building, mostly clang, takes 4.7 s ([table](bench/results/compile-times-2026-10-05.md)).
+- Types do not slow the checker down with depth: 128 dense layers of distinct sizes check in 0.14 s (8 layers: 0.12 s); building, mostly clang, takes 3.3 s ([table](bench/results/compile-times-2026-10-08.md)).
 - The GPU only helps compute-bound work; our kernels are chains of dependent pointer loads.
 - Measuring corrected some of my early claims: PyTorch takes 21 ms per token, not 150 ms; the GPU is not "slower everywhere"; and the "~10 GB" of GPT-2 memory was virtual size (the resident peak is ~1.5 GB).
 
@@ -121,7 +121,7 @@ make media          # regenerate the figures and the video on this page
 <summary>limits</summary>
 
 - PyTorch is faster (see 04).
-- The GPT-2 weights become trees of nodes; loading streams 1 MB blocks into the arrays, with a ~1.5 GB resident peak (the process reserves ~10 GB of address space).
+- The GPT-2 weights become trees of nodes; loading streams 1 MB blocks into the arrays, with a ~0.9 GB resident peak (the process reserves ~41 GB of address space). Decoding the blocks in parallel did not make it faster (`NOTES.md`, exp. 13).
 - Only `Nat`, `U32` and `F32`; no `F64`.
 - `Mat<r,c>` does not carry "capacity ≥ r·c" in its type: the constructors establish it with the proved `cap_ok`, and that `Array.new(d)` gives `2^d` slots is trusted.
 - The GPT-2 pre-tokenizer classifies code points up to U+1FFFF with a table generated from Unicode; above that, and for invalid UTF-8, everything counts as a letter.
