@@ -620,3 +620,17 @@ time printed by `demos/gpt2/fast.bend`, alternated runs; prototypes in `.scratch
 5. `make check-full`, `make bench` and the GPT-2 timings on an idle machine; a short entry here.
 6. Packages: republish only if their source changes (the `Bend:` line alone is not a reason); then the
    release PR `devel` → `main`, tag `v3.2.0` on `main`.
+
+### Idle measurement (2026-10-08, pending since v3.1)
+
+Nothing else running (Brave closed by Renan), on AC power, `performance` profile; the load average of
+1.2-1.5 comes from the runs themselves.
+
+- GPT-2, 36 forward passes, alternated 5 times (`bench/results/gpt2-idle-2026-10-08.txt`): v2.1 load 5-7 s,
+  1 thread 4.9-5.3 s, 16 threads 4.8-5.2 s; v3.1 load 3.8-5.4 s, 1 thread 5.2-5.5 s, 16 threads 3.7-4.3 s. On one
+  thread v3.1 is 3-6% slower than v2.1 here (under load on 2026-10-06 it looked equal: 4.8 against 4.7 s).
+- `make bench` (`mv_bands-2026-10-08.txt`): within a few percent of the 2026-10-06 numbers taken under load;
+  logits 50257 × 768 sequential 31.8 ms, list API with 2^5 bands on 16 threads 5.5 ms. Compile times
+  (`compile-times-2026-10-08.md`) are lower than under load: 128 layers check in 0.14 s and build in 3.3 s.
+- Peak resident memory of the current demo: 894 MB (`scripts/peak_rss.sh`).
+- README, `demos/gpt2/BENCHMARK.md` and `docs/media/numbers.json` updated (the figure now says 27 laws).

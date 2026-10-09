@@ -18,6 +18,19 @@
 | v3.0 | 5.1-6.1 s | 5.2 s | 3.8-4.2 s |
 | **v3.1** | **3.9-5.1 s** | **4.8 s** | **3.6-3.8 s** |
 
+Re-measured on an idle machine on 2026-10-08 (nothing else running, on AC power), alternated 5 times
+(`bench/results/gpt2-idle-2026-10-08.txt`):
+
+| | load | 36 forward passes, 1 thread | 36 forward passes, 16 threads |
+|---|---|---|---|
+| v2.1 | 5-7 s | 4.9-5.3 s | 4.8-5.2 s |
+| **v3.1** | **3.8-5.4 s** | **5.2-5.5 s** | **3.7-4.3 s** |
+
+On one thread v3.1 is 3-6% slower than v2.1 in this run (the residual cost of `matvec_l` on the 50257-row
+matrix, NOTES v3.1). Per product, with the matrix already built (`bench/results/mv_bands-2026-10-08.txt`,
+16 threads, list API): 2304 × 768 from 0.78 ms to 0.29 ms (2^5 bands); 50257 × 768 from 31.8 ms to 5.5 ms. These
+match the numbers taken under load on 2026-10-06 within a few percent.
+
 Over 36 positions the attention over the key/value cache (still lists) takes a growing share of each
 token, so the end-to-end gain is smaller than the gain on the matrix · vector products. The same ids and
 logits as v2.1 on the 11 prompts.
@@ -39,7 +52,7 @@ The machine had background load during these runs, so v2.1 and v3 were run alter
 
 In a quieter moment the same comparison gave 1.2 s against 0.7 s (~0.054 s per token, ~2.6x the 21 ms of
 16-thread PyTorch). On one thread v3 is ~12% slower than v2.1 (the typed result is converted to a `Mat` and
-back to a list, and the bands' lists are appended at every node). An idle re-measure is pending.
+back to a list, and the bands' lists are appended at every node). Re-measured on an idle machine in the v3.1 section.
 
 Per product, with the matrix already built (`bench/mv_bands.py`, 16 threads): 2304 × 768 from 0.80 ms to
 0.32 ms; 50257 × 768 (the logits) from 25.1 ms to 6.1 ms.
