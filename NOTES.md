@@ -600,3 +600,23 @@ time printed by `demos/gpt2/fast.bend`, alternated runs; prototypes in `.scratch
   streaming loader. The walk that a parallel decode can split is a small part; the per-byte list built by the
   host and held across the IO steps is the cost. The lever left is upstream: a read that gives denser data
   (for example `File.read_at` into an `Array<U32>`, or 4 bytes per `U32`). An idea, not a draft yet.
+
+### Bend main checked ahead of the release (2026-10-08)
+
+- `make check-full` against Bend main `60fa05d` (2026-10-08, carries #1377; run with `bun bend2/main.ts`
+  through a copy of `check_all.py` whose `BEND` points at it and whose version pin is skipped): **43/43 ok**,
+  including the C join check of `bmv`, GPT-2 against PyTorch on 11 prompts and `--verdict` on every package.
+  Nothing to fix before the bump.
+
+### Checklist for the bump to the release that carries #1377
+
+1. Read the release notes and `bend guide` for changes; `bend update`, then `bend version`.
+2. `scripts/setup.sh`: `BEND_VERSION` and the two SHA256 sums (from the release's checksums).
+3. `reference/check_all.py` (`check_toolchain`), `.github/workflows/ci.yml` (step name), the README badge and
+   setup line, the `Bend:` line of each package README, CLAUDE.md rule 1 and the pitfalls title, this file's
+   "Pinned version".
+4. CLAUDE.md pitfall and README section 05: the erased-last-parameter bug becomes history (fixed in the new
+   version); the C join check stays.
+5. `make check-full`, `make bench` and the GPT-2 timings on an idle machine; a short entry here.
+6. Packages: republish only if their source changes (the `Bend:` line alone is not a reason); then the
+   release PR `devel` → `main`, tag `v3.2.0` on `main`.
