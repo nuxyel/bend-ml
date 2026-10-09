@@ -675,3 +675,9 @@ bench shows the list API with one band within a few percent of `Mat.matmul_nt`, 
 - **Open:** ~2% on one thread against v1.0. Skipping the clone of `x` gave 0.6%, within noise.
 - A correction: I first read a drop of the peak *virtual* size (41 GB → 10.6 GB) as an effect of the fix; it came
   from a shorter prompt. With the same prompt v1.1, v1.2 and v1.2.1 all reserve 41 GB.
+
+## Next: llama.bend (2026-10-09)
+
+I started step 1 of my plans after v1.2 in its own private repository, `nuxyel/llama.bend`: SmolLM2-135M in
+Bend, using `bend-ml-tensor-array@0.1.6.0` and `bend-ml-bpe-tokenizer@0.1.2.0` from BendHub. Its findings live in
+its own `NOTES.md`; bend-ml's README will mention it when it goes public.
