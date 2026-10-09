@@ -1,6 +1,6 @@
 # bend-ml-tensor-array: tensors over a flat Array<F32>, with the shape in the type.
 #
-#   import bend-ml-tensor-array@0.1.5.0/main.bend as TA
+#   import bend-ml-tensor-array@0.1.6.0/main.bend as TA
 #
 # Mat<r, c> stores r*c numbers in an Array<F32>, row by row (index i*c + j). The
 # dimensions are erased type parameters: the same guarantee as bend-ml-tensor
@@ -1045,24 +1045,31 @@ type BV<-r: Nat, -c: Nat> is Type:
 type BL<-r: Nat, -c: Nat> is Type:
   BL{b: Bands<r, c>, y: List<&2, F32>}
 
-def bv_leaf(-r: Nat, -c: Nat, st: S3) -> BL<r, c>:
-  match st:
-    case S3{a, b, out}:
-      BL{BLeaf{Mat{b}}, List.reverse(&2, F32, out)}
+def bv_g2(-r: Nat, -c: Nat, w: Array<F32>, al: AL) -> BL<r, c>:
+  match al:
+    case AL{d, l}:
+      BL{BLeaf{Mat{w}}, l}
 
-# the rows of one band, one dot product each: the same kernel (and the same order of
-# additions) as Mat.matmul_nt, so the results are identical
-def bv_rows(-r: Nat, -c: Nat, rows: Nat, +k: Nat, x: Array<F32>, w: Array<F32>) -> BL<r, c>:
+# the band's 1 + m rows came out in an Array (one number per row); read them back as a list
+def bv_g(-r: Nat, -c: Nat, +m: Nat, g: G) -> BL<r, c>:
+  match g:
+    case G{a, b, y}:
+      bv_g2(r, c, b, read_l(m, 0, Nil{}, Array.get(F32, y, 0)))
+
+# the rows of one band, one dot product each, with the gemm of Mat.matmul_nt (n = 1), so the
+# results are identical. Writing the results into an Array and reading them back is faster than
+# building the list row by row (NOTES.md, exp. 14).
+def bv_gemm(-r: Nat, +c: Nat, rows: Nat, +rr: Nat, x: Array<F32>, w: Array<F32>) -> BL<r, c>:
   match rows:
     case 0n:
       BL{BLeaf{Mat{w}}, Nil{}}
     case 1n+p:
-      bv_leaf(r, c, lcols(p, k, 0, 0, 1, 1, U32.from_nat(k), Nil{}, dotg(k, 0, 0, 1, 1, 0.0, Array.get(F32, x, 0), Array.get(F32, w, 0))))
+      bv_g(r, c, p, gemm(1n, rr, c, U32.from_nat(c), 1, 1, U32.from_nat(c), x, w, Array.new(F32, cap_depth(rr), 0.0)))
 
 def bv_mat(-r: Nat, +c: Nat, +rr: Nat, x: Array<F32>, m: Mat<r, c>) -> BL<r, c>:
   match m:
     case Mat{w}:
-      bv_rows(r, c, rr, c, x, w)
+      bv_gemm(r, c, rr, rr, x, w)
 
 def bv_join(-r: Nat, -c: Nat, p: BL<half(r), c>, q: BL<Nat.sub(r, half(r)), c>) -> BL<r, c>:
   match p q:
@@ -1203,44 +1210,49 @@ def app_len(+xs: List<&2, F32>, +ys: List<&2, F32>) -> {List.length(&2, F32, Lis
       %app_len(t, ys) : {1n+List.length(&2, F32, List.append(&2, F32, t, ys)) == 1n+_ : Nat}
       {==}
 
-# a leaf's list: lcols puts mleft + 1 numbers on out, and bv_leaf reverses them
+# a leaf's list: read_l reads mleft + 1 numbers onto acc and reverses them. By induction on
+# mleft: with 0 left it reads one number (rev_len counts the reversed list); with 1 + p left it
+# reads one and recurses, and len_step moves the 1 out of the sum.
 law leaf_len:
   for -r: Nat
   for -c: Nat
+  for w: Array<F32>
   for +mleft: Nat
-  for +kn: Nat
-  for +ia0: U32
-  for +ib0: U32
-  for +sa: U32
-  for +sb: U32
-  for +bcol: U32
-  for +out: List<&2, F32>
-  for rd: R
-  {bl_len(r, c, bv_leaf(r, c, lcols(mleft, kn, ia0, ib0, sa, sb, bcol, out, rd))) == Nat.add(1n+mleft, List.length(&2, F32, out)) : Nat}
+  for +idx: U32
+  for +acc: List<&2, F32>
+  for rc: Array<F32> & F32
+  {bl_len(r, c, bv_g2(r, c, w, read_l(mleft, idx, acc, rc))) == Nat.add(1n+mleft, List.length(&2, F32, acc)) : Nat}
 
-def leaf_len(r, c, mleft, kn, ia0, ib0, sa, sb, bcol, out, rd):
-  match mleft rd:
-    case 0n R{a, b, +x}:
-      zero_out(List.length(&2, F32, List.reverse.go(&2, F32, x <> out, Nil{})), 1n+List.length(&2, F32, out), rev_len(x <> out, Nil{}))
-    case 1n+p R{a, b, +x}:
-      len_step(bl_len(r, c, bv_leaf(r, c, lcols(p, kn, ia0, (ib0 + bcol : U32), sa, sb, bcol, x <> out, dotg(kn, ia0, (ib0 + bcol : U32), sa, sb, 0.0, Array.get(F32, a, ia0), Array.get(F32, b, (ib0 + bcol : U32)))))), p, List.length(&2, F32, out), leaf_len(r, c, p, kn, ia0, (ib0 + bcol : U32), sa, sb, bcol, x <> out, dotg(kn, ia0, (ib0 + bcol : U32), sa, sb, 0.0, Array.get(F32, a, ia0), Array.get(F32, b, (ib0 + bcol : U32)))))
+def leaf_len(r, c, w, mleft, idx, acc, rc):
+  match mleft rc:
+    case 0n Tuple{d, +v}:
+      zero_out(List.length(&2, F32, List.reverse.go(&2, F32, v <> acc, Nil{})), 1n+List.length(&2, F32, acc), rev_len(v <> acc, Nil{}))
+    case 1n+p Tuple{d, +v}:
+      len_step(bl_len(r, c, bv_g2(r, c, w, read_l(p, (idx + 1 : U32), v <> acc, Array.get(F32, d, (idx + 1 : U32))))), p, List.length(&2, F32, acc), leaf_len(r, c, w, p, (idx + 1 : U32), v <> acc, Array.get(F32, d, (idx + 1 : U32))))
+
+# whatever the gemm wrote, reading 1 + p rows back gives 1 + p numbers (G has one constructor, so
+# matching g opens it, and leaf_len counts the list)
+def g_len(-r: Nat, -c: Nat, +p: Nat, g: G) -> {bl_len(r, c, bv_g(r, c, p, g)) == 1n+p : Nat}:
+  match g:
+    case G{a, b, y}:
+      zero_out(bl_len(r, c, bv_g2(r, c, b, read_l(p, 0, Nil{}, Array.get(F32, y, 0)))), 1n+p, leaf_len(r, c, b, p, 0, Nil{}, Array.get(F32, y, 0)))
 
 # LAW (band_len): the product of one band with `rows` rows gives exactly `rows` numbers.
+# 0 rows give the empty list; 1 + p rows go through the gemm, and g_len counts what is read back.
 law band_len:
   for -r: Nat
-  for -c: Nat
+  for +c: Nat
   for +rows: Nat
-  for +k: Nat
   for x: Array<F32>
   for w: Array<F32>
-  {bl_len(r, c, bv_rows(r, c, rows, k, x, w)) == rows : Nat}
+  {bl_len(r, c, bv_gemm(r, c, rows, rows, x, w)) == rows : Nat}
 
-def band_len(r, c, rows, k, x, w):
+def band_len(r, c, rows, x, w):
   match rows:
     case 0n:
       {==}
     case 1n+p:
-      zero_out(bl_len(r, c, bv_leaf(r, c, lcols(p, k, 0, 0, 1, 1, U32.from_nat(k), Nil{}, dotg(k, 0, 0, 1, 1, 0.0, Array.get(F32, x, 0), Array.get(F32, w, 0))))), 1n+p, leaf_len(r, c, p, k, 0, 0, 1, 1, U32.from_nat(k), Nil{}, dotg(k, 0, 0, 1, 1, 0.0, Array.get(F32, x, 0), Array.get(F32, w, 0))))
+      g_len(r, c, p, gemm(1n, 1n+p, c, U32.from_nat(c), 1, 1, U32.from_nat(c), x, w, Array.new(F32, cap_depth(1n+p), 0.0)))
 
 # joining two halves of h1 and h2 numbers gives h1 + h2 numbers. (The statement for the whole tree,
 # "Bands.matvec_l gives r numbers", would apply this to the results of the two recursive calls and

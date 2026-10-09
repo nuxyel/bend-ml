@@ -8,7 +8,7 @@ Tensors in Bend 2 over a flat `Array<F32>`, **with the shape in the type**: the 
 
 ```python
 import Base
-import bend-ml-tensor-array@0.1.5.0/main.bend as TA
+import bend-ml-tensor-array@0.1.6.0/main.bend as TA
 
 def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 128n>:
   TA.Mat.matmul(100n, 784n, 128n, 3n, a, w)   # 3n = 2^3 = 8 parallel blocks
@@ -74,7 +74,7 @@ Ultra 7 155H (`bench/mv_bands.py`, `bench/results/`):
 |---|---|
 | `cap_ok` | an `Array` with `2^cap_depth(n)` slots always has room for `n` numbers, so the constructors never allocate too little |
 | `half_cover` | the two bands of a node, `half(r)` rows and `r - half(r)` rows, add up to exactly `r` rows: no row is lost and none is counted twice |
-| `leaf_len` | the kernel of one band (`lcols`, then `bv_leaf`) puts exactly one number per row it computes on the output list |
+| `leaf_len` | reading a band's results back from its `Array` (`read_l`, then `bv_g2`) gives exactly one number per row read |
 | `band_len` | the product of one band with `rows` rows gives exactly `rows` numbers |
 
 Not proved yet: that the whole tree (`Bands.matvec_l`) gives exactly `r` numbers. The proof would apply the
@@ -117,6 +117,7 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 
 ## Versions
 
+- `0.1.6.0`: each band of `Bands.matvec` / `Bands.matvec_l` runs the `gemm` of `Mat.matmul_nt` and reads its rows back, instead of building the list row by row: the same numbers bit for bit, 3-4% faster on GPT-2 with 1 and with 16 threads, 19-32% per product on 16 threads. `leaf_len` and `band_len` are proved again over the new code.
 - `0.1.5.0`: `Bands.matvec_l` (lists in and out) and the laws `leaf_len` and `band_len`.
 - `0.1.4.0`: `Bands<r, c>` (row bands, a parallel matrix · vector that copies no weights), with the law `half_cover`.
 
