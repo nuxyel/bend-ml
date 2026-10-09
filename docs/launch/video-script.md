@@ -2,7 +2,7 @@
 
 The video is **generated**, not recorded: `docs/media/video/scene.html` animates the real command outputs (`docs/media/outputs/`) and the measured numbers (`docs/media/numbers.json`), `docs/media/render_video.mjs` renders it frame by frame with a headless Chromium-based browser, and `ffmpeg` encodes it. It is 1920x1080, 30 fps, silent, with English captions.
 
-The MP4 is not stored in git (it would stay in the history forever). It is attached to the GitHub release: `https://github.com/nuxyel/bend-ml/releases/download/v2.1.0/bend-ml.mp4`. The repository keeps `docs/media/poster.png` and the looping `docs/media/teaser.webp` used by the README.
+The MP4 is not stored in git (it would stay in the history forever). It is attached to the GitHub release: `https://github.com/nuxyel/bend-ml/releases/download/v1.0.0/bend-ml.mp4`. The repository keeps `docs/media/poster.png` and the looping `docs/media/teaser.webp` used by the README.
 
 ## Regenerate
 
@@ -10,7 +10,7 @@ The MP4 is not stored in git (it would stay in the history forever). It is attac
 make media                                  # screenshots, charts, poster, teaser and the video
 scripts/make_media.sh --capture             # also re-run the commands and refresh docs/media/outputs/ (slow)
 scripts/make_media.sh --no-video            # only the README images
-gh release upload v2.1.0 docs/media/bend-ml.mp4 --clobber
+gh release upload v1.0.0 docs/media/bend-ml.mp4 --clobber
 ```
 
 Needs `node`, `ffmpeg` and a Chromium-based browser (`/usr/bin/brave`, or set `$BRAVE`). To look at single frames: `node docs/media/render_video.mjs --stills 3,14,40`.

@@ -22,7 +22,8 @@ use on BendHub, and a portfolio piece for HOC.
 
 Work on `devel`: every commit and push goes there, and CI checks it. `main` only receives stable releases,
 through a pull request `devel` → `main` merged after its CI passes; the version tag (`vX.Y.Z`) and the GitHub
-release are made on `main` after that merge.
+release are made on `main` after that merge. Version numbers follow `docs/VERSIONING.md` (major only for a change in
+what bend-ml is; renumbered on 2026-10-09, old tags kept).
 
 ## About Renan
 

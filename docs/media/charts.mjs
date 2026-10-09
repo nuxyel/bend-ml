@@ -50,19 +50,19 @@ function bars(x0, y0, w, h, title, max, items) {
 const m = N.mnist_epoch_seconds, g = N.gpt2_seconds_per_token, R = N.ratios;
 {
   let b = bars(60, 54, 400, 250, "MNIST · one training epoch", 8, [
-    { label: "v1", sub: "lists", v: m.bend_v1_lists, kind: "over" },
-    { label: "v2", sub: "Array", v: m.bend_v2_array, kind: "bend" },
+    { label: "v0.2", sub: "lists", v: m.bend_v1_lists, kind: "over" },
+    { label: "v0.3", sub: "Array", v: m.bend_v2_array, kind: "bend" },
     { label: "PyTorch", sub: "16 threads", v: m.pytorch, kind: "other" },
   ]);
   b += bars(560, 54, 400, 250, "GPT-2 small · time per token", 0.12, [
-    { label: "v1", sub: "lists", v: g.bend_v1_lists, kind: "over" },
-    { label: "v2", sub: "Array", v: g.bend_v2_array, kind: "bend" },
+    { label: "v0.2", sub: "lists", v: g.bend_v1_lists, kind: "over" },
+    { label: "v0.3", sub: "Array", v: g.bend_v2_array, kind: "bend" },
     { label: "PyTorch", sub: "1 thread", v: g.pytorch_1_thread, kind: "other" },
     { label: "PyTorch", sub: "16 threads", v: g.pytorch_16_threads, kind: "other" },
   ]);
   b += T(510, 432, "seconds, lower is better · same machine · hatched bars are off the chart", { size: 14, fill: C.b1, anchor: "middle" });
-  b += T(510, 462, `v1 → v2: ${Math.round(m.bend_v1_lists / m.bend_v2_array)}× and ${Math.round(g.bend_v1_lists / g.bend_v2_array)}× faster. PyTorch is still ~${R.mnist_pytorch_ahead_max}× and ~${R.gpt2_pytorch_ahead_min}–${R.gpt2_pytorch_ahead_max}× ahead.`, { size: 15, fill: C.ora, anchor: "middle" });
-  out("benchmarks.svg", svg(1020, 490, "Benchmarks: MNIST epoch and GPT-2 time per token, Bend v1, Bend v2 and PyTorch", b));
+  b += T(510, 462, `v0.2 → v0.3: ${Math.round(m.bend_v1_lists / m.bend_v2_array)}× and ${Math.round(g.bend_v1_lists / g.bend_v2_array)}× faster. PyTorch is still ~${R.mnist_pytorch_ahead_max}× and ~${R.gpt2_pytorch_ahead_min}–${R.gpt2_pytorch_ahead_max}× ahead.`, { size: 15, fill: C.ora, anchor: "middle" });
+  out("benchmarks.svg", svg(1020, 490, "Benchmarks: MNIST epoch and GPT-2 time per token, Bend v0.2, Bend v0.3 and PyTorch", b));
 }
 
 {

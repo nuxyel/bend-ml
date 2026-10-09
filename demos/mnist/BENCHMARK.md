@@ -1,13 +1,15 @@
 # MNIST: an honest benchmark, Bend vs PyTorch
 
-**Summary (v2):** the results are **identical** (same loss, same accuracy after 1 and after 3 epochs). In v1 Bend took **544 s per epoch** (~1800x PyTorch); in v2, with matrices in a flat `Array` and parallel products, it takes **6.6 s** (~33x PyTorch with 16 threads, ~22x with 1). The difference between v1 and v2 is the data structure, not the language; what is left is scalar code against BLAS/SIMD. Re-measured on 2026-10-04 on an idle machine: 7.0, 7.0 and 7.2 s per epoch for Bend (the 6.6 s of the tables below are the original runs) and 0.18 to 0.20 s for PyTorch, i.e. ~35x.
+Versions follow [`docs/VERSIONING.md`](../../docs/VERSIONING.md) (renumbered on 2026-10-09: v0.2 was called v1, v0.3 v2, v1.0 v2.1, v1.1 v3.0, v1.2 v3.1).
 
-## v2: flat `Array` (`demos/mnist/fast.bend`, package `bend-ml-tensor-array@0.1.1.0`)
+**Summary (v0.3):** the results are **identical** (same loss, same accuracy after 1 and after 3 epochs). In v0.2 Bend took **544 s per epoch** (~1800x PyTorch); in v0.3, with matrices in a flat `Array` and parallel products, it takes **6.6 s** (~33x PyTorch with 16 threads, ~22x with 1). The difference between v0.2 and v0.3 is the data structure, not the language; what is left is scalar code against BLAS/SIMD. Re-measured on 2026-10-04 on an idle machine: 7.0, 7.0 and 7.2 s per epoch for Bend (the 6.6 s of the tables below are the original runs) and 0.18 to 0.20 s for PyTorch, i.e. ~35x.
+
+## v0.3: flat `Array` (`demos/mnist/fast.bend`, package `bend-ml-tensor-array@0.1.1.0`)
 
 | | 1 epoch | loss / hits after 1, 2, 3 epochs |
 |---|---|---|
-| **Bend v2, 16 threads** | **6.6 s** | 0.5204771 / 9129 · 0.27043572 / 9298 · 0.2156194 / 9418 |
-| Bend v2, 1 thread | 18.1 s | |
+| **Bend v0.3, 16 threads** | **6.6 s** | 0.5204771 / 9129 · 0.27043572 / 9298 · 0.2156194 / 9418 |
+| Bend v0.3, 1 thread | 18.1 s | |
 | PyTorch, 16 threads | 0.19 to 0.21 s | 0.520477 / 9129 · 0.270433 / 9298 · 0.215613 / 9418 |
 | PyTorch, 1 thread | 0.30 s | |
 
@@ -15,14 +17,14 @@ Every product, every gradient and every update has its shape checked by the type
 
 | step | epoch |
 |---|---|
-| v1: matrices as linked lists | 544.3 s |
+| v0.2: matrices as linked lists | 544.3 s |
 | flat `Array`, `Array.get/set` by index, 1 thread | 11.5 s |
 | + large products in 2^3 parallel blocks (16 threads) | 6.3 s |
 | the package's typed API (list↔Array conversions in the wrappers) | 6.6 s |
 
 ---
 
-## v1: lists (`demos/mnist/train.bend`), kept as the baseline
+## v0.2: lists (`demos/mnist/train.bend`), kept as the baseline
 
 ## Setup
 

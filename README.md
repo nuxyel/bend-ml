@@ -10,8 +10,8 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/nuxyel/bend-ml/releases/download/v2.1.0/bend-ml.mp4"><img src="docs/media/teaser.webp" alt="Two matrices whose shapes do not match fail to fit, and Bend rejects the program. Click for the 60 s video." width="80%"></a>
-  <br><sub>the 60 s video: <a href="https://github.com/nuxyel/bend-ml/releases/download/v2.1.0/bend-ml.mp4">bend-ml.mp4</a></sub>
+  <a href="https://github.com/nuxyel/bend-ml/releases/download/v1.0.0/bend-ml.mp4"><img src="docs/media/teaser.webp" alt="Two matrices whose shapes do not match fail to fit, and Bend rejects the program. Click for the 60 s video." width="80%"></a>
+  <br><sub>the 60 s video: <a href="https://github.com/nuxyel/bend-ml/releases/download/v1.0.0/bend-ml.mp4">bend-ml.mp4</a></sub>
 </p>
 
 **bend-ml** is machine learning for [Bend 2](https://bend-lang.com). The shape of every tensor lives in its type, so a product of mismatched matrices does not compile, and the structural guarantees (a tokenizer that never loses a byte, a reverse mode that agrees with the forward mode) are laws that Bend's kernel checks. Five packages are on BendHub, and two demos run on them, an MNIST classifier and GPT-2 small, both checked against PyTorch.
@@ -75,19 +75,19 @@ Every package passes `bend X/main.bend --verdict`, the re-check by Bend's Lean-p
 
 | Demo | Result |
 |---|---|
-| [MNIST](demos/mnist), 784-128-10 MLP | about 7 s per epoch (v1: 544 s). Loss and hits identical to PyTorch with the same weights and batches: 0.5204771 / 9129, then 0.27043572 / 9298, then 0.2156194 / 9418. |
-| [GPT-2 small](demos/gpt2), 124 M | about 0.1 s per token sequential (v1: 3 s). With the weights in parallel bands (v3.1, 16 threads), 36 forward passes take 3.7-4.3 s against 4.8-5.2 s for v2.1, alternated on an idle machine. The same tokens as PyTorch on 11 prompts, logits within 6e-4 (they are of order 100); the tokenizer matches `tiktoken` on 79 texts. Loading takes 4-5 s (v3.1; 5-7 s in v2.1), with a resident peak of ~0.9 GB. |
+| [MNIST](demos/mnist), 784-128-10 MLP | about 7 s per epoch (v0.2: 544 s). Loss and hits identical to PyTorch with the same weights and batches: 0.5204771 / 9129, then 0.27043572 / 9298, then 0.2156194 / 9418. |
+| [GPT-2 small](demos/gpt2), 124 M | about 0.1 s per token sequential (v0.2: 3 s). With the weights in parallel bands (v1.2, 16 threads), 36 forward passes take 3.7-4.3 s against 4.8-5.2 s for v1.0, alternated on an idle machine. The same tokens as PyTorch on 11 prompts, logits within 6e-4 (they are of order 100); the tokenizer matches `tiktoken` on 79 texts. Loading takes 4-5 s (v1.2; 5-7 s in v1.0), with a resident peak of ~0.9 GB. |
 
 ## 04 · Benchmarks
 
-<p align="center"><img src="docs/media/benchmarks.svg" alt="Bar charts: MNIST epoch, v1 544 s, v2 7 s, PyTorch 0.2 s; GPT-2 per token, v1 3 s, v2 0.1 s, PyTorch 55 ms on 1 thread and 21 ms on 16 threads" width="90%"></p>
+<p align="center"><img src="docs/media/benchmarks.svg" alt="Bar charts: MNIST epoch, v0.2 544 s, v0.3 7 s, PyTorch 0.2 s; GPT-2 per token, v0.2 3 s, v0.3 0.1 s, PyTorch 55 ms on 1 thread and 21 ms on 16 threads" width="90%"></p>
 
 <p align="center"><img src="docs/media/findings.svg" alt="What moved the needle: lists to a flat Array 49x faster; parallel row blocks 1.8x; GPU on a flat loop 3.8x faster; GPU on our matrix kernels 3 to 18x slower; copying the matrix per task 10x slower" width="90%"></p>
 
 <details>
 <summary>why PyTorch is still ahead</summary>
 
-Bend 2.0.35 generates scalar code, with no BLAS or SIMD: on the same matrix product PyTorch does 62 G multiply-adds/s on one thread and Bend with an `Array` ~2.3 G/s. Parallelism adds ~2 to 4x on this hybrid CPU. The GPU (a user-local CUDA 12 makes `!` run on the RTX 4050, see `docs/gpu-setup.md`) is 3.8x faster on compute-bound flat loops but 3 to 18x slower on our memory-bound kernels, so the benchmarks use the CPU. v3 keeps a weight matrix as a tree of row bands (`Bands`), so each task of a matrix · vector product takes its band without copying it: the 50257 × 768 logits product goes from 25 ms to 6 ms on 16 threads, with the same numbers bit for bit. Full tables: [MNIST](demos/mnist/BENCHMARK.md), [GPT-2](demos/gpt2/BENCHMARK.md), and `NOTES.md`, experiments 1 to 13.
+Bend 2.0.35 generates scalar code, with no BLAS or SIMD: on the same matrix product PyTorch does 62 G multiply-adds/s on one thread and Bend with an `Array` ~2.3 G/s. Parallelism adds ~2 to 4x on this hybrid CPU. The GPU (a user-local CUDA 12 makes `!` run on the RTX 4050, see `docs/gpu-setup.md`) is 3.8x faster on compute-bound flat loops but 3 to 18x slower on our memory-bound kernels, so the benchmarks use the CPU. v1.1 keeps a weight matrix as a tree of row bands (`Bands`), so each task of a matrix · vector product takes its band without copying it: the 50257 × 768 logits product goes from 25 ms to 6 ms on 16 threads, with the same numbers bit for bit. Full tables: [MNIST](demos/mnist/BENCHMARK.md), [GPT-2](demos/gpt2/BENCHMARK.md), and `NOTES.md`, experiments 1 to 13.
 </details>
 
 ## 05 · What we learned
@@ -115,7 +115,7 @@ make check-full     # 43 checks with GPT-2 and MNIST, about 5 min
 make media          # regenerate the figures and the video on this page
 ```
 
-`make setup-lite` skips the 550 MB GPT-2 download. CI runs `make check-full` on every push. `main` holds the released versions; work in progress lives on the `devel` branch. The history was rewritten on 2026-10-04 (English messages, smaller commits), so clone again if you have an older copy.
+`make setup-lite` skips the 550 MB GPT-2 download. CI runs `make check-full` on every push. `main` holds the released versions (numbered as in [`docs/VERSIONING.md`](docs/VERSIONING.md)); work in progress lives on the `devel` branch. The history was rewritten on 2026-10-04 (English messages, smaller commits), so clone again if you have an older copy.
 
 <details>
 <summary>limits</summary>
