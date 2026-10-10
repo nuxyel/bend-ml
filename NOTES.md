@@ -4,7 +4,7 @@ Date: 2026-10-03. Everything below was verified on the machine or in a primary s
 
 ## Pinned version
 
-- **Bend 2.0.35** (`bend version`). Pin this version until further notice.
+- **Bend 2.0.36** (`bend version`), since 2026-10-10 (2.0.35 before). Pin this version until further notice.
 - Official repository: `github.com/bendlang/bend` (not `HigherOrderCO/Bend`, which is Bend 1).
 - Installed with `curl -fsSL https://bend-lang.com/install.sh | sh` (script read before running: it downloads the GitHub release, checks the SHA256, installs only into `~/.bend`, no sudo).
 - Update: `bend update` (runs the installer again). Do not update without recording it here, since Bend 2 changes fast.
@@ -781,7 +781,8 @@ vectors of 768 or 3072 numbers. The inner loop of `dotg` has no `ctr_take`. Bend
 - **Numbers:** the 11 prompts give the same ids and text, and the logits move closer to PyTorch: the largest
   difference drops on 9 of the 11 prompts (for example 5.8e-4 → 2.8e-4, 2.0e-4 → 8e-5). The summation order
   changes, so the logits are no longer bit for bit those of v1.2.1.
-- **Open, my call:** adopt it or not. Short term: -5% on one thread, nothing on 16 for GPT-2, logits closer to
+- **Adopted** (my call, 2026-10-10) with four accumulators, in `bend-ml-tensor-array@0.1.7.0`, together with the bump to
+  Bend 2.0.36. Before that call: Short term: -5% on one thread, nothing on 16 for GPT-2, logits closer to
   PyTorch. Medium and long term: llama.bend and a training framework would inherit the kernel, and any future
   proof about the dot product's value would be about this order.
 

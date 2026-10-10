@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # One-shot, idempotent setup for the bend-ml checks. No sudo.
 #
-#   scripts/setup.sh              # Bend 2.0.35, Lean 4.34.0, Python venv, MNIST and GPT-2 data
+#   scripts/setup.sh              # Bend 2.0.36, Lean 4.34.0, Python venv, MNIST and GPT-2 data
 #   scripts/setup.sh --no-gpt2    # skip the 550 MB GPT-2 download and its preparation
 #
-# Pins: Bend 2.0.35 (checked by SHA256) and Lean v4.34.0 (the kernel behind `bend --verdict`).
+# Pins: Bend 2.0.36 (checked by SHA256) and Lean v4.34.0 (the kernel behind `bend --verdict`).
 set -euo pipefail
 
-BEND_VERSION=2.0.35
+BEND_VERSION=2.0.36
 LEAN_VERSION=4.34.0
 GPT2=1
 [ "${1:-}" = "--no-gpt2" ] && GPT2=0
@@ -27,8 +27,8 @@ if have_bend; then
   echo "already installed"
 else
   case "$(uname -s)-$(uname -m)" in
-    Linux-x86_64)  OS=linux; ARCH=x64;   SHA=63039d1a119f716767ac5a7d8fe0717cfacf219c6c253c35192148e0dade722f ;;
-    Linux-aarch64) OS=linux; ARCH=arm64; SHA=09b813073241628f590f2c2fe420299ec25e4dddd6cf3fdc49c9486339989564 ;;
+    Linux-x86_64)  OS=linux; ARCH=x64;   SHA=02089dc0eed0fd5fd6d73c74cc9cffcb2c6638dd3b02ae83f7b8cc57fbe381ba ;;
+    Linux-aarch64) OS=linux; ARCH=arm64; SHA=a14a311e39bad45f9669d4eab39d156b578c945f13a2b7bae20d9c23567a4664 ;;
     *) echo "unsupported platform $(uname -s)-$(uname -m): Bend runs on Linux (use WSL on Windows)"; exit 1 ;;
   esac
   HOME_BEND=${BEND_HOME:-$HOME/.bend}

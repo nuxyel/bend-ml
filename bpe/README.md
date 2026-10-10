@@ -2,7 +2,7 @@
 
 **Byte-level BPE** tokenizer (GPT-2 style) in Bend 2, with the **roundtrip proved** by the kernel: `decode(encode(s)) == s`.
 
-- Bend: **2.0.35** · License: MIT · Depends on `bend-ml-nat-lemmas@0.1.0.0`.
+- Bend: **2.0.36** · License: MIT · Depends on `bend-ml-nat-lemmas@0.1.0.0`.
 - `bend bpe/main.bend` and `bend bpe/main.bend --verdict` → `ALL PROOFS CHECK` (no `@unsafe`, no `?TODO`).
 
 ## Model
