@@ -5,7 +5,7 @@ import torch
 import torch.nn.functional as F
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BEND = os.path.expanduser("~/.bend/bin/bend")
+BEND = os.environ.get("BEND_BIN") or os.path.expanduser("~/.bend/bin/bend")
 ENV = dict(os.environ, BEND_NO_TELEMETRY="1")
 RTOL, ATOL = 5e-4, 5e-5  # F32 (no F64 in Bend)
 

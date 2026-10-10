@@ -7,7 +7,7 @@ includes clang) for the demos and for generated networks of 8, 32 and 128 distin
 import os, statistics, subprocess, sys, tempfile, time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BEND = os.path.expanduser("~/.bend/bin/bend")
+BEND = os.environ.get("BEND_BIN") or os.path.expanduser("~/.bend/bin/bend")
 ENV = dict(os.environ, BEND_NO_TELEMETRY="1")
 
 

@@ -4,7 +4,7 @@ import os, random, subprocess, sys, tempfile
 import torch
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BEND = os.path.expanduser("~/.bend/bin/bend")
+BEND = os.environ.get("BEND_BIN") or os.path.expanduser("~/.bend/bin/bend")
 ENV = dict(os.environ, BEND_NO_TELEMETRY="1")
 CASES = int(os.environ.get("FUZZ_CASES", "120"))
 SEED = 20261004

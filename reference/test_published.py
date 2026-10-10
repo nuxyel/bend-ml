@@ -5,7 +5,7 @@ broken or mismatched publication.
 import os, re, subprocess, sys, tempfile
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BEND = os.path.expanduser("~/.bend/bin/bend")
+BEND = os.environ.get("BEND_BIN") or os.path.expanduser("~/.bend/bin/bend")
 ENV = dict(os.environ, BEND_NO_TELEMETRY="1")
 
 README = open(os.path.join(ROOT, "README.md"), encoding="utf-8").read()

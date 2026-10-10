@@ -9,7 +9,7 @@ For each shape and setting, builds the benchmark with REPS = 1 and REPS = 1 + N 
 import os, statistics, subprocess, sys, tempfile, time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-BEND = os.path.expanduser("~/.bend/bin/bend")
+BEND = os.environ.get("BEND_BIN") or os.path.expanduser("~/.bend/bin/bend")
 ENV = dict(os.environ, BEND_NO_TELEMETRY="1")
 SCALE = float(sys.argv[1]) if len(sys.argv) > 1 else 1.0
 # (rows, columns, products): the four GPT-2 small products per layer and the logits

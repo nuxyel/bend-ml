@@ -7,7 +7,9 @@ import os, re, subprocess, sys, tempfile, time
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PY = os.path.join(ROOT, "reference/.venv/bin/python")
-BEND = os.path.expanduser("~/.bend/bin/bend")
+BEND = os.environ.get("BEND_BIN") or os.path.expanduser("~/.bend/bin/bend")
+# BEND_BIN and BEND_PIN run the checks on another Bend (for example a newer release before a bump)
+BEND_PIN = os.environ.get("BEND_PIN") or "2.0.35"
 ENV = dict(os.environ, BEND_NO_TELEMETRY="1", PATH=os.path.expanduser("~/.elan/bin") + ":" + os.environ["PATH"])
 FULL = "--full" in sys.argv
 results = []
@@ -28,8 +30,8 @@ def run(name, cmd, ok_if=None, timeout=3600, extra_env=None):
 def check_toolchain():
     """Fail early, with a clear message, when the pinned toolchain is not the one in use."""
     bv = subprocess.run([BEND, "version"], capture_output=True, text=True, env=ENV).stdout.split()
-    if not bv or bv[-1] != "2.0.35":
-        sys.exit(f"ERROR: bend 2.0.35 is required (found {' '.join(bv) or 'none'}); run scripts/setup.sh")
+    if not bv or bv[-1] != BEND_PIN:
+        sys.exit(f"ERROR: bend {BEND_PIN} is required (found {' '.join(bv) or 'none'}); run scripts/setup.sh")
     lv = subprocess.run(["lean", "--version"], capture_output=True, text=True, env=ENV)
     if "version 4.34.0" not in lv.stdout:
         sys.exit(f"ERROR: lean 4.34.0 is required for --verdict (found {lv.stdout.strip() or 'none'}); run scripts/setup.sh")
