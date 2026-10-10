@@ -2,13 +2,13 @@
 
 Tensors in Bend 2 over a flat `Array<F32>`, **with the shape in the type**: the same guarantee as [`bend-ml-tensor`](../tensor) (a product with wrong dimensions does not compile), but **~50x faster** than the list-based `bend-ml-tensor`, because it reads and writes by index and runs products in parallel blocks of rows.
 
-- Bend: **2.0.35** · License: MIT.
+- Bend: **2.0.36** · License: MIT.
 - `bend tensor-array/main.bend` and `--verdict` → `ALL PROOFS CHECK` (no `@unsafe`, no `?TODO`).
 - Tests against PyTorch and NumPy: `reference/test_tensor_array.py` (280 checks, maximum error ≈ 1.4e-6; `Bands.matvec` equal to `Mat.matmul_nt` bit for bit).
 
 ```python
 import Base
-import bend-ml-tensor-array@0.1.6.0/main.bend as TA
+import bend-ml-tensor-array@0.1.7.0/main.bend as TA
 
 def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 128n>:
   TA.Mat.matmul(100n, 784n, 128n, 3n, a, w)   # 3n = 2^3 = 8 parallel blocks
@@ -117,6 +117,7 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 
 ## Versions
 
+- `0.1.7.0`: the dot product inside every product (`gemm`, so `Mat.matmul*`, `Bands.matvec*`) keeps four partial sums instead of one running sum. GPT-2 is 4.6% faster on one thread (no change on 16), per product 4-12% on one thread and up to 26% on 16; the logits move closer to PyTorch (largest difference lower on 9 of 11 prompts) and are no longer bit for bit those of 0.1.6.0. `Bands.matvec` still equals `Mat.matmul_nt` bit for bit. Checked on Bend 2.0.36.
 - `0.1.6.0`: each band of `Bands.matvec` / `Bands.matvec_l` runs the `gemm` of `Mat.matmul_nt` and reads its rows back, instead of building the list row by row: the same numbers bit for bit, 3-4% faster on GPT-2 with 1 and with 16 threads, 19-32% per product on 16 threads. `leaf_len` and `band_len` are proved again over the new code.
 - `0.1.5.0`: `Bands.matvec_l` (lists in and out) and the laws `leaf_len` and `band_len`.
 - `0.1.4.0`: `Bands<r, c>` (row bands, a parallel matrix · vector that copies no weights), with the law `half_cover`.

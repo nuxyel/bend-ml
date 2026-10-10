@@ -1,6 +1,6 @@
 # bend-ml-tensor-array: tensors over a flat Array<F32>, with the shape in the type.
 #
-#   import bend-ml-tensor-array@0.1.6.0/main.bend as TA
+#   import bend-ml-tensor-array@0.1.7.0/main.bend as TA
 #
 # Mat<r, c> stores r*c numbers in an Array<F32>, row by row (index i*c + j). The
 # dimensions are erased type parameters: the same guarantee as bend-ml-tensor
@@ -27,12 +27,20 @@ type R is Type:
 type G is Type:
   G{a: Array<F32>, b: Array<F32>, c: Array<F32>}
 
-def dotg(k: Nat, +ia: U32, +ib: U32, +sa: U32, +sb: U32, acc: F32, ra: Array<F32> & F32, rb: Array<F32> & F32) -> R:
+# A dot product with four partial sums. Each step adds its product to a0 and rotates the sums
+# (a1, a2, a3, a0), so each sum gets every fourth product and the processor can work on the next
+# addition before the last one has finished; at the end the sums are added in pairs. The order of
+# the additions is fixed, so the result is the same on every run and every thread count, but it is
+# not the order of a single running sum (NOTES.md, exp. 17).
+def dotr(k: Nat, +ia: U32, +ib: U32, +sa: U32, +sb: U32, a0: F32, a1: F32, a2: F32, a3: F32, ra: Array<F32> & F32, rb: Array<F32> & F32) -> R:
   match k ra rb:
     case 0n Tuple{a, x} Tuple{b, y}:
-      R{a, b, acc}
+      R{a, b, ((a0 + a1 : F32) + (a2 + a3 : F32) : F32)}
     case 1n+p Tuple{a, +x} Tuple{b, +y}:
-      dotg(p, (ia + sa : U32), (ib + sb : U32), sa, sb, (acc + (x * y : F32) : F32), Array.get(F32, a, (ia + sa : U32)), Array.get(F32, b, (ib + sb : U32)))
+      dotr(p, (ia + sa : U32), (ib + sb : U32), sa, sb, a1, a2, a3, (a0 + (x * y : F32) : F32), Array.get(F32, a, (ia + sa : U32)), Array.get(F32, b, (ib + sb : U32)))
+
+def dotg(k: Nat, +ia: U32, +ib: U32, +sa: U32, +sb: U32, acc: F32, ra: Array<F32> & F32, rb: Array<F32> & F32) -> R:
+  dotr(k, ia, ib, sa, sb, acc, 0.0, 0.0, 0.0, ra, rb)
 
 # row i of C, columns j.. ; r is the product of the current column (already computed)
 
