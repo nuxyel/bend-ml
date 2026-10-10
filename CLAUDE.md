@@ -77,7 +77,8 @@ NOTES exp. 10).
 - `Array` is a plain ADT (`ALeaf`/`ANode`): matching an owned array hands out its halves in O(1) and is
   safe; `Array.clone` is O(n); `Array.fork` is `@unsafe`. Indexes wrap around, so never write past a
   capacity.
-- An `import ... as M` does not re-export, so a publishable package is one file.
+- An `import ... as M` does not re-export. A BendHub package can hold several files (users import each one as
+  `pkg@ver/file.bend`; NOTES 2026-10-10, lead 5), but then every caller must import every file it uses.
 
 ## Agent skills
 

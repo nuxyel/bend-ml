@@ -1,0 +1,40 @@
+# exp. 17, 2026-10-10 14:59, load 0.76, runs 5
+== W 768 x 768, 400 products; ms per product at 1t 16t
+2^0 bend   old     0.270   0.268   out 153783.5
+2^0 bend   acc4    0.239   0.230   out 153783.5
+2^0 bend   acc8    0.289   0.290   out 153783.5
+2^0 native old     0.273   0.272   out 153783.5
+2^0 native acc4    0.251   0.254   out 153783.5
+2^0 native acc8    0.286   0.285   out 153783.5
+2^4 bend   old     0.283   0.126   out 153783.5
+2^4 bend   acc4    0.249   0.110   out 153783.5
+2^4 bend   acc8    0.308   0.119   out 153783.5
+2^4 native old     0.292   0.138   out 153783.5
+2^4 native acc4    0.269   0.116   out 153783.5
+2^4 native acc8    0.302   0.119   out 153783.5
+== W 2304 x 768, 200 products; ms per product at 1t 16t
+2^0 bend   old     0.796   0.800   out 77083.5
+2^0 bend   acc4    0.701   0.723   out 77083.5
+2^0 bend   acc8    0.849   0.850   out 77083.5
+2^0 native old     0.811   0.803   out 77083.5
+2^0 native acc4    0.743   0.749   out 77083.5
+2^0 native acc8    0.855   0.858   out 77083.5
+2^4 bend   old     0.827   0.233   out 77083.5
+2^4 bend   acc4    0.749   0.172   out 77083.5
+2^4 bend   acc8    0.886   0.209   out 77083.5
+2^4 native old     0.870   0.254   out 77083.5
+2^4 native acc4    0.817   0.225   out 77083.5
+2^4 native acc8    0.909   0.216   out 77083.5
+== W 50257 x 768, 40 products; ms per product at 1t 16t
+2^0 bend   old    24.391  24.541   out 15723.5
+2^0 bend   acc4   23.447  22.847   out 15723.5
+2^0 bend   acc8   25.250  25.323   out 15723.5
+2^0 native old    25.200  24.612   out 15723.5
+2^0 native acc4   24.363  24.579   out 15723.5
+2^0 native acc8   26.306  26.757   out 15723.5
+2^4 bend   old    26.028   4.220   out 15723.5
+2^4 bend   acc4   25.275   3.607   out 15723.5
+2^4 bend   acc8   26.665   3.780   out 15723.5
+2^4 native old    26.988   4.078   out 15723.5
+2^4 native acc4   26.406   3.612   out 15723.5
+2^4 native acc8   27.226   3.786   out 15723.5
