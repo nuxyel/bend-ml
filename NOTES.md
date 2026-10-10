@@ -681,3 +681,45 @@ bench shows the list API with one band within a few percent of `Mat.matmul_nt`, 
 I started step 1 of my plans after v1.2 in its own private repository, `nuxyel/llama.bend`: SmolLM2-135M in
 Bend, using `bend-ml-tensor-array@0.1.6.0` and `bend-ml-bpe-tokenizer@0.1.2.0` from BendHub. Its findings live in
 its own `NOTES.md`; bend-ml's README will mention it when it goes public.
+
+## Leads from Stelliferous v0.0.2 (2026-10-10)
+
+kazzzz520 renamed Bend-Conv to Stelliferous and published v0.0.2 on BendHub (`stelliferous@0.0.2.0`;
+[post](https://x.com/kazzzz520/status/2108962063846645902), repository read at `ad83301`). YOLOv5n forward in
+110 ms on one thread and 43 ms on four (PyTorch 49 and 15 ms; EPYC 9B45, Bend 2.0.36, Clang 19). I quoted it
+([post](https://x.com/nuxyel/status/2108968007506513990)). Nothing below is measured on bend-ml yet; each item is
+a lead to test, with where it comes from.
+
+1. **Leaf work as a fork-free task** (their `docs/toolchain_rules.md`, rule H4). In the grow turn a worker that
+   reaches a leaf inlined into the forking recursion runs that whole leaf there, so four leaves take the time of
+   two. Their remedy: the parallel let calls a def that neither forks nor calls a closure (bit 2 of its row in
+   the `FID_T` table; their `scripts/toolchain_rules/fork_flags.py` prints it), with the hot loop in a flat def
+   one level below (rule F6: a def called directly by a parallel let becomes a task, so its loop is a worklist
+   self-jump, not a C loop). They measured 171 → 121 ms at four threads. This may explain exp. 11's "2 bands
+   never helped" and the 1.6x of 4 bands on 4 threads. Test: read `bmv`'s emitted C for which tasks are fork-free
+   and where the band loop sits, move the leaf behind a fork-free def, rerun `bench/mv_bands.py` at 2, 4 and 16
+   threads with 2^1 to 2^5 bands; bit-identity must hold since the kernel does not change.
+2. **Clang vectorizes 8-wide records** (their `lib/tensor_lanes.bend`, `Tile8`). There is no SIMD type in Bend;
+   they read 8 values into a flat record, write the 8 operations out, and write them back, compiled with
+   `-O3 -march=native -ffp-contract=off`. Their GEMM is 4 output channels by 8 positions with local
+   accumulators. Test on `gemm`'s inner dot: 8 partial sums instead of one. It changes the summation order, so
+   `Bands.matvec` stays equal to `Mat.matmul_nt` only if both change together, and the PyTorch comparisons must
+   stay within their tolerances. First check which C flags `bend` passes and whether they can be set.
+3. **Inlining of small `spin_N` chains** (rule F7) and **shared constructors** (G2, G3): a helper inlined in a
+   small program can become a real call per element once more operations are linked, and a value used twice can
+   make every constructor of its type shared. Every build prints `N of M constructors shared`; record it for the
+   GPT-2 demo and the bench.
+4. **Own `exp`/`tanh`/`log` in F32** (their `lib/math_fp32.bend`): Cephes/Chebyshev polynomials with F32
+   coefficients, special cases by bit selection, checked against MPFR over every F32 input (max 0.8 ULP for
+   `exp`, 1.06 for `tanh`; their GELU is not accurate yet). For bend-ml: softmax and GELU that do not depend on
+   the C library, and the same exhaustive check (2^32 inputs) for any scalar function I write.
+5. **Multi-file packages on BendHub**: users import one file of a package, `stelliferous@0.0.2.0/tensor_f32.bend`.
+   My rule "a publishable package is one file" came from the missing re-export; importing each file directly
+   avoids it. Worth trying for llama.bend before its files grow.
+6. **`.npy` loading** (their `lib/tensor_file.bend`): blocks of 16384 values through the official `File` effects,
+   bytes gathered into little-endian words. Exp. 13 found the per-byte list to be the cost of my loader, and
+   this reads the same lists, so I expect the same limit; time it on GPT-2's weights before adopting anything.
+7. **Bend 2.0.36** (released 2026-10-07 04:53 UTC) does **not** carry #1377 (merged 12:29 UTC the same day), so
+   the bump checklist above still waits for the next release. 2.0.36 does change the scheduler ("the work pass
+   after a grow runs each lane's own ring", bendlang/bend#1132), which touches lead 1; measure on it before
+   drawing conclusions from 2.0.35 alone.
