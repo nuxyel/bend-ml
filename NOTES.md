@@ -822,3 +822,5 @@ through copies in `.scratch/`.
   build in 3.3 s, as on 2.0.35.
 - README, `demos/gpt2/BENCHMARK.md` and `docs/media/numbers.json` updated (the charts do not show the Bend version,
   so the media were not rendered again).
+- **Published:** `bend-ml-tensor-array@0.1.7.0`, hash `0x373e5f0e1b2ccdc5e9e1fe2004c1644c` (2026-10-11). The GPT-2 demo,
+  `bench/mv_bands*.bend` and the README table now use it; `test_published.py` reads the version from the README.
