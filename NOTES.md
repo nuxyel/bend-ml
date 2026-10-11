@@ -824,3 +824,18 @@ through copies in `.scratch/`.
   so the media were not rendered again).
 - **Published:** `bend-ml-tensor-array@0.1.7.0`, hash `0x373e5f0e1b2ccdc5e9e1fe2004c1644c` (2026-10-11). The GPT-2 demo,
   `bench/mv_bands*.bend` and the README table now use it; `test_published.py` reads the version from the README.
+
+## Evidence run of every release (2026-10-11)
+
+I measured every release from v0.2.0 to v1.2.2 in one session, next to PyTorch, NumPy, llama.cpp, llm.c, candle and dfdx,
+with one protocol (black-box marginal cost, shuffled rounds, raw samples kept). Harness, data and report:
+`nuxyel/bend2-lab`, `results/2026-10-11/REPORT.md`. Every release gives the same GPT-2 tokens as PyTorch; the worst logit
+difference is 5.82e-4 from v0.3 to v1.2.1 and 3.20e-4 in v1.2.2; the law count goes 21, 23, 24, 25, 27, 27, 27, and every
+package of every release passes `--verdict`.
+
+- **Debt: `demos/mnist/train.bend` has not type-checked since v0.3.** It imports `bend-ml-tensor@0.1.2.0`, while
+  `bend-ml-autograd@0.1.1.0` was published against `bend-ml-tensor@0.1.0.0`, and Bend treats the two `Mat` types as
+  different types (`expected 0xf983…/main.Mat<784n, 128n>, observed T.Mat<784n, 128n>` in `s5`). No check builds it, so
+  nothing caught it; `demos/mnist/README.md` still calls it the kept baseline. Fix: import the tensor version autograd was
+  built on (or publish autograd against 0.1.2.0), and add a build of `train.bend` to `check_all.py`. Only v0.2's list
+  baseline could be measured: 885 ms per batch, or 531 s for 600 batches, close to the 544 s per epoch on record.
