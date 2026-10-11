@@ -55,6 +55,10 @@ def main():
     run("tensor/tests/ok.bend compiles and runs", [BEND, "tensor/tests/ok.bend"], lambda o, c: "18 18 18 18" in o)
     run("tensor-array/tests/ok.bend compiles and runs", [BEND, "tensor-array/tests/ok.bend"], lambda o, c: o.strip() == "8n")
     run("examples/symbolic_reshape.bend reshapes Mat<3, 6> into Mat<6, 3>", [BEND, "examples/symbolic_reshape.bend", "--", "3"], lambda o, c: "regroup(x) : Mat<6, 3>" in o and "15 16 17" in o)
+    # the list-based baselines of the demos: nothing else builds them (train.bend went unchecked from v0.3 to v1.2.2)
+    with tempfile.TemporaryDirectory() as d:
+        run("demos/gpt2/gpt2.bend (lists) compiles", [BEND, "demos/gpt2/gpt2.bend", "-o", os.path.join(d, "g")])
+        run("demos/mnist/train.bend (lists) compiles", [BEND, "demos/mnist/train.bend", "-o", os.path.join(d, "m")])
     with tempfile.TemporaryDirectory() as d:
         c_out = os.path.join(d, "par_bands.c")
         run("Bands.matvec compiles to a parallel join (no sequential fallback)", [BEND, "tensor-array/tests/par_bands.bend", "-o", c_out],
@@ -92,6 +96,12 @@ def main():
             run("compile MNIST (Array)", [BEND, "demos/mnist/fast.bend", "-o", mn])
             out = run("MNIST (Array) in Bend, 50 batches", [mn, "1", "50", "0.1"], lambda o, c: "test_correct=7829/10000" in o)
             run("MNIST in PyTorch, 50 batches", [PY, "reference/mnist_torch.py", "--epochs", "1", "--max-batches", "50"], lambda o, c: "test_acc=0.7829" in o)
+            ml = os.path.join(d, "mnist_lists")
+            run("compile MNIST (lists)", [BEND, "demos/mnist/train.bend", "-o", ml])
+            run("MNIST (lists) in Bend, 10 batches, same loss as PyTorch", [ml, "1", "10", "0.1"],
+                lambda o, c: "train_loss=2.2162626" in o and "test_correct=4934/10000" in o)
+            run("MNIST in PyTorch, 10 batches", [PY, "reference/mnist_torch.py", "--epochs", "1", "--max-batches", "10"],
+                lambda o, c: "train_loss=2.216263" in o and "test_acc=0.4934" in o)
 
     failures = results.count(False)
     print(f"\nTOTAL: {len(results) - failures}/{len(results)} checks ok")
