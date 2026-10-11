@@ -55,11 +55,11 @@ dfdx's last release is v0.13.0 (July 2023).
 | [`bend-ml-nat-lemmas`](nat-lemmas) | 0.1.1.0 | `Nat` and `List` lemmas that Base does not have | `add_comm`, `add_assoc`, `mul_comm`, `mul_assoc`, `mul_dist`, `append_assoc`, `length_append`, `product_append`... (15) |
 | [`bend-ml-bpe-tokenizer`](bpe) | 0.1.2.0 | Byte-level BPE tokenizer (GPT-2 style) | **roundtrip** `decode(encode(s)) = s`, `vocab_bound`, `dec_append`, `train_wf`, `roundtrip_trained` |
 | [`bend-ml-tensor`](tensor) | 0.1.2.0 | `Vec<n>` and `Mat<r,c>` with the shape in the type, over lists | `reshape_swap`, `reshape_flat` |
-| [`bend-ml-tensor-array`](tensor-array) | 0.1.6.0 | the same guarantees over a flat `Array<F32>`, ~50x faster; `Bands<r,c>` for a parallel matrix · vector that copies no weights | `cap_ok`, `half_cover`, `leaf_len`, `band_len`; typed `matmul`, `matmul_nt`, `matmul_tn`, `Bands.matvec` |
+| [`bend-ml-tensor-array`](tensor-array) | 0.1.7.0 | the same guarantees over a flat `Array<F32>`, ~50x faster; `Bands<r,c>` for a parallel matrix · vector that copies no weights | `cap_ok`, `half_cover`, `leaf_len`, `band_len`; typed `matmul`, `matmul_nt`, `matmul_tn`, `Bands.matvec` |
 | [`bend-ml-autograd`](autograd) | 0.1.1.0 | Automatic differentiation and layers with typed backward | **`reverse_eq_forward`** |
 
 ```python
-import bend-ml-tensor-array@0.1.6.0/main.bend as TA
+import bend-ml-tensor-array@0.1.7.0/main.bend as TA
 import bend-ml-bpe-tokenizer@0.1.2.0/main.bend as BPE
 ```
 
@@ -76,7 +76,7 @@ Every package passes `bend X/main.bend --verdict`, the re-check by Bend's Lean-p
 | Demo | Result |
 |---|---|
 | [MNIST](demos/mnist), 784-128-10 MLP | about 7 s per epoch (v0.2: 544 s). Loss and hits identical to PyTorch with the same weights and batches: 0.5204771 / 9129, then 0.27043572 / 9298, then 0.2156194 / 9418. |
-| [GPT-2 small](demos/gpt2), 124 M | about 0.1 s per token sequential (v0.2: 3 s). With the weights in parallel bands (v1.2.2, 16 threads), 36 forward passes take 3.5 s (3.7 s in v1.2.1, 5.2 s in v1.0), each measured on an idle machine. The same tokens as PyTorch on 11 prompts, logits within 6e-4 (they are of order 100); the tokenizer matches `tiktoken` on 79 texts. Loading takes 4-5 s (v1.2.2; 5-7 s in v1.0), with a resident peak of ~0.9 GB. |
+| [GPT-2 small](demos/gpt2), 124 M | about 0.1 s per token sequential (v0.2: 3 s). With the weights in parallel bands (v1.2.2, 16 threads), 36 forward passes take 3.5 s (3.7 s in v1.2.1, 5.2 s in v1.0), each measured on an idle machine. The same tokens as PyTorch on 11 prompts, logits within 3.2e-4 (they are of order 100); the tokenizer matches `tiktoken` on 79 texts. Loading takes 4-5 s (v1.2.2; 5-7 s in v1.0), with a resident peak of ~0.9 GB. |
 
 ## 04 · Benchmarks
 
@@ -87,7 +87,7 @@ Every package passes `bend X/main.bend --verdict`, the re-check by Bend's Lean-p
 <details>
 <summary>why PyTorch is still ahead</summary>
 
-Bend generates scalar code, with no BLAS or SIMD (measured on 2.0.35; 2.0.36 compiles the same way): on the same matrix product PyTorch does 62 G multiply-adds/s on one thread and Bend with an `Array` ~2.3 G/s. Parallelism adds ~2 to 4x on this hybrid CPU. The GPU (a user-local CUDA 12 makes `!` run on the RTX 4050, see `docs/gpu-setup.md`) is 3.8x faster on compute-bound flat loops but 3 to 18x slower on my memory-bound kernels, so the benchmarks use the CPU. v1.1 keeps a weight matrix as a tree of row bands (`Bands`), so each task of a matrix · vector product takes its band without copying it: the 50257 × 768 logits product goes from 25 ms to 6 ms on 16 threads, with the same numbers bit for bit. Full tables: [MNIST](demos/mnist/BENCHMARK.md), [GPT-2](demos/gpt2/BENCHMARK.md), and `NOTES.md`, experiments 1 to 13.
+Bend generates scalar code, with no BLAS or SIMD (measured on 2.0.35; 2.0.36 compiles the same way): on the same matrix product PyTorch does 62 G multiply-adds/s on one thread and Bend with an `Array` ~2.3 G/s. Parallelism adds ~2 to 4x on this hybrid CPU. The GPU (a user-local CUDA 12 makes `!` run on the RTX 4050, see `docs/gpu-setup.md`) is 3.8x faster on compute-bound flat loops but 3 to 18x slower on my memory-bound kernels, so the benchmarks use the CPU. v1.1 keeps a weight matrix as a tree of row bands (`Bands`), so each task of a matrix · vector product takes its band without copying it: the 50257 × 768 logits product went from 25 ms to 6 ms on 16 threads, with the same numbers bit for bit. v1.2.2 keeps four partial sums in every dot product, and the same product now takes 28 ms on one thread and 3.2 ms on 16. Full tables: [MNIST](demos/mnist/BENCHMARK.md), [GPT-2](demos/gpt2/BENCHMARK.md), and `NOTES.md`, experiments 1 to 17.
 </details>
 
 ## 05 · What I learned
@@ -101,6 +101,7 @@ Bend generates scalar code, with no BLAS or SIMD (measured on 2.0.35; 2.0.36 com
 - `IO.fork` gives concurrency, not parallelism: forked computations take turns on one core. Loading the weights with one fork per layer took 6.6-7.1 s instead of 5.1-5.6 s. I reported it ([#1375](https://github.com/bendlang/bend/issues/1375)), and the Bend guide now says so ([#1415](https://github.com/bendlang/bend/pull/1415)). Work that should use every core goes in parallel lets.
 - Types do not slow the checker down with depth: 128 dense layers of distinct sizes check in 0.13 s (8 layers: 0.12 s); building, mostly clang, takes 3.3 s ([table](bench/results/compile-times-2026-10-11.md)).
 - The GPU only helps compute-bound work; my kernels are chains of dependent pointer loads.
+- Other people's notes are worth testing, and worth testing honestly. From kaz's [Stelliferous](https://github.com/Kaz9487/Stelliferous), a Bend library that runs YOLOv5n, I tried two ideas on Bend 2.0.35 and 2.0.36. Running each band as a task that never forks changed nothing here, because my bands already scaled. Four partial sums in the dot product made GPT-2 4-5% faster and its logits closer to PyTorch. Eight sums did worse than four, and `-march=native` did not help either, because each element costs an array lookup more than an addition (`NOTES.md`, exp. 15-17).
 - Measuring corrected some of my early claims: PyTorch takes 21 ms per token, not 150 ms; the GPU is not "slower everywhere"; and the "~10 GB" of GPT-2 memory was virtual size (the resident peak is ~1.5 GB).
 
 ## 06 · Reproduce
