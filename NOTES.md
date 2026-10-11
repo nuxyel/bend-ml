@@ -852,3 +852,17 @@ are retired; the launch video stays linked as the v1.0 video and is rendered onl
 - **Correction (2026-10-11).** Exp. 17 above and the v1.2.2 notes said the largest logit difference drops on 9 of the 11
   prompts. Counted prompt by prompt (the same values), it drops on 10: only "The capital of France is" moves the other way
   (8.0e-5 → 9.0e-5). The worst case over all prompts goes from 5.82e-4 to 3.20e-4.
+
+## Next steps (2026-10-11)
+
+- **Bend 2.0.37** (when a release carries my #1377): bump the pin with the checklist above ("Checklist for the bump to
+  the release that carries #1377"), retire the erased-last-parameter workaround from `bmv`'s comment and the README's
+  pitfall (keep the C join check in `check_all.py`), re-run `make check-full` and the GPT-2 timings on an idle machine.
+  The parallel copy of Bend 2.0.35 in `~/.cache/bend-2.0.35` stays until llama.bend moves off 2.0.35 too.
+- **The per-element cost of `Array`.** On every product the time goes to the array access of each element (the depth-
+  bounded descent, the index mask, the load), not to the multiply-add: four partial sums gave 4-5%, eight were slower,
+  and `-march=native` changed nothing (exp. 17). Two directions: storage the C compiler can vectorize (a contiguous leaf
+  of several numbers per access, or a primitive for a dense block), and a read-only borrow of an `Array` across a
+  parallel let, which would remove the per-split clone of the input vector (bendlang/bend#1376, open). Measure each
+  against `bench/mv_bands.py` and the GPT-2 timings before changing a published package.
+- **llama.bend** depends on both: its next step (a key/value cache in flat Arrays) is in its own NOTES.
