@@ -802,3 +802,23 @@ package can have several files; what Bend lacks is re-export, so a user imports 
 
 `load_npy` of a 50257 × 768 F32 array (154 MB) takes 4.7-5.3 s, about 30 MB/s. My GPT-2 loader reads the
 498 MB of weights in ~4.2 s, about 120 MB/s, so there is nothing to take for loading.
+
+### Idle measurement for v1.2.2 (2026-10-11)
+
+Nothing else running (one terminal session), AC power, `performance` profile. The 0.1.7.0 candidate is the
+`tensor-array` source of `c2c12d9`, imported locally (it is not published yet); the bench and the demo point to it
+through copies in `.scratch/`.
+
+- **GPT-2** (`bench/results/gpt2-v122-2026-10-11.txt`), v1.2.1 kernel and candidate, each built with Bend 2.0.35
+  and 2.0.36, alternated: 16 threads (7 runs) 3678 / 3671 ms for v1.2.1 and 3564 / 3516 ms for the candidate;
+  1 thread pinned (5 runs) 4962 / 4920 and 4677 / 4678 ms. So 2.0.36 times like 2.0.35, and the candidate is
+  4-5% faster on both thread counts. Peak resident 932 MB (v1.2.1: 936 MB). A first batch of 5 runs right after
+  the builds gave 4161 against 4058 ms on 16 threads, with a wide spread (min 3626); I left it out and reran with
+  more runs.
+- **Per product** (`bench/results/mv_bands-2026-10-11.txt`, against `mv_bands-2026-10-09.txt`, different
+  sessions): `Mat.matmul_nt` on one thread 5-12% faster (logits 31.6 → 27.9 ms); list API with 2^4 bands on 16
+  threads 10-21% faster (logits 4.0 → 3.2 ms).
+- **Compile times** (`bench/results/compile-times-2026-10-11.md`, Bend 2.0.36): 128 layers check in 0.13 s and
+  build in 3.3 s, as on 2.0.35.
+- README, `demos/gpt2/BENCHMARK.md` and `docs/media/numbers.json` updated (the charts do not show the Bend version,
+  so the media were not rendered again).

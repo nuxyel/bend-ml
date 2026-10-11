@@ -4,6 +4,28 @@ Versions follow [`docs/VERSIONING.md`](../../docs/VERSIONING.md) (renumbered on 
 
 **Summary (v0.3):** GPT-2 small with 124 M parameters runs in Bend and **generates exactly the same tokens as PyTorch**, with logits equal to within 6e-4 over 11 prompts (2e-4 on the first 3). In v0.2 it took ~3 s per token (~150x PyTorch); in v0.3 (matrix · vector products over `Array`) it takes **~0.1 s per token**: ~5x PyTorch with 16 threads (21 ms per forward pass of 11 tokens) and ~2x PyTorch with 1 thread (55 ms). What still weighs is loading the weights (9 s against ~1 s), because the 124 M numbers become trees of nodes (~1.5 GB of resident memory at the peak).
 
+## v1.2.2: four partial sums in the dot product (package `bend-ml-tensor-array@0.1.7.0`, Bend 2.0.36)
+
+The dot product inside every matrix product keeps four partial sums, rotated at each step, instead of one
+running sum, so the processor can start the next addition before the last one finishes (`NOTES.md`, exp. 17).
+The order of the additions changes: the ids and text match PyTorch on the 11 prompts as before, and the logits
+move closer to it (the largest difference drops on 9 of the 11 prompts, from 5.8e-4 to 2.8e-4 at most). They are
+no longer bit for bit those of v1.2.1. The project also moved from Bend 2.0.35 to 2.0.36, which times the same.
+
+Measured in one session on an idle machine, "The capital of France is" + 32 tokens (36 forward passes), median of
+alternated runs, one thread pinned to a performance core (`bench/results/gpt2-v122-2026-10-11.txt`):
+
+| | 36 passes, 1 thread | 36 passes, 16 threads | load, 16 threads | peak resident |
+|---|---|---|---|---|
+| v1.2.1, Bend 2.0.35 | 4.96 s | 3.68 s | 4.3 s | |
+| v1.2.1, Bend 2.0.36 | 4.92 s | 3.67 s | 4.2 s | 936 MB |
+| **v1.2.2**, Bend 2.0.36 | **4.68 s** (-5%) | **3.52 s** (-4%) | 4.2 s | 932 MB |
+
+Per product (`bench/results/mv_bands-2026-10-11.txt`, against `mv_bands-2026-10-09.txt`): `Mat.matmul_nt` on one
+thread is 5-12% faster (the logits product 31.6 → 27.9 ms), and the list API with 2^4 bands on 16 threads 10-21%
+(logits 4.0 → 3.2 ms). The v1.2.1 rows of this table are lower than on 2026-10-09 (5.28 s on one thread); the
+comparison above is within one session.
+
 ## v1.2.1: one band computes like `Mat.matmul_nt` (package `bend-ml-tensor-array@0.1.6.0`)
 
 Each band of a matrix · vector product now runs the `gemm` of `Mat.matmul_nt`, writing its rows into an `Array`

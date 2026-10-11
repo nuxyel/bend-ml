@@ -76,7 +76,7 @@ Every package passes `bend X/main.bend --verdict`, the re-check by Bend's Lean-p
 | Demo | Result |
 |---|---|
 | [MNIST](demos/mnist), 784-128-10 MLP | about 7 s per epoch (v0.2: 544 s). Loss and hits identical to PyTorch with the same weights and batches: 0.5204771 / 9129, then 0.27043572 / 9298, then 0.2156194 / 9418. |
-| [GPT-2 small](demos/gpt2), 124 M | about 0.1 s per token sequential (v0.2: 3 s). With the weights in parallel bands (v1.2.1, 16 threads), 36 forward passes take 3.7 s against 5.2 s for v1.0, measured in one session on an idle machine. The same tokens as PyTorch on 11 prompts, logits within 6e-4 (they are of order 100); the tokenizer matches `tiktoken` on 79 texts. Loading takes 4-5 s (v1.2.1; 5-7 s in v1.0), with a resident peak of ~0.9 GB. |
+| [GPT-2 small](demos/gpt2), 124 M | about 0.1 s per token sequential (v0.2: 3 s). With the weights in parallel bands (v1.2.2, 16 threads), 36 forward passes take 3.5 s (3.7 s in v1.2.1, 5.2 s in v1.0), each measured on an idle machine. The same tokens as PyTorch on 11 prompts, logits within 6e-4 (they are of order 100); the tokenizer matches `tiktoken` on 79 texts. Loading takes 4-5 s (v1.2.2; 5-7 s in v1.0), with a resident peak of ~0.9 GB. |
 
 ## 04 · Benchmarks
 
@@ -99,7 +99,7 @@ Bend generates scalar code, with no BLAS or SIMD (measured on 2.0.35; 2.0.36 com
 - Copying is the hidden cost: splitting a matrix for parallel work by copying it costs more than the arithmetic of a matrix · vector. Splitting the data structure itself (row bands, each its own `Array`) costs nothing per call.
 - Read the generated C when parallel code does not scale: in Bend 2.0.35 and 2.0.36 an erased parameter at the end of a def's parameter list turns its parallel let into two sequential calls ([bendlang/bend#1374](https://github.com/bendlang/bend/issues/1374); I traced it to the compiler and my fix, [#1377](https://github.com/bendlang/bend/pull/1377), is merged and will ship in the next release).
 - `IO.fork` gives concurrency, not parallelism: forked computations take turns on one core. Loading the weights with one fork per layer took 6.6-7.1 s instead of 5.1-5.6 s. I reported it ([#1375](https://github.com/bendlang/bend/issues/1375)), and the Bend guide now says so ([#1415](https://github.com/bendlang/bend/pull/1415)). Work that should use every core goes in parallel lets.
-- Types do not slow the checker down with depth: 128 dense layers of distinct sizes check in 0.14 s (8 layers: 0.12 s); building, mostly clang, takes 3.3 s ([table](bench/results/compile-times-2026-10-08.md)).
+- Types do not slow the checker down with depth: 128 dense layers of distinct sizes check in 0.13 s (8 layers: 0.12 s); building, mostly clang, takes 3.3 s ([table](bench/results/compile-times-2026-10-11.md)).
 - The GPU only helps compute-bound work; my kernels are chains of dependent pointer loads.
 - Measuring corrected some of my early claims: PyTorch takes 21 ms per token, not 150 ms; the GPU is not "slower everywhere"; and the "~10 GB" of GPT-2 memory was virtual size (the resident peak is ~1.5 GB).
 

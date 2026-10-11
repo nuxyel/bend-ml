@@ -1,0 +1,20 @@
+GPT-2 small, "The capital of France is" + 32 tokens (36 forward passes), 2026-10-11 00:01, nothing else running,
+AC power, performance profile. Times in ms (tsec2 patched in local copies of the demo). 1 thread pinned to P-core 3
+(taskset -c 3); 16 threads unpinned. Median of alternated runs (7 at 16 threads, 5 at 1 thread), (min, max).
+*_old = v1.2.1 kernel (bend-ml-tensor-array 0.1.6.0 source), *_acc4 = the 0.1.7.0 candidate (four partial sums).
+v35_* built with Bend 2.0.35, v_* with Bend 2.0.36. Last lines: peak memory (scripts/peak_rss.sh, 16 threads).
+
+ 00:01:29 up 12:42,  1 user,  load average: 2.29, 1.61, 1.20
+--- 16 threads
+v35_old  passes 3678 (min 3591, max 4195)   load 4272 (min 4145, max 5180)
+v_old  passes 3671 (min 3542, max 3980)   load 4218 (min 3830, max 4731)
+v35_acc4  passes 3564 (min 3502, max 4102)   load 4140 (min 3945, max 5184)
+v_acc4  passes 3516 (min 3445, max 3983)   load 4217 (min 4170, max 4660)
+--- 1 thread (P-core)
+v35_old  passes 4962 (min 4872, max 4992)   load 4501 (min 4432, max 4950)
+v_old  passes 4920 (min 4885, max 4924)   load 4703 (min 4418, max 4834)
+v35_acc4  passes 4677 (min 4611, max 4709)   load 4951 (min 4509, max 5011)
+v_acc4  passes 4678 (min 4644, max 4695)   load 4860 (min 4305, max 4889)
+ 00:08:29 up 12:50,  1 user,  load average: 1.23, 1.40, 1.28
+v_old peak RSS: 936 MB (peak virtual: 41094 MB)
+v_acc4 peak RSS: 932 MB (peak virtual: 41094 MB)
