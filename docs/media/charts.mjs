@@ -1,4 +1,4 @@
-// Builds the README figures as SVG from numbers.json, in Bend's visual language (bend-lang.com):
+// Builds the README banner and package diagram as SVG from numbers.json, in Bend's visual language (bend-lang.com):
 // warm paper, one monospace family (embedded, so GitHub renders it), violet for Bend, grey for
 // the rest, hatched bars for values off the chart.
 import fs from "node:fs";
@@ -47,41 +47,7 @@ function bars(x0, y0, w, h, title, max, items) {
   return s;
 }
 
-const m = N.mnist_epoch_seconds, g = N.gpt2_seconds_per_token, R = N.ratios;
-{
-  let b = bars(60, 54, 400, 250, "MNIST · one training epoch", 8, [
-    { label: "v0.2", sub: "lists", v: m.bend_v1_lists, kind: "over" },
-    { label: "v0.3", sub: "Array", v: m.bend_v2_array, kind: "bend" },
-    { label: "PyTorch", sub: "16 threads", v: m.pytorch, kind: "other" },
-  ]);
-  b += bars(560, 54, 400, 250, "GPT-2 small · time per token", 0.12, [
-    { label: "v0.2", sub: "lists", v: g.bend_v1_lists, kind: "over" },
-    { label: "v0.3", sub: "Array", v: g.bend_v2_array, kind: "bend" },
-    { label: "PyTorch", sub: "1 thread", v: g.pytorch_1_thread, kind: "other" },
-    { label: "PyTorch", sub: "16 threads", v: g.pytorch_16_threads, kind: "other" },
-  ]);
-  b += T(510, 432, "seconds, lower is better · same machine · hatched bars are off the chart", { size: 14, fill: C.b1, anchor: "middle" });
-  b += T(510, 462, `v0.2 → v0.3: ${Math.round(m.bend_v1_lists / m.bend_v2_array)}× and ${Math.round(g.bend_v1_lists / g.bend_v2_array)}× faster. PyTorch is still ~${R.mnist_pytorch_ahead_max}× and ~${R.gpt2_pytorch_ahead_min}–${R.gpt2_pytorch_ahead_max}× ahead.`, { size: 15, fill: C.ora, anchor: "middle" });
-  out("benchmarks.svg", svg(1020, 490, "Benchmarks: MNIST epoch and GPT-2 time per token, Bend v0.2, Bend v0.3 and PyTorch", b));
-}
-
-{
-  const rows = [
-    [`${N.list_vs_array_speedup.value}×`, "faster", C.vio, "lists → one flat Array", "one thread, same matrix product"],
-    ["1.8×", "faster", C.vio, "parallel row blocks", "the MNIST product, 8 threads"],
-    [`${N.gpu.compute_bound_speedup}×`, "faster", C.vio, "GPU on a flat numeric loop", "16384 leaves, compute-bound"],
-    [`${N.gpu.memory_bound_slowdown_min}–${N.gpu.memory_bound_slowdown_max}×`, "slower", C.red, "GPU on my matrix kernels", "memory-bound: pointer chasing"],
-    ["10×", "slower", C.red, "copying the matrix per task", "the copy costs more than the arithmetic"],
-  ];
-  let b = T(50, 58, "what moved the needle", { size: 17, fill: C.b02, weight: 700 }) + T(970, 58, "each line is an experiment in NOTES.md", { size: 13, fill: C.b1, anchor: "end" });
-  rows.forEach(([f, word, col, what, why], i) => {
-    const y = 112 + i * 54;
-    b += `<line x1="50" y1="${y - 32}" x2="970" y2="${y - 32}" stroke="${C.line}"/>`;
-    b += T(50, y, f, { size: 26, fill: col, weight: 700 }) + T(178, y, word, { size: 15, fill: col });
-    b += T(300, y, what, { size: 17, fill: C.b02 }) + T(970, y, why, { size: 14, fill: C.b00, anchor: "end" });
-  });
-  out("findings.svg", svg(1020, 112 + rows.length * 54 - 10, "What moved the needle: each measured change and its effect", b));
-}
+// The benchmark charts are frames of the deck now (deck.mjs, deck/readme.mjs), built from numbers.json "evidence".
 
 {
   const W = 1020, H = 560, bh = 92;
@@ -109,7 +75,7 @@ const m = N.mnist_epoch_seconds, g = N.gpt2_seconds_per_token, R = N.ratios;
   b += box("bpe", "bpe-tokenizer", "byte-level BPE, GPT-2 style", [["5 laws", C.grn], ["fuzzed", C.b00]]);
   b += box("ten", "tensor", "Mat<r,c> over lists", [["2 laws", C.grn], ["vs PyTorch", C.b00]]);
   b += box("aut", "autograd", "reverse mode = forward mode", [["1 law", C.grn], ["gradcheck", C.b00]]);
-  b += box("arr", "tensor-array", "Mat<r,c> over a flat Array", [["cap_ok", C.grn], ["vs PyTorch", C.b00], ["Array.new", C.ora]]);
+  b += box("arr", "tensor-array", "Mat<r,c> and Bands over a flat Array", [["4 laws", C.grn], ["vs PyTorch", C.b00], ["Array.new", C.ora]]);
   b += box("gpt", "GPT-2 demo", "same tokens as PyTorch", [["vs tiktoken", C.b00]]);
   b += box("mni", "MNIST demo", "typed training step", [["vs PyTorch", C.b00]]);
   b += T(40, H - 26, "proved by the kernel", { size: 13, fill: C.grn, weight: 700 }) + T(230, H - 26, "tested against a reference", { size: 13, fill: C.b00, weight: 700 }) + T(470, H - 26, "trusted", { size: 13, fill: C.ora, weight: 700 }) + T(980, H - 26, "arrows: imports", { size: 13, fill: C.b1, anchor: "end" });

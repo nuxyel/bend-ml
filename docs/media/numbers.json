@@ -1,22 +1,215 @@
 {
-  "_note": "Every number shown in the README charts and the video. Measured on an Intel Core Ultra 7 155H, 32 GB, Bend 2.0.35 (the project moved to 2.0.36 on 2026-10-10; per-token times unchanged), PyTorch 2.14.1 (CPU, 16 threads).",
-  "mnist_epoch_seconds": {
-    "bend_v1_lists": 544,
-    "bend_v2_array": 7.0,
-    "pytorch": 0.2,
-    "source": "demos/mnist/BENCHMARK.md; v2 and PyTorch re-measured on 2026-10-04 on an idle machine (runs: 7.0, 7.0, 7.2 s, and 12.5 s once under load; PyTorch 0.18, 0.20, 0.55 s)"
+ "_note": "Every number shown in the README charts and the video. Measured on an Intel Core Ultra 7 155H, 32 GB, Bend 2.0.35 (the project moved to 2.0.36 on 2026-10-10; per-token times unchanged), PyTorch 2.14.1 (CPU, 16 threads).",
+ "mnist_epoch_seconds": {
+  "bend_v1_lists": 544,
+  "bend_v2_array": 7.0,
+  "pytorch": 0.2,
+  "source": "demos/mnist/BENCHMARK.md; v2 and PyTorch re-measured on 2026-10-04 on an idle machine (runs: 7.0, 7.0, 7.2 s, and 12.5 s once under load; PyTorch 0.18, 0.20, 0.55 s)"
+ },
+ "gpt2_seconds_per_token": {
+  "bend_v1_lists": 3.0,
+  "bend_v2_array": 0.1,
+  "pytorch_1_thread": 0.055,
+  "pytorch_16_threads": 0.021,
+  "source": "demos/gpt2/BENCHMARK.md; v2 re-measured on 2026-10-04 (0.1 s per token after a 7 s load)"
+ },
+ "gpt2_load_seconds": {
+  "bend": 5,
+  "source": "v3.1, re-measured 2026-10-08 on an idle machine: 3.8-5.4 s (bench/results/gpt2-idle-2026-10-08.txt); v2.1 5-7 s"
+ },
+ "gpt2_peak_rss_mb": {
+  "before": 2326,
+  "after": 1462,
+  "source": "NOTES.md, stability work; scripts/peak_rss.sh"
+ },
+ "list_vs_array_speedup": {
+  "value": 49,
+  "source": "NOTES.md, experiment 1"
+ },
+ "gpu": {
+  "compute_bound_speedup": 3.8,
+  "memory_bound_slowdown_min": 3,
+  "memory_bound_slowdown_max": 18,
+  "source": "NOTES.md, experiment 10"
+ },
+ "project": {
+  "packages": 5,
+  "laws": 27,
+  "checks_quick": 40,
+  "checks_full": 48,
+  "bend": "2.0.36",
+  "lean": "4.34.0"
+ },
+ "ratios": {
+  "mnist_pytorch_ahead_min": 25,
+  "mnist_pytorch_ahead_max": 35,
+  "gpt2_pytorch_ahead_min": 2,
+  "gpt2_pytorch_ahead_max": 5
+ },
+ "evidence": {
+  "source": "measured on 2026-10-11 on an Intel Core Ultra 7 155H; medians",
+  "date": "2026-10-11",
+  "gpt2_ms_per_token_history": {
+   "v0.2.0": {
+    "1": 3177,
+    "16": 3143
+   },
+   "v0.3.0": {
+    "1": 155.3,
+    "16": 152.1
+   },
+   "v1.0.0": {
+    "1": 151.9,
+    "16": 148.4
+   },
+   "v1.1.0": {
+    "1": 166.6,
+    "16": 125.5
+   },
+   "v1.2.0": {
+    "1": 159.9,
+    "16": 115.5
+   },
+   "v1.2.1": {
+    "1": 155.7,
+    "16": 114.0
+   },
+   "v1.2.2": {
+    "1": 141.1,
+    "16": 113.1
+   },
+   "v1.2.2 (Bend 2.0.36)": {
+    "1": 140.4,
+    "16": 108.9
+   }
   },
-  "gpt2_seconds_per_token": {
-    "bend_v1_lists": 3.0,
-    "bend_v2_array": 0.1,
-    "pytorch_1_thread": 0.055,
-    "pytorch_16_threads": 0.021,
-    "source": "demos/gpt2/BENCHMARK.md; v2 re-measured on 2026-10-04 (0.1 s per token after a 7 s load)"
+  "gpt2_peak_mb_16t": {
+   "v0.2.0": 3506,
+   "v0.3.0": 2325,
+   "v1.0.0": 1463,
+   "v1.1.0": 967,
+   "v1.2.0": 931,
+   "v1.2.1": 928,
+   "v1.2.2": 933
   },
-  "gpt2_load_seconds": { "bend": 5, "source": "v3.1, re-measured 2026-10-08 on an idle machine: 3.8-5.4 s (bench/results/gpt2-idle-2026-10-08.txt); v2.1 5-7 s" },
-  "gpt2_peak_rss_mb": { "before": 2326, "after": 1462, "source": "NOTES.md, stability work; scripts/peak_rss.sh" },
-  "list_vs_array_speedup": { "value": 49, "source": "NOTES.md, experiment 1" },
-  "gpu": { "compute_bound_speedup": 3.8, "memory_bound_slowdown_min": 3, "memory_bound_slowdown_max": 18, "source": "NOTES.md, experiment 10" },
-  "project": { "packages": 5, "laws": 27, "checks_quick": 38, "checks_full": 43, "bend": "2.0.36", "lean": "4.34.0" },
-  "ratios": { "mnist_pytorch_ahead_min": 25, "mnist_pytorch_ahead_max": 35, "gpt2_pytorch_ahead_min": 2, "gpt2_pytorch_ahead_max": 5 }
+  "gpt2_ms_per_token_peers": {
+   "PyTorch": {
+    "1": 18.5,
+    "16": 9.4
+   },
+   "NumPy": {
+    "1": 18.5,
+    "16": 11.2
+   },
+   "llama.cpp": {
+    "1": 22.2,
+    "16": 9.8
+   },
+   "llm.c": {
+    "1": 529.1,
+    "16": 141.5
+   },
+   "bend-ml v1.2.2": {
+    "1": 140.4,
+    "16": 108.9
+   }
+  },
+  "gpt2_thread_curve": {
+   "threads": [
+    1,
+    2,
+    4,
+    8,
+    12,
+    16,
+    22
+   ],
+   "bend-ml v1.2.2": [
+    140.4,
+    132.8,
+    106.7,
+    104.4,
+    108.6,
+    108.9,
+    96.6
+   ],
+   "PyTorch": [
+    18.5,
+    13.0,
+    9.4,
+    10.8,
+    11.3,
+    9.4,
+    44.4
+   ],
+   "llama.cpp": [
+    22.2,
+    13.9,
+    10.7,
+    9.2,
+    9.7,
+    9.8,
+    11.8
+   ],
+   "llm.c (no KV cache)": [
+    529.1,
+    349.2,
+    187.5,
+    153.9,
+    133.0,
+    141.5,
+    121.0
+   ]
+  },
+  "mnist_ms_per_batch": {
+   "NumPy": {
+    "1": 0.42,
+    "16": 0.42
+   },
+   "PyTorch": {
+    "1": 0.48,
+    "16": 0.98
+   },
+   "dfdx": {
+    "1": 0.67,
+    "16": 0.53
+   },
+   "candle": {
+    "1": 0.72,
+    "16": 1.0
+   },
+   "bend-ml v1.2.2": {
+    "1": 30.2,
+    "16": 12.5
+   },
+   "bend-ml v0.2 (lists)": {
+    "1": 885,
+    "16": 896
+   }
+  },
+  "mnist_peak_mb_16t": {
+   "NumPy": 388,
+   "PyTorch": 593,
+   "dfdx": 254,
+   "candle": 452,
+   "bend-ml v1.2.2": 119
+  },
+  "laws_by_release": {
+   "v0.2.0": 21,
+   "v0.3.0": 23,
+   "v1.0.0": 24,
+   "v1.1.0": 25,
+   "v1.2.0": 27,
+   "v1.2.1": 27,
+   "v1.2.2": 27
+  },
+  "gpt2_worst_logit_diff_by_release": {
+   "v0.3.0": 0.000582,
+   "v1.0.0": 0.000582,
+   "v1.1.0": 0.000582,
+   "v1.2.0": 0.000582,
+   "v1.2.1": 0.000582,
+   "v1.2.2": 0.00032
+  }
+ }
 }

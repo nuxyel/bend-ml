@@ -1,18 +1,20 @@
 #!/usr/bin/env bash
-# Regenerates the README images and the presentation video from the real command outputs.
+# Regenerates the README images (screenshots, banner, diagram, the deck frames) from the real command outputs and
+# numbers.json; the launch video (v1.0) only with --video.
 # Needs: node, ffmpeg, a Chromium-based browser (default /usr/bin/brave, or set $BRAVE).
-# Usage: scripts/make_media.sh [--capture] [--no-video]
+# Usage: scripts/make_media.sh [--capture] [--video]
 #   --capture   also re-run the commands and refresh docs/media/outputs/ (slow: runs GPT-2 and make check-full)
-#   --no-video  only the screenshots, charts and diagram
+#   --video     also render the launch video, its poster and teaser
 set -euo pipefail
 cd "$(dirname "$0")/.."
-capture=0; video=1
-for a in "$@"; do case "$a" in --capture) capture=1;; --no-video) video=0;; *) echo "unknown option $a" >&2; exit 2;; esac; done
+capture=0; video=0
+for a in "$@"; do case "$a" in --capture) capture=1;; --video) video=1;; *) echo "unknown option $a" >&2; exit 2;; esac; done
 [ "$capture" = 1 ] && scripts/capture_outputs.sh
 cd docs/media
 [ -d node_modules ] || npm ci --silent
 node shoot.mjs
 node charts.mjs
+node deck.mjs deck/readme.mjs deck/frames
 if [ "$video" = 1 ]; then
   node render_video.mjs --poster
   node render_video.mjs               # writes bend-ml.mp4 (attach it to the release; it is not committed)
