@@ -9,7 +9,7 @@ Versions follow [`docs/VERSIONING.md`](../../docs/VERSIONING.md) (renumbered on 
 The dot product inside every matrix product keeps four partial sums, rotated at each step, instead of one
 running sum, so the processor can start the next addition before the last one finishes (`NOTES.md`, exp. 17).
 The order of the additions changes: the ids and text match PyTorch on the 11 prompts as before, and the logits
-move closer to it (the largest difference drops on 9 of the 11 prompts, from 5.8e-4 to 2.8e-4 at most). They are
+move closer to it (the largest difference drops on 10 of the 11 prompts; the worst case goes from 5.8e-4 to 3.2e-4). They are
 no longer bit for bit those of v1.2.1. The project also moved from Bend 2.0.35 to 2.0.36, which times the same.
 
 Measured in one session on an idle machine, "The capital of France is" + 32 tokens (36 forward passes), median of

@@ -9,12 +9,13 @@
   <img src="https://img.shields.io/badge/laws%20proved-27-7e9a5e?style=flat-square&labelColor=4d4a44" alt="27 laws proved">
 </p>
 
-<p align="center">
-  <a href="https://github.com/nuxyel/bend-ml/releases/download/v1.0.0/bend-ml.mp4"><img src="docs/media/teaser.webp" alt="Two matrices whose shapes do not match fail to fit, and Bend rejects the program. Click for the 60 s video." width="80%"></a>
-  <br><sub>the 60 s video: <a href="https://github.com/nuxyel/bend-ml/releases/download/v1.0.0/bend-ml.mp4">bend-ml.mp4</a></sub>
-</p>
+**bend-ml** is machine learning for [Bend 2](https://bend-lang.com). The shape of every tensor lives in its type, so a
+product of mismatched matrices does not compile, and the structural guarantees (a tokenizer that never loses a byte, a
+reverse mode that agrees with the forward mode, a parallel product that covers every row) are laws that Bend's kernel
+checks. Five packages are on BendHub, and two demos run on them: an MNIST classifier that trains, and GPT-2 small, which
+generates the same tokens as PyTorch.
 
-**bend-ml** is machine learning for [Bend 2](https://bend-lang.com). The shape of every tensor lives in its type, so a product of mismatched matrices does not compile, and the structural guarantees (a tokenizer that never loses a byte, a reverse mode that agrees with the forward mode) are laws that Bend's kernel checks. Five packages are on BendHub, and two demos run on them, an MNIST classifier and GPT-2 small, both checked against PyTorch.
+<p align="center"><img src="docs/media/deck/frames/01-title.webp" alt="bend-ml v1.2.2: 27 laws proved, 7 releases measured, 6 reference systems" width="90%"></p>
 
 ## 01 · A shape error is a type error
 
@@ -26,36 +27,19 @@ def bad() -> TA.MMul<2n, 3n, 5n>:
   TA.Mat.matmul(2n, 3n, 5n, 0n, TA.Mat.zeros(2n, 3n), TA.Mat.zeros(4n, 5n))
 ```
 
-The sizes do not have to be constants: in [`examples/runtime_batch.bend`](examples) the batch size comes from the input file, is checked once where the data enters, and every layer after that is checked for any batch size. The same holds for every layer of a training step: the gradient of a weight matrix must have the shape of `Xᵀ·dY`, and a `reshape` only compiles with a proof that the number of elements does not change.
-
-<details>
-<summary>the reshape case</summary>
-<p align="center"><img src="docs/media/shots/reshape-error.png" alt="bend rejects a reshape from 2x6 to 5x3: expected 12n, observed 15n" width="80%"></p>
-</details>
-
-<details>
-<summary>how is this different from const generics (Rust's dfdx)?</summary>
-
-[dfdx](https://github.com/coreylowman/dfdx) checks shapes with const generics: `Tensor<Rank2<3, 10>>` · `Tensor<Rank2<10, 5>>` is checked when it compiles. A size known only at run time is a `usize`, and from then on dfdx checks it when the program runs: a product asserts `assert_eq!(self.shape.1, rhs.shape.0)` ([matmul](https://github.com/coreylowman/dfdx/blob/4722a99d303f347d6088d95867d007c75ca6dd78/dfdx-core/src/tensor_ops/matmul/mod.rs#L191-L192)), and a reshape to a run-time shape asserts the number of elements ([reshape_like](https://github.com/coreylowman/dfdx/blob/4722a99d303f347d6088d95867d007c75ca6dd78/dfdx-core/src/tensor_ops/reshape_to/mod.rs#L91)). Only fully constant reshapes are checked at compile time ([`AssertSameNumel`](https://github.com/coreylowman/dfdx/blob/4722a99d303f347d6088d95867d007c75ca6dd78/dfdx-core/src/shapes/same_numel.rs#L13)).
-
-In Bend a run-time size is still a variable in the type, and the checker reasons about it:
-
-- [`examples/symbolic_reshape.bend`](examples/symbolic_reshape.bend) reads `n` from the command line and reshapes `Mat<n, 6>` into `Mat<n·2, 3>`. It compiles once, for every `n`, with a proof that `n·(2·3) = (n·2)·3` (`mul_assoc` from `bend-ml-nat-lemmas`). Asking for `Mat<n, 5>` instead ([`symbolic_reshape_bad.bend`](examples/symbolic_reshape_bad.bend)) does not compile: no proof of `n·6 = n·5` exists.
-- [`examples/runtime_batch.bend`](examples/runtime_batch.bend) takes the batch size from its input file; every layer after the one check at the boundary is typed for any batch size.
-- [`examples/square_transpose_bad.bend`](examples/square_transpose_bad.bend) is the bug that fits by accident: a 768 × 768 weight used as `X·W` instead of `X·Wᵀ`. With the sizes written as constants it compiles, in Bend as in any shape checker. Written once for any `d_in` and `d_out`, the two sizes have different names and it does not compile, even though it is only ever called with 768 and 768.
-- The structural guarantees are laws checked by the kernel (section 02), not tests.
-
-dfdx's last release is v0.13.0 (July 2023).
-</details>
+The sizes do not have to be constants. A batch size read from a file is checked once where the data enters, and every
+layer after it is checked for any batch size ([`examples/runtime_batch.bend`](examples/runtime_batch.bend)). A `reshape`
+only compiles with a proof that the number of elements does not change, even when the sizes are only known at run time
+([`examples/symbolic_reshape.bend`](examples/symbolic_reshape.bend)).
 
 ## 02 · Laws, not trust
 
-| Package | Version | What it is | Proved LAWS |
+| Package | Version | What it is | Proved laws |
 |---|---|---|---|
 | [`bend-ml-nat-lemmas`](nat-lemmas) | 0.1.1.0 | `Nat` and `List` lemmas that Base does not have | `add_comm`, `add_assoc`, `mul_comm`, `mul_assoc`, `mul_dist`, `append_assoc`, `length_append`, `product_append`... (15) |
 | [`bend-ml-bpe-tokenizer`](bpe) | 0.1.2.0 | Byte-level BPE tokenizer (GPT-2 style) | **roundtrip** `decode(encode(s)) = s`, `vocab_bound`, `dec_append`, `train_wf`, `roundtrip_trained` |
 | [`bend-ml-tensor`](tensor) | 0.1.2.0 | `Vec<n>` and `Mat<r,c>` with the shape in the type, over lists | `reshape_swap`, `reshape_flat` |
-| [`bend-ml-tensor-array`](tensor-array) | 0.1.7.0 | the same guarantees over a flat `Array<F32>`, ~50x faster; `Bands<r,c>` for a parallel matrix · vector that copies no weights | `cap_ok`, `half_cover`, `leaf_len`, `band_len`; typed `matmul`, `matmul_nt`, `matmul_tn`, `Bands.matvec` |
+| [`bend-ml-tensor-array`](tensor-array) | 0.1.7.0 | the same guarantees over a flat `Array<F32>`; `Bands<r,c>` for a parallel matrix · vector | `cap_ok`, `half_cover`, `leaf_len`, `band_len`; typed `matmul`, `matmul_nt`, `matmul_tn`, `Bands.matvec` |
 | [`bend-ml-autograd`](autograd) | 0.1.1.0 | Automatic differentiation and layers with typed backward | **`reverse_eq_forward`** |
 
 ```python
@@ -67,42 +51,34 @@ import bend-ml-bpe-tokenizer@0.1.2.0/main.bend as BPE
 
 <p align="center"><img src="docs/media/diagram.svg" alt="The five packages: nat-lemmas is imported by bpe-tokenizer, tensor and autograd; tensor-array stands alone; the GPT-2 demo uses bpe-tokenizer, tensor and tensor-array; the MNIST demo uses tensor and tensor-array" width="90%"></p>
 
-Every package passes `bend X/main.bend --verdict`, the re-check by Bend's Lean-proved kernel, with no `@unsafe` and no `?TODO`. Numbers are a different matter: `F32` is not a real number, so the numerics are tested against PyTorch, NumPy and `tiktoken` instead of proved. [`docs/AUDIT.md`](docs/AUDIT.md) lists the trust base.
+Every package passes `bend X/main.bend --verdict`, the re-check by Bend's Lean-proved kernel, with no `@unsafe` and no
+`?TODO`. Numbers are a different matter: `F32` is not a real number, so the numerics are tested against PyTorch, NumPy and
+`tiktoken` instead of proved. [`docs/AUDIT.md`](docs/AUDIT.md) lists the trust base.
 
-## 03 · It runs
+## 03 · It runs, and it computes the same thing
 
 <p align="center"><img src="docs/media/shots/gpt2.png" alt="GPT-2 small in Bend generates 'The capital of France is the capital of the French Republic, and'" width="80%"></p>
 
-| Demo | Result |
-|---|---|
-| [MNIST](demos/mnist), 784-128-10 MLP | about 7 s per epoch (v0.2: 544 s). Loss and hits identical to PyTorch with the same weights and batches: 0.5204771 / 9129, then 0.27043572 / 9298, then 0.2156194 / 9418. |
-| [GPT-2 small](demos/gpt2), 124 M | about 0.1 s per token sequential (v0.2: 3 s). With the weights in parallel bands (v1.2.2, 16 threads), 36 forward passes take 3.5 s (3.7 s in v1.2.1, 5.2 s in v1.0), each measured on an idle machine. The same tokens as PyTorch on 11 prompts, logits within 3.2e-4 (they are of order 100); the tokenizer matches `tiktoken` on 79 texts. Loading takes 4-5 s (v1.2.2; 5-7 s in v1.0), with a resident peak of ~0.9 GB. |
+| Demo | What it does | Checked against |
+|---|---|---|
+| [GPT-2 small](demos/gpt2), 124 M | greedy generation with a key/value cache, the weights in parallel row bands | PyTorch on 11 prompts: the same tokens, logits within 3.2e-4; the tokenizer matches `tiktoken` on 79 texts |
+| [MNIST](demos/mnist), 784-128-10 MLP | SGD training with every shape typed | PyTorch with the same initial weights and batches: the same loss and hits |
 
-## 04 · Benchmarks
+<p align="center"><img src="docs/media/deck/frames/02-same-work.webp" alt="Same tokens and the same loss across bend-ml, PyTorch, NumPy, llama.cpp, llm.c, dfdx and candle" width="90%"></p>
 
-<p align="center"><img src="docs/media/benchmarks.svg" alt="Bar charts: MNIST epoch, v0.2 544 s, v0.3 7 s, PyTorch 0.2 s; GPT-2 per token, v0.2 3 s, v0.3 0.1 s, PyTorch 55 ms on 1 thread and 21 ms on 16 threads" width="90%"></p>
+## 04 · How it compares
 
-<p align="center"><img src="docs/media/findings.svg" alt="What moved the needle: lists to a flat Array 49x faster; parallel row blocks 1.8x; GPU on a flat loop 3.8x faster; GPU on my matrix kernels 3 to 18x slower; copying the matrix per task 10x slower" width="90%"></p>
+<p align="center"><img src="docs/media/deck/frames/04-vs-references.webp" alt="GPT-2 small, ms per token: PyTorch 18.5 and 9.4, NumPy 18.5 and 11.2, llama.cpp 22.2 and 9.8, bend-ml 140 and 109, llm.c without a key/value cache 529 and 142, on 1 and 16 threads" width="90%"></p>
 
-<details>
-<summary>why PyTorch is still ahead</summary>
+<p align="center"><img src="docs/media/deck/frames/05-threads.webp" alt="ms per token by thread count: Bend keeps improving up to 22 threads" width="90%"></p>
 
-Bend generates scalar code, with no BLAS or SIMD (measured on 2.0.35; 2.0.36 compiles the same way): on the same matrix product PyTorch does 62 G multiply-adds/s on one thread and Bend with an `Array` ~2.3 G/s. Parallelism adds ~2 to 4x on this hybrid CPU. The GPU (a user-local CUDA 12 makes `!` run on the RTX 4050, see `docs/gpu-setup.md`) is 3.8x faster on compute-bound flat loops but 3 to 18x slower on my memory-bound kernels, so the benchmarks use the CPU. v1.1 keeps a weight matrix as a tree of row bands (`Bands`), so each task of a matrix · vector product takes its band without copying it: the 50257 × 768 logits product went from 25 ms to 6 ms on 16 threads, with the same numbers bit for bit. v1.2.2 keeps four partial sums in every dot product, and the same product now takes 28 ms on one thread and 3.2 ms on 16. Full tables: [MNIST](demos/mnist/BENCHMARK.md), [GPT-2](demos/gpt2/BENCHMARK.md), and `NOTES.md`, experiments 1 to 17.
-</details>
+<p align="center"><img src="docs/media/deck/frames/06-mnist.webp" alt="MNIST, ms per batch at 16 threads and peak memory: bend-ml slower, with the smallest footprint" width="90%"></p>
 
-## 05 · What I learned
+## 05 · Every release
 
-- Types can carry the shapes of a whole training step, and they cost nothing at run time: the dimensions are erased.
-- Proofs cover the structure, tests cover the numbers. Of the 27 laws, the ones that matter most are the tokenizer roundtrip, `reverse_eq_forward`, the reshape size and the array capacity.
-- The trust base is small and written down: the kernel, Base's `F32` primitives, and the fact that `Array.new(d)` gives `2^d` slots.
-- Speed is bounded by the compiler, not by the types. Flat arrays gave ~49x, parallel blocks ~2x; what is left is BLAS and SIMD.
-- Copying is the hidden cost: splitting a matrix for parallel work by copying it costs more than the arithmetic of a matrix · vector. Splitting the data structure itself (row bands, each its own `Array`) costs nothing per call.
-- Read the generated C when parallel code does not scale: in Bend 2.0.35 and 2.0.36 an erased parameter at the end of a def's parameter list turns its parallel let into two sequential calls ([bendlang/bend#1374](https://github.com/bendlang/bend/issues/1374); I traced it to the compiler and my fix, [#1377](https://github.com/bendlang/bend/pull/1377), is merged and will ship in the next release).
-- `IO.fork` gives concurrency, not parallelism: forked computations take turns on one core. Loading the weights with one fork per layer took 6.6-7.1 s instead of 5.1-5.6 s. I reported it ([#1375](https://github.com/bendlang/bend/issues/1375)), and the Bend guide now says so ([#1415](https://github.com/bendlang/bend/pull/1415)). Work that should use every core goes in parallel lets.
-- Types do not slow the checker down with depth: 128 dense layers of distinct sizes check in 0.13 s (8 layers: 0.12 s); building, mostly clang, takes 3.3 s ([table](bench/results/compile-times-2026-10-11.md)).
-- The GPU only helps compute-bound work; my kernels are chains of dependent pointer loads.
-- Other people's notes are worth testing, and worth testing honestly. From kaz's [Stelliferous](https://github.com/Kaz9487/Stelliferous), a Bend library that runs YOLOv5n, I tried two ideas on Bend 2.0.35 and 2.0.36. Running each band as a task that never forks changed nothing here, because my bands already scaled. Four partial sums in the dot product made GPT-2 4-5% faster and its logits closer to PyTorch. Eight sums did worse than four, and `-march=native` did not help either, because each element costs an array lookup more than an addition (`NOTES.md`, exp. 15-17).
-- Measuring corrected some of my early claims: PyTorch takes 21 ms per token, not 150 ms; the GPU is not "slower everywhere"; and the "~10 GB" of GPT-2 memory was virtual size (the resident peak is ~1.5 GB).
+<p align="center"><img src="docs/media/deck/frames/03-history.webp" alt="GPT-2 ms per token by release, from v0.2 to v1.2.2, on 1 and 16 threads" width="90%"></p>
+
+Versions are numbered as in [`docs/VERSIONING.md`](docs/VERSIONING.md); each release has its notes on GitHub.
 
 ## 06 · Reproduce
 
@@ -111,45 +87,20 @@ Linux x86_64 (or WSL), clang ≥ 14, Python ≥ 3.12, `curl`, ~3 GB of disk, 8 G
 ```bash
 git clone https://github.com/nuxyel/bend-ml.git && cd bend-ml
 make setup          # Bend 2.0.36 (SHA256-checked), Lean 4.34.0, Python venv, data; no sudo
-make check          # 38 checks, about 1.5 min
-make check-full     # 43 checks with GPT-2 and MNIST, about 5 min
-make media          # regenerate the figures and the video on this page
+make check          # 40 checks, about 1.5 min
+make check-full     # 48 checks with GPT-2 and MNIST, about 6 min
+make media          # regenerate the figures on this page (needs node, ffmpeg, Brave)
 ```
 
-`make setup-lite` skips the 550 MB GPT-2 download. CI runs `make check-full` on every push. `main` holds the released versions (numbered as in [`docs/VERSIONING.md`](docs/VERSIONING.md)); work in progress lives on the `devel` branch. The history was rewritten on 2026-10-04 (English messages, smaller commits), so clone again if you have an older copy.
+`make setup-lite` skips the 550 MB GPT-2 download. CI runs `make check-full` on every push. `main` holds the released
+versions; work in progress lives on `devel`.
 
-<details>
-<summary>limits</summary>
+## Upstream
 
-- PyTorch is faster (see 04).
-- The GPT-2 weights become trees of nodes; loading streams 1 MB blocks into the arrays, with a ~0.9 GB resident peak (the process reserves ~41 GB of address space). Decoding the blocks in parallel did not make it faster (`NOTES.md`, exp. 13).
-- Only `Nat`, `U32` and `F32`; no `F64`.
-- `Mat<r,c>` does not carry "capacity ≥ r·c" in its type: the constructors establish it with the proved `cap_ok`, and that `Array.new(d)` gives `2^d` slots is trusted.
-- The GPT-2 pre-tokenizer classifies code points up to U+1FFFF with a table generated from Unicode; above that, and for invalid UTF-8, everything counts as a letter.
-</details>
+What this project found in Bend and reported:
 
-<details>
-<summary>upstream</summary>
-
-What this project found in Bend and reported. The reports and their repros are in [`docs/upstream/`](docs/upstream).
-
-- [#1374](https://github.com/bendlang/bend/issues/1374): an erased last parameter made a parallel let sequential. Fixed by my PR [#1377](https://github.com/bendlang/bend/pull/1377), merged on 2026-10-07; bend-ml moves to the release that carries it.
-- [#1375](https://github.com/bendlang/bend/issues/1375): `IO.fork` does not spread pure work over cores, although the guide said it did. Closed by [#1415](https://github.com/bendlang/bend/pull/1415), which corrected the guide.
+- [#1374](https://github.com/bendlang/bend/issues/1374): an erased last parameter made a parallel let sequential. Fixed by my PR [#1377](https://github.com/bendlang/bend/pull/1377).
+- [#1375](https://github.com/bendlang/bend/issues/1375): `IO.fork` does not spread pure work over cores. The guide now says so ([#1415](https://github.com/bendlang/bend/pull/1415)).
 - [#1376](https://github.com/bendlang/bend/issues/1376): a read-only borrow of an `Array` for a parallel let, without `@unsafe`. Open.
-</details>
 
-<details>
-<summary>structure</summary>
-
-```
-nat-lemmas/  bpe/  tensor/  tensor-array/  autograd/   packages (main.bend, README, LICENSE)
-demos/mnist  demos/gpt2                 demos with README and BENCHMARK
-examples/                               small programs, e.g. a batch size read at run time
-reference/                              PyTorch, tiktoken and check_all.py
-poc/  bench/                            proofs of concept and micro-benchmarks
-docs/                                   audit guide, launch material, media
-NOTES.md                                decisions, findings and debts
-```
-</details>
-
-<p align="center"><sub>MIT · the visual identity uses Bend's own colours, from bend-lang.com</sub></p>
+<p align="center"><sub>MIT · the visual identity uses Bend's own colours, from bend-lang.com · the launch video (v1.0): <a href="https://github.com/nuxyel/bend-ml/releases/download/v1.0.0/bend-ml.mp4">bend-ml.mp4</a></sub></p>

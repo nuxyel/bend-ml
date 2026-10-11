@@ -828,8 +828,7 @@ through copies in `.scratch/`.
 ## Evidence run of every release (2026-10-11)
 
 I measured every release from v0.2.0 to v1.2.2 in one session, next to PyTorch, NumPy, llama.cpp, llm.c, candle and dfdx,
-with one protocol (black-box marginal cost, shuffled rounds, raw samples kept). Harness, data and report:
-`nuxyel/bend2-lab`, `results/2026-10-11/REPORT.md`. Every release gives the same GPT-2 tokens as PyTorch; the worst logit
+with one protocol. Harness, raw data and report are kept privately (material for a paper). Every release gives the same GPT-2 tokens as PyTorch; the worst logit
 difference is 5.82e-4 from v0.3 to v1.2.1 and 3.20e-4 in v1.2.2; the law count goes 21, 23, 24, 25, 27, 27, 27, and every
 package of every release passes `--verdict`.
 
@@ -839,3 +838,17 @@ package of every release passes `--verdict`.
   nothing caught it; `demos/mnist/README.md` still calls it the kept baseline. Fix: import the tensor version autograd was
   built on (or publish autograd against 0.1.2.0), and add a build of `train.bend` to `check_all.py`. Only v0.2's list
   baseline could be measured: 885 ms per batch, or 531 s for 600 batches, close to the 544 s per epoch on record.
+- **Fixed (2026-10-11).** `demos/mnist/train.bend` imports `bend-ml-tensor@0.1.0.0`, the version `bend-ml-autograd@0.1.1.0`
+  was published against; the translation to 0.1.2.0 changed no API, only the comments, so nothing else moves. It gives the
+  same loss and hits as PyTorch after 10 batches (2.2162626 and 4934/10000). `check_all.py` now builds both list baselines
+  (`gpt2.bend`, `train.bend`) in the quick check, and runs those 10 batches in the full one: 40 and 48 checks, all passing.
+
+### README and media rewritten around the evidence (2026-10-11)
+
+The README still had the structure of the first proof of concept. It now leads with the evidence of every release: frames
+in the launch video's identity rendered by `docs/media/deck.mjs` from `numbers.json` ("evidence", copied from the run by a
+script; the source tables are kept privately with the raw data). The two PoC charts (`benchmarks.svg`, `findings.svg`)
+are retired; the launch video stays linked as the v1.0 video and is rendered only with `make media` `--video`.
+- **Correction (2026-10-11).** Exp. 17 above and the v1.2.2 notes said the largest logit difference drops on 9 of the 11
+  prompts. Counted prompt by prompt (the same values), it drops on 10: only "The capital of France is" moves the other way
+  (8.0e-5 → 9.0e-5). The worst case over all prompts goes from 5.82e-4 to 3.20e-4.
