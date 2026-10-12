@@ -358,7 +358,7 @@ Goal: a stranger can clone the repository, reproduce every claim, and see it ver
 
 Plan: `docs/v3-plan.md`. The launch post (2026-10-05) asked: "dfdx already does compile-time shapes?",
 "compile times on deeper nets?", and kazzzz520 (Bend-Conv) pointed at copying as the real cost of
-parallel work. Plans after v3 (llama.bend, a training framework) are in the private repo `nuxyel/bend2-notes`.
+parallel work. Plans after v3 (llama.bend, a training framework) are in my private notes.
 
 ### Exp. 11: `Bands<r, c>`, matrix · vector in parallel without copying the weights
 
