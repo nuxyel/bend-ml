@@ -99,7 +99,7 @@ versions; work in progress lives on `devel`.
 
 What this project found in Bend and reported:
 
-- [#1374](https://github.com/bendlang/bend/issues/1374): an erased last parameter made a parallel let sequential. Fixed by my PR [#1377](https://github.com/bendlang/bend/pull/1377).
+- [#1374](https://github.com/bendlang/bend/issues/1374): an erased last parameter made a parallel let sequential. Fixed by my PR [#1377](https://github.com/bendlang/bend/pull/1377), released in Bend 2.0.37.
 - [#1375](https://github.com/bendlang/bend/issues/1375): `IO.fork` does not spread pure work over cores. The guide now says so ([#1415](https://github.com/bendlang/bend/pull/1415)).
 - [#1376](https://github.com/bendlang/bend/issues/1376): a read-only borrow of an `Array` for a parallel let, without `@unsafe`. Open.
 
