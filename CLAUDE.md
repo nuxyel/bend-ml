@@ -34,7 +34,7 @@ NOTES exp. 10).
 
 ## Rules
 
-1. Bend is pinned to **2.0.36** (and Lean 4.34.0 for `--verdict`). Bend 2 changes fast and differs from
+1. Bend is pinned to **2.0.37** (and Lean 4.34.0 for `--verdict`). Bend 2 changes fast and differs from
    Bend 1: before writing code, read `bend guide`, `bend base <name>` and the Base source
    (`~/.bend/bend2/base.bend`). A version bump goes in `NOTES.md`.
 2. Run the checker on every change; it takes a fraction of a second.
@@ -55,7 +55,7 @@ NOTES exp. 10).
    stays in the third person: it tells agents whose decisions are whose. Drafts already posted upstream and
    dated entries are left as written.
 
-## Bend 2.0.36 pitfalls we paid for
+## Bend 2.0.37 pitfalls we paid for
 
 - `match` only inspects a parameter or a pattern variable; a computed value (including a destructuring
   `let` of a call) needs its own def or a parameter computed by the caller.

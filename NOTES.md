@@ -4,7 +4,7 @@ Date: 2026-10-03. Everything below was verified on the machine or in a primary s
 
 ## Pinned version
 
-- **Bend 2.0.36** (`bend version`), since 2026-10-10 (2.0.35 before). Pin this version until further notice.
+- **Bend 2.0.37** (`bend version`), since 2026-10-13 (2.0.36 from 2026-10-10, 2.0.35 before). Pin this version until further notice.
 - Official repository: `github.com/bendlang/bend` (not `HigherOrderCO/Bend`, which is Bend 1).
 - Installed with `curl -fsSL https://bend-lang.com/install.sh | sh` (script read before running: it downloads the GitHub release, checks the SHA256, installs only into `~/.bend`, no sudo).
 - Update: `bend update` (runs the installer again). Do not update without recording it here, since Bend 2 changes fast.

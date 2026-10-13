@@ -2,7 +2,7 @@
 
 Tensors in Bend 2 over a flat `Array<F32>`, **with the shape in the type**: the same guarantee as [`bend-ml-tensor`](../tensor) (a product with wrong dimensions does not compile), but **~50x faster** than the list-based `bend-ml-tensor`, because it reads and writes by index and runs products in parallel blocks of rows.
 
-- Bend: **2.0.36** · License: MIT.
+- Bend: **2.0.37** · License: MIT.
 - `bend tensor-array/main.bend` and `--verdict` → `ALL PROOFS CHECK` (no `@unsafe`, no `?TODO`).
 - Tests against PyTorch and NumPy: `reference/test_tensor_array.py` (280 checks, maximum error ≈ 1.4e-6; `Bands.matvec` equal to `Mat.matmul_nt` bit for bit).
 

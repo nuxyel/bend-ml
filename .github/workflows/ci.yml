@@ -36,7 +36,7 @@ jobs:
             demos/gpt2/data
           key: data-${{ hashFiles('scripts/setup.sh', 'reference/gpt2_prep.py', 'reference/mnist_torch.py') }}
 
-      - name: Set up (Bend 2.0.36, Lean 4.34.0, Python venv, data)
+      - name: Set up (Bend 2.0.37, Lean 4.34.0, Python venv, data)
         run: scripts/setup.sh
 
       - name: Quick checks (proofs, kernel, shape errors, PyTorch and tiktoken comparisons)

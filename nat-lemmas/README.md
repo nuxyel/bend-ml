@@ -2,7 +2,7 @@
 
 Proved lemmas about `Nat` and `List` that Bend 2's Base does not have yet. They are the foundation for the rest of bend-ml (tensor shapes, the tokenizer).
 
-- Bend: **2.0.36**
+- Bend: **2.0.37**
 - License: MIT
 - No `@unsafe`, no `?TODO`: `bend nat-lemmas/main.bend` prints `ALL PROOFS CHECK`, and `bend nat-lemmas/main.bend --verdict` re-checks it with the Lean-proved kernel.
 
