@@ -881,7 +881,7 @@ grow's forks go to idle threads). The checklist above, step by step:
 - **GPT-2 timings, the same commit (`124a0aa`) built with 2.0.36 and 2.0.37**, 7 alternated rounds in one session on
   mains power (the evidence harness, `gpt2` block; medians and interquartile ranges, ms per token): one thread 129.8
   (121.8-145.9) on 2.0.36 against 130.1 (122.9-134.0) on 2.0.37; 16 threads 111.0 (102.2-118.2) against 117.1
-  (106.3-122.2). No difference beyond the spread: bend-ml had no def with the erased-last-parameter shape left, and its
-  fork trees are not the late, wide kind #1479 speeds up. The 2.0.37 binary is less than half the size (0.41 MB
+  (106.3-122.2). No difference beyond the spread. For #1377 that is expected (`bmv` already had the workaround); I did
+  not look further into why #1479 changes nothing here. The 2.0.37 binary is less than half the size (0.41 MB
   against 0.93 MB).
 - **Packages.** No source changed, so none is republished.
