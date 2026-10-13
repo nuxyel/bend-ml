@@ -65,10 +65,10 @@ NOTES exp. 10).
 - Variables are affine; `+x` reuses a `Data` value. A parameter used in a type counts as a use.
 - `%e : P` rewrites: `_` marks where the right-hand side of `e` sits in the current goal, and the new goal
   has the left-hand side there; use `Equal.sym` to go the other way.
-- Parallel lets (`a b = f(..) g(..)`) silently become sequential when the def's **last parameter is
-  erased** (put a runtime parameter after it; fixed upstream by bendlang/bend#1377, not in a release
-  yet), and suffer from non-tail recursive helpers in the fork tree (use tail loops with an accumulator). Check scaling with `--threads 1` against `--threads 16`, and
-  read the emitted C (`bend X.bend -o x.c`) when it does not scale. NOTES exp. 11.
+- Parallel lets (`a b = f(..) g(..)`) suffer from non-tail recursive helpers in the fork tree (use tail
+  loops with an accumulator). Check scaling with `--threads 1` against `--threads 16`, and read the emitted
+  C (`bend X.bend -o x.c`) when it does not scale. (Up to 2.0.36 a parallel let silently became sequential
+  when the def's last parameter was erased, NOTES exp. 11; fixed in 2.0.37 by bendlang/bend#1377.)
 - `IO.fork` gives concurrency, not parallelism: forked computations take turns on one event loop
   (NOTES exp. 12). This is intended; the guide says so since bendlang/bend#1415. Use parallel lets in pure
   code for several cores.
