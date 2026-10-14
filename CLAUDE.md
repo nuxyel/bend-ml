@@ -74,9 +74,10 @@ NOTES exp. 10).
   code for several cores.
 - Proofs follow the affine rules too: a lemma about values that hold an `Array` cannot mention them twice at
   run-time positions; pass the expression in an erased argument (`-s`) and the arrays once.
-- `Array` is a plain ADT (`ALeaf`/`ANode`): matching an owned array hands out its halves in O(1) and is
-  safe; `Array.clone` is O(n); `Array.fork` is `@unsafe`. Indexes wrap around, so never write past a
-  capacity.
+- `Array` is a binary tree in Base (`ALeaf`/`ANode`) but one flat block in the compiled program: `get`/`set` are
+  an index mask and a load or store (no descent), while matching an array copies each half into its own block
+  (BendRT, "Arrays"), so never walk an array by `match`; `Array.clone` is O(n); `Array.fork` is `@unsafe`.
+  Indexes wrap around, so never write past a capacity. Corrected 2026-10-13 (NOTES).
 - An `import ... as M` does not re-export. A BendHub package can hold several files (users import each one as
   `pkg@ver/file.bend`; NOTES 2026-10-10, lead 5), but then every caller must import every file it uses.
 
