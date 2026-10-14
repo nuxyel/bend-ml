@@ -64,6 +64,9 @@ Every package passes `bend X/main.bend --verdict`, the re-check by Bend's Lean-p
 | [GPT-2 small](demos/gpt2), 124 M | greedy generation with a key/value cache, the weights in parallel row bands | PyTorch on 11 prompts: the same tokens, logits within 3.2e-4; the tokenizer matches `tiktoken` on 79 texts |
 | [MNIST](demos/mnist), 784-128-10 MLP | SGD training with every shape typed | PyTorch with the same initial weights and batches: the same loss and hits |
 
+Built on bend-ml: [llama.bend](https://github.com/nuxyel/llama.bend) runs SmolLM2-135M, 360M and 1.7B in Bend with the
+same tokens as `transformers`; its typed layers are on BendHub as `bend-ml-llama`.
+
 <p align="center"><img src="docs/media/deck/frames/02-same-work.webp" alt="Same tokens and the same loss across bend-ml, PyTorch, NumPy, llama.cpp, llm.c, dfdx and candle" width="90%"></p>
 
 ## 04 · How it compares
