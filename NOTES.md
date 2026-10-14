@@ -857,8 +857,8 @@ are retired; the launch video stays linked as the v1.0 video and is rendered onl
 
 - **Bend 2.0.37**: done on 2026-10-13 (below), except `bmv`'s comment, which waits for the next change to
   tensor-array's source.
-- **The per-element cost of `Array`.** On every product the time goes to the array access of each element (the depth-
-  bounded descent, the index mask, the load), not to the multiply-add: four partial sums gave 4-5%, eight were slower,
+- **The per-element cost of `Array`.** On every product the time goes to the array access of each element (locating the
+  block, the index mask, the load; corrected on 2026-10-13, below), not to the multiply-add: four partial sums gave 4-5%, eight were slower,
   and `-march=native` changed nothing (exp. 17). Two directions: storage the C compiler can vectorize (a contiguous leaf
   of several numbers per access, or a primitive for a dense block), and a read-only borrow of an `Array` across a
   parallel let, which would remove the per-split clone of the input vector (bendlang/bend#1376, open). Measure each
@@ -885,3 +885,17 @@ grow's forks go to idle threads). The checklist above, step by step:
   not look further into why #1479 changes nothing here. The 2.0.37 binary is less than half the size (0.41 MB
   against 0.93 MB).
 - **Packages.** No source changed, so none is republished.
+
+## Correction: an `Array` access is not a tree descent (2026-10-13)
+
+These notes (exp. 17, "Next steps") said that each element of a product costs "a depth-bounded descent, an index mask, a
+load". Wrong about the descent. In Base, `Array` is defined as a binary tree (`ALeaf`/`ANode`), but the compiler
+recognizes the array operations and emits a flat block: `Array.get` becomes `blk_loc` (the block's address, following
+one redirect when the array is shared), `blk_at` (the index masked to the block's size) and `blk_read` (a packed 32-bit
+load for `F32`). Bend v2.0.37, `bend2/comp.ts`: `arr_op` and `arr_cells` (lines 1730-1780), `blk_at` (4045), `blk_read`
+(4030). What exp. 17 measured stands: the loop is bound by the access, not by the floating-point unit, and
+`-march=native` changed nothing for one element per access. What changes is the direction: a contiguous buffer already
+exists, so the lead is to read several numbers per access. A record of 8 `F32` per array cell (`Tile8`), with the same
+four rotating sums (the same order of additions), made an isolated 49152x576 product about 3x faster on one thread, and
+clang emitted packed SSE for it (a Codex research run, reproduced here: 313-326 ms against 88-116 ms for 20 products,
+indicative timings). Not integrated or measured in a demo yet.
