@@ -97,6 +97,7 @@ make media          # regenerate the figures on this page (needs node, ffmpeg, B
 
 `make setup-lite` skips the 550 MB GPT-2 download. CI runs `make check-full` on every push. `main` holds the released
 versions; work in progress lives on `devel`.
+Contributions are welcome: see [`CONTRIBUTING.md`](CONTRIBUTING.md) (pull requests go to `devel`).
 
 ## Upstream
 
