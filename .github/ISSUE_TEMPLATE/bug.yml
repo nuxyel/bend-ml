@@ -1,0 +1,32 @@
+name: Bug
+description: Something fails, gives wrong output or does not build
+labels: [bug]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What happened
+      description: What you ran, what you expected and what you got. Paste the error.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: How to reproduce
+      description: The commands, from a fresh clone if possible.
+      render: shell
+    validations:
+      required: true
+  - type: input
+    id: model
+    attributes:
+      label: Package and version
+      placeholder: bend-ml-tensor-array@0.1.7.0
+  - type: textarea
+    id: env
+    attributes:
+      label: Environment
+      description: Output of `bend version`, `clang --version | head -1` and `uname -sm`; the commit you are on.
+      render: text
+    validations:
+      required: true

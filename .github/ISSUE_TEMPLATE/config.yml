@@ -1,0 +1,5 @@
+blank_issues_enabled: true
+contact_links:
+  - name: Bend itself (compiler, runtime, Base)
+    url: https://github.com/bendlang/bend/issues
+    about: Problems with the Bend language belong upstream.

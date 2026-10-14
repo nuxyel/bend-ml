@@ -1,0 +1,26 @@
+name: Idea or proposal
+description: A new law, operation, package or performance experiment
+labels: [enhancement]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What and why
+      description: What you propose and what it would make possible.
+    validations:
+      required: true
+  - type: textarea
+    id: how
+    attributes:
+      label: How
+      description: >
+        The approach, and how we would know it worked: a law that checks, a test against PyTorch, a benchmark.
+        NOTES.md lists what was already tried; say if this builds on or differs from it.
+  - type: dropdown
+    id: pr
+    attributes:
+      label: Would you like to work on it?
+      options:
+        - Yes, I'd open the pull request
+        - Maybe, with some guidance
+        - No, just the idea
