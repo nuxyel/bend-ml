@@ -1,10 +1,11 @@
 # Draft issue for bendlang/bend: reading a binary file without one list cell per byte
 
-Status: draft, not posted. Written 2026-10-12; updated 2026-10-14 with a standalone repro on Bend 2.0.37 and
+Status: posted as https://github.com/bendlang/bend/issues/1573 (2026-10-15 03:47 UTC, by Renan), in the Feature form's
+two fields with a shorter text (the GPT-2 table left out). Written 2026-10-12; updated 2026-10-14 with a standalone repro on Bend 2.0.37 and
 llama.bend's numbers (public since 2026-10-13). Checked for duplicates on 2026-10-12 and again on 2026-10-14: searches
 for `read_at`, `read_bytes`, "File read Array", "binary file" and "bytes U32 list" found only #578 (user-friendly file
 IO, closed), which is about text. On main `014ccd03` (2026-10-14), `File.read_at` and `File.read_bytes` still build
-their result with `io_list` (`bend2/effs/file_read.c`). Renan posts it himself.
+their result with `io_list` (`bend2/effs/file_read.c`).
 
 ---
 
