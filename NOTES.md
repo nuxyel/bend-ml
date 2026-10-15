@@ -899,3 +899,12 @@ exists, so the lead is to read several numbers per access. A record of 8 `F32` p
 four rotating sums (the same order of additions), made an isolated 49152x576 product about 3x faster on one thread, and
 clang emitted packed SSE for it (a Codex research run, reproduced here: 313-326 ms against 88-116 ms for 20 products,
 indicative timings). Not integrated or measured in a demo yet.
+
+## Upstream: a dense file read (2026-10-14)
+
+Exp. 13's lever, taken upstream: [bendlang/bend#1573](https://github.com/bendlang/bend/issues/1573) asks for a file read
+into an `Array<U32>` (four little-endian bytes per word) instead of a `List<U32>` with one cell per byte. Draft and repro
+in `docs/upstream/` (`dense-file-read.md`, `read_at_bytes.bend`, `read_at_bytes.c`). The standalone repro, Bend 2.0.37,
+one thread pinned to CPU 3, five alternated runs: reading and summing 384 MiB in 1 MiB blocks takes 1.52-1.57 s with
+`File.read_at` and 56-58 ms with `pread` in C, the same sum. The work per byte is one addition in both, so the gap is
+the list. The gain would be in loading only (llama.bend's 1.7B: 66 s); the cost per token does not change.
