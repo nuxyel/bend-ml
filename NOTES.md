@@ -909,7 +909,7 @@ one thread pinned to CPU 3, five alternated runs: reading and summing 384 MiB in
 `File.read_at` and 56-58 ms with `pread` in C, the same sum. The work per byte is one addition in both, so the gap is
 the list. The gain would be in loading only (llama.bend's 1.7B: 66 s); the cost per token does not change.
 
-## Products in cells of 8 (tensor-array 0.1.8.0, not published yet; 2026-10-15)
+## Products in cells of 8 (tensor-array 0.1.8.0; 2026-10-15)
 
 Products with two or more rows pack A's rows and B's columns once into cells of 8 F32 (`T8`), so the inner loop reads 8
 numbers per array access instead of one (the lead of 2026-10-13, checked first with sizes read at run time: 3.0-3.3x on
@@ -919,3 +919,7 @@ scalar loop. Result, measured in BendTorch's MNIST (784-128-10, SGD, one epoch, 
 one thread, 6.0 to 4.7 s on 16; BendTorch's and llama.bend's exact outputs unchanged. A first version that built each
 cell through a list was 2.3x slower than 0.1.7.0: packing has to read the 8 numbers directly. The parallel path still
 copies its operands per block (next: B2).
+
+- Published: `bend-ml-tensor-array@0.1.8.0`, hash `0x3283e28131a46d2d98db11347f49016c` (`--verdict` ok, no `@unsafe`). From a
+  clean folder, `tests/t8.bend` against the published package gives `0 0 0 0 0 0 0 0`; `reference/test_published.py` ok.
+  `bench/mv_bands*.bend` point at it; `demos/gpt2/fast.bend` waits (it has uncommitted local changes).
