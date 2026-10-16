@@ -946,7 +946,7 @@ step piped `make check-full` through `tee`, which hid the exit status, and the j
 puts the demo back to v1.2.4's loader and runs that step with `pipefail`; its CI ran 50/50, including the GPT-2 demo
 against PyTorch. v1.2.5's release notes point to v1.2.6.
 
-## Accumulating products (tensor-array 0.1.10.0; 2026-10-16, not published yet)
+## Accumulating products (tensor-array 0.1.10.0; 2026-10-16)
 
 A training loop accumulates its weight gradient, `dW += Xᵀ · dY`, and with the products it had to do that in two steps:
 `Mat.matmul_tn` into a new matrix, then `Mat.add` into the gradient, a second pass over every weight plus an allocation.
@@ -982,7 +982,7 @@ the same depth for every `n` up to 2000 and that the depth is the smallest at fo
 too, a little: an MNIST training epoch 4.26 to 4.19 s on one thread.
 
 
-## binary-read: the weights straight into an Array (2026-10-16, not published yet)
+## binary-read: the weights straight into an Array (2026-10-16)
 
 Exp. 13's lever without waiting for Base. bendlang/bend#1430 proposed a read into an array for Base and was closed:
 Base keeps thin wrappers over system calls. So `binary-read/` is a library effect, `read_f32(file, offset, n, a)`, in C
@@ -1000,3 +1000,10 @@ logit for logit, and the 11 prompts match PyTorch as before (`make check-full`: 
 The same morning, the GPT-2 demo built with tensor-array 0.1.7.0, 0.1.9.0 and the local 0.1.10.0 (7 alternated rounds):
 the same output in all 42 runs, the same generation time, and the load 4.7 → 4.3 s on one thread with 0.1.10.0, the
 capacity by doubling.
+
+- Published: `bend-ml-tensor-array@0.1.10.0`, hash `0xbb78793a12728b7aa5a6f9756c65086a` (`--verdict` ok, no `@unsafe`), and
+  `bend-ml-binary-read@0.1.0.0`, hash `0x90859c4c8057ca356750f70618fd2ed4` (4 files: the Bend declaration, the C and the
+  JavaScript effect, the license). From a clean folder, `tests/acc.bend`, `tests/t8.bend` and `tests/cap.bend` against the
+  published tensor-array give their expected lines, and `tests/read_f32.bend` against the published binary-read gives the
+  same lines on both lanes; `reference/test_published.py` checks both; `make check-full` 59/59 with the GPT-2 demo on
+  both packages from BendHub. Left: the package diagram in the README still shows five packages.
