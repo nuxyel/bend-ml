@@ -21,7 +21,7 @@ body:
     id: model
     attributes:
       label: Package and version
-      placeholder: bend-ml-tensor-array@0.1.10.0
+      placeholder: bend-ml-tensor-array@0.1.11.0
   - type: textarea
     id: env
     attributes:
