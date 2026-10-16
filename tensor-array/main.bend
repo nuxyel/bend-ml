@@ -1038,15 +1038,33 @@ def mmul_tn_fin(-n: Nat, -k: Nat, -m: Nat, g: G) -> MMulTN<n, k, m>:
     case G{a, b, c}:
       MMulTN{Mat{a}, Mat{b}, Mat{c}}
 
+# ---- the split depth of a product (0.1.11.0): par is an upper bound, and a product too small to gain splits 0 times ----
+#
+# A product of n x k by k x m splits into 2^par blocks only when it does at least 2^23 multiply-adds and each cell of C
+# sums at least 64 of them; otherwise it runs sequentially. Measured on 16 threads (bend2-lab, B8 sweep): below 2^23 the
+# split costs more than it saves, and with a short inner dimension (a weight gradient over a few tokens) every split
+# was 2-3.6x slower, because each block hands its rows of C back as a list that is then written into C, a cost per cell
+# of C that k multiply-adds per cell do not pay for. The result does not depend on the depth: the same bits at every
+# depth (tests/t8.bend, tests/acc.bend, tests/split.bend).
+def split_pick(big: Bool, d: Nat) -> Nat:
+  match big:
+    case True{}:
+      d
+    case False{}:
+      0n
+
+def split_depth(d: Nat, +n: Nat, +m: Nat, +k: Nat) -> Nat:
+  split_pick(Bool.and(Nat.is_le(64n, k), Nat.is_le(8388608n, Nat.mul(Nat.mul(n, m), k))), d)
+
 def mm_a(+n: Nat, +k: Nat, +m: Nat, d: Nat, a: Array<F32>, b: Array<F32>) -> MMul<n, k, m>:
   mmul_fin(n, k, m, gemm_any(False{}, d, n, m, k, U32.from_nat(k), 1, U32.from_nat(m), 1, a, b, Array.new(F32, cap_depth(Nat.mul(n, m)), 0.0)))
 
-# C = A · B   (n x k) · (k x m); par = log2 of the number of parallel blocks (0 = sequential)
+# C = A · B   (n x k) · (k x m); par = log2 of the most parallel blocks (0 = sequential); split_depth picks 0 or par
 
 def Mat.matmul(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: Mat<n, k>, b: Mat<k, m>) -> MMul<n, k, m>:
   match a b:
     case Mat{x} Mat{y}:
-      mm_a(n, k, m, par, x, y)
+      mm_a(n, k, m, split_depth(par, n, m, k), x, y)
 
 # C + A · B, into C (n x m); A and B come back with the result, as Mat.matmul returns them. Each cell of A · B is
 # computed as Mat.matmul computes it and added once to C's cell: the same bits as Mat.add(c, Mat.matmul(a, b)'s c),
@@ -1055,7 +1073,7 @@ def Mat.matmul(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: Mat<n, k>, b: Mat<k, m>) 
 def Mat.matmul_acc(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: Mat<n, k>, b: Mat<k, m>, c: Mat<n, m>) -> MMul<n, k, m>:
   match a b c:
     case Mat{x} Mat{y} Mat{z}:
-      mmul_fin(n, k, m, gemm_any(True{}, par, n, m, k, U32.from_nat(k), 1, U32.from_nat(m), 1, x, y, z))
+      mmul_fin(n, k, m, gemm_any(True{}, split_depth(par, n, m, k), n, m, k, U32.from_nat(k), 1, U32.from_nat(m), 1, x, y, z))
 
 def mm_nt(+n: Nat, +k: Nat, +m: Nat, d: Nat, a: Array<F32>, b: Array<F32>) -> MMulNT<n, k, m>:
   mmul_nt_fin(n, k, m, gemm_any(False{}, d, n, m, k, U32.from_nat(k), 1, 1, U32.from_nat(k), a, b, Array.new(F32, cap_depth(Nat.mul(n, m)), 0.0)))
@@ -1065,14 +1083,14 @@ def mm_nt(+n: Nat, +k: Nat, +m: Nat, d: Nat, a: Array<F32>, b: Array<F32>) -> MM
 def Mat.matmul_nt(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: Mat<n, k>, b: Mat<m, k>) -> MMulNT<n, k, m>:
   match a b:
     case Mat{x} Mat{y}:
-      mm_nt(n, k, m, par, x, y)
+      mm_nt(n, k, m, split_depth(par, n, m, k), x, y)
 
 # C + A · Bᵀ, into C (n x m)
 
 def Mat.matmul_nt_acc(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: Mat<n, k>, b: Mat<m, k>, c: Mat<n, m>) -> MMulNT<n, k, m>:
   match a b c:
     case Mat{x} Mat{y} Mat{z}:
-      mmul_nt_fin(n, k, m, gemm_any(True{}, par, n, m, k, U32.from_nat(k), 1, 1, U32.from_nat(k), x, y, z))
+      mmul_nt_fin(n, k, m, gemm_any(True{}, split_depth(par, n, m, k), n, m, k, U32.from_nat(k), 1, 1, U32.from_nat(k), x, y, z))
 
 def mm_tn(+n: Nat, +k: Nat, +m: Nat, d: Nat, a: Array<F32>, b: Array<F32>) -> MMulTN<n, k, m>:
   mmul_tn_fin(n, k, m, gemm_any(False{}, d, n, m, k, 1, U32.from_nat(n), U32.from_nat(m), 1, a, b, Array.new(F32, cap_depth(Nat.mul(n, m)), 0.0)))
@@ -1082,14 +1100,14 @@ def mm_tn(+n: Nat, +k: Nat, +m: Nat, d: Nat, a: Array<F32>, b: Array<F32>) -> MM
 def Mat.matmul_tn(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: Mat<k, n>, b: Mat<k, m>) -> MMulTN<n, k, m>:
   match a b:
     case Mat{x} Mat{y}:
-      mm_tn(n, k, m, par, x, y)
+      mm_tn(n, k, m, split_depth(par, n, m, k), x, y)
 
 # C + Aᵀ · B, into C (n x m): a weight gradient added into the gradient it accumulates, dW += Xᵀ · dY
 
 def Mat.matmul_tn_acc(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: Mat<k, n>, b: Mat<k, m>, c: Mat<n, m>) -> MMulTN<n, k, m>:
   match a b c:
     case Mat{x} Mat{y} Mat{z}:
-      mmul_tn_fin(n, k, m, gemm_any(True{}, par, n, m, k, 1, U32.from_nat(n), U32.from_nat(m), 1, x, y, z))
+      mmul_tn_fin(n, k, m, gemm_any(True{}, split_depth(par, n, m, k), n, m, k, 1, U32.from_nat(n), U32.from_nat(m), 1, x, y, z))
 
 # ---- element-wise and training operations ----
 
