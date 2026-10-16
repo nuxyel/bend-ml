@@ -8,7 +8,7 @@ Tensors in Bend 2 over a flat `Array<F32>`, **with the shape in the type**: the 
 
 ```python
 import Base
-import bend-ml-tensor-array@0.1.10.0/main.bend as TA
+import bend-ml-tensor-array@0.1.11.0/main.bend as TA
 
 def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 128n>:
   TA.Mat.matmul(100n, 784n, 128n, 3n, a, w)   # 3n = 2^3 = 8 parallel blocks
@@ -118,7 +118,7 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 
 ## Versions
 
-- `0.1.11.0` (not published yet): the products choose their split depth from the work (`split_depth`): `par` or 0. On 16
+- `0.1.11.0`: the products choose their split depth from the work (`split_depth`): `par` or 0. On 16
   threads a weight gradient over 8 tokens of SmolLM2-135M's sizes (1536 x 8 by 8 x 576) goes from 9.3 to 2.8 ms at `par`
   3, one over 32 tokens from 10.2 to 5.9 ms, and MNIST's small last layer from 0.083 to 0.034 ms; products large enough
   to gain keep their split and their time. The same bits (`tests/split.bend`).
