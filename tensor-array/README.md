@@ -117,6 +117,12 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 
 ## Versions
 
+- `0.1.8.0` (not published yet): products with two or more rows (`Mat.matmul`, `Mat.matmul_nt`, `Mat.matmul_tn`) pack
+  A's rows and B's columns once into cells of 8 F32, so the inner loop reads 8 numbers per array access. The additions
+  keep `dotr`'s order (product p to partial sum p mod 4, combined as `dotr` combines them after k products), so the
+  results are the same bits as 0.1.7.0's, apart from which NaN payload comes out; `tensor-array/tests/t8.bend` checks it
+  on every layout and every k from 0 to 19. Products with one row (`Bands.matvec*`, `gemm` called directly) keep the
+  scalar loop. An MLP training epoch on MNIST (784-128-10, batches of 100) goes from 8.7 to 4.8 s on one thread.
 - `0.1.7.0`: the dot product inside every product (`gemm`, so `Mat.matmul*`, `Bands.matvec*`) keeps four partial sums instead of one running sum. GPT-2 is 4.6% faster on one thread (no change on 16), per product 4-12% on one thread and up to 26% on 16; the logits move closer to PyTorch (largest difference lower on 10 of 11 prompts) and are no longer bit for bit those of 0.1.6.0. `Bands.matvec` still equals `Mat.matmul_nt` bit for bit. Checked on Bend 2.0.36.
 - `0.1.6.0`: each band of `Bands.matvec` / `Bands.matvec_l` runs the `gemm` of `Mat.matmul_nt` and reads its rows back, instead of building the list row by row: the same numbers bit for bit, 3-4% faster on GPT-2 with 1 and with 16 threads, 19-32% per product on 16 threads. `leaf_len` and `band_len` are proved again over the new code.
 - `0.1.5.0`: `Bands.matvec_l` (lists in and out) and the laws `leaf_len` and `band_len`.
