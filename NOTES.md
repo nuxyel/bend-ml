@@ -1077,3 +1077,7 @@ v1.3.2: GPT-2 138.8 ms per token on one thread, 107.1 on 16 (unchanged), the sma
 5.4, peak 831 MB against 1,464 on one thread; MNIST 20.0 ms per batch against 29.9 on one thread, 7.7 against 12.8 on 16,
 peak 107 MB. Every output the same as before. `numbers.json` ("evidence", "rerun_2026_10_16") holds them; the deck
 (`docs/media/deck/readme.mjs`) shows v1.3.2.
+
+## v1.3.2 (2026-10-16)
+
+The MNIST demo on tensor-array 0.1.11.0 and the README measured again (pull request #12, CI 61/61).
