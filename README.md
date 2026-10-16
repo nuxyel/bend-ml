@@ -12,7 +12,7 @@
 **bend-ml** is machine learning for [Bend 2](https://bend-lang.com). The shape of every tensor lives in its type, so a
 product of mismatched matrices does not compile, and the structural guarantees (a tokenizer that never loses a byte, a
 reverse mode that agrees with the forward mode, a parallel product that covers every row) are laws that Bend's kernel
-checks. Five packages are on BendHub, and two demos run on them: an MNIST classifier that trains, and GPT-2 small, which
+checks. Six packages are on BendHub, and two demos run on them: an MNIST classifier that trains, and GPT-2 small, which
 generates the same tokens as PyTorch.
 
 <p align="center"><img src="docs/media/deck/frames/01-title.webp" alt="bend-ml v1.2.2: 27 laws proved, 7 releases measured, 6 reference systems" width="90%"></p>
@@ -39,11 +39,12 @@ only compiles with a proof that the number of elements does not change, even whe
 | [`bend-ml-nat-lemmas`](nat-lemmas) | 0.1.1.0 | `Nat` and `List` lemmas that Base does not have | `add_comm`, `add_assoc`, `mul_comm`, `mul_assoc`, `mul_dist`, `append_assoc`, `length_append`, `product_append`... (15) |
 | [`bend-ml-bpe-tokenizer`](bpe) | 0.1.2.0 | Byte-level BPE tokenizer (GPT-2 style) | **roundtrip** `decode(encode(s)) = s`, `vocab_bound`, `dec_append`, `train_wf`, `roundtrip_trained` |
 | [`bend-ml-tensor`](tensor) | 0.1.2.0 | `Vec<n>` and `Mat<r,c>` with the shape in the type, over lists | `reshape_swap`, `reshape_flat` |
-| [`bend-ml-tensor-array`](tensor-array) | 0.1.9.0 | the same guarantees over a flat `Array<F32>`; `Bands<r,c>` for a parallel matrix · vector | `cap_ok`, `half_cover`, `leaf_len`, `band_len`; typed `matmul`, `matmul_nt`, `matmul_tn`, `Bands.matvec` |
+| [`bend-ml-tensor-array`](tensor-array) | 0.1.10.0 | the same guarantees over a flat `Array<F32>`; `Bands<r,c>` for a parallel matrix · vector | `cap_ok`, `half_cover`, `leaf_len`, `band_len`; typed `matmul`, `matmul_nt`, `matmul_tn` (and their accumulating forms), `Bands.matvec` |
 | [`bend-ml-autograd`](autograd) | 0.1.1.0 | Automatic differentiation and layers with typed backward | **`reverse_eq_forward`** |
+| [`bend-ml-binary-read`](binary-read) | 0.1.0.0 | F32 weights read from a file straight into an `Array<F32>`; foreign code (C and JavaScript), kept out of the packages with laws | none: an effect, tested on both lanes |
 
 ```python
-import bend-ml-tensor-array@0.1.7.0/main.bend as TA
+import bend-ml-tensor-array@0.1.10.0/main.bend as TA
 import bend-ml-bpe-tokenizer@0.1.2.0/main.bend as BPE
 ```
 
