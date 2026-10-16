@@ -43,7 +43,9 @@ jobs:
         run: make check
 
       - name: Full checks (adds MNIST and GPT-2)
+        shell: bash
         run: |
+          set -o pipefail
           make check-full 2>&1 | tee check-full.log
           free -g
 
