@@ -1041,7 +1041,7 @@ def mmul_tn_fin(-n: Nat, -k: Nat, -m: Nat, g: G) -> MMulTN<n, k, m>:
 # ---- the split depth of a product (0.1.11.0): par is an upper bound, and a product too small to gain splits 0 times ----
 #
 # A product of n x k by k x m splits into 2^par blocks only when it does at least 2^23 multiply-adds and each cell of C
-# sums at least 64 of them; otherwise it runs sequentially. Measured on 16 threads (bend2-lab, B8 sweep): below 2^23 the
+# sums at least 64 of them; otherwise it runs sequentially. Measured on 16 threads (2026-10-16, 18 shapes): below 2^23 the
 # split costs more than it saves, and with a short inner dimension (a weight gradient over a few tokens) every split
 # was 2-3.6x slower, because each block hands its rows of C back as a list that is then written into C, a cost per cell
 # of C that k multiply-adds per cell do not pay for. The result does not depend on the depth: the same bits at every
