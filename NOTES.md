@@ -923,3 +923,14 @@ copies its operands per block (next: B2).
 - Published: `bend-ml-tensor-array@0.1.8.0`, hash `0x3283e28131a46d2d98db11347f49016c` (`--verdict` ok, no `@unsafe`). From a
   clean folder, `tests/t8.bend` against the published package gives `0 0 0 0 0 0 0 0`; `reference/test_published.py` ok.
   `bench/mv_bands*.bend` point at it; `demos/gpt2/fast.bend` waits (it has uncommitted local changes).
+
+## The parallel products without per-block copies (tensor-array 0.1.9.0, not published yet; 2026-10-15)
+
+The parallel path in cells of 8 copied both packed operands at every node of the fork tree. Now the larger operand
+(A's rows or B's columns, whichever is longer) is packed straight into one piece per block, and the smaller one is
+copied once per node (`2^d - 1` copies); the split is by rows or by columns of C to match. The inner loop also passes
+its four sums as arguments instead of building a record per step. Same bits (`tests/t8.bend`, and the training program's
+exact outputs). The MNIST training epoch, 5 alternated rounds: 4.9 to 3.9 s on one thread, 5.0 to 4.0 s on 16. More threads still add
+little at this size: a 100 x 784 by 784 x 128 product is about 1.3 ms of work, and splitting it in 8 measured 1.5x
+faster at best in isolation (a version where every leaf owns all its data reached 2.8x), so the fork, the packing and
+the writes of C weigh as much as the work. A coarser grain (a whole step, or several products at once) is the lead.
