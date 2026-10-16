@@ -67,6 +67,9 @@ def main():
         t8 = os.path.join(d, "t8")
         run("compile tensor-array/tests/t8.bend", [BEND, "tensor-array/tests/t8.bend", "-o", t8])
         run("the products in cells of 8 give the scalar loop's bits (tensor-array/tests/t8.bend)", [t8], lambda o, c: o.strip().strip('"') == "0 0 0 0 0 0 0 0")
+        acc = os.path.join(d, "acc")
+        run("compile tensor-array/tests/acc.bend", [BEND, "tensor-array/tests/acc.bend", "-o", acc])
+        run("the accumulating products give the bits of Mat.add(C, A·B) (tensor-array/tests/acc.bend)", [acc], lambda o, c: o.strip().strip('"') == "0 0 0 0 0 0")
     run("tensor-array/tests/checked.bend rejects wrong label counts", [BEND, "tensor-array/tests/checked.bend"], lambda o, c: o.strip() == "[1n, 0n, 0n, 1n, 0n, 0n]")
 
     # 3. tests against the Python references
