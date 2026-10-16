@@ -117,6 +117,12 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 
 ## Versions
 
+- `0.1.9.0` (not published yet): the parallel products in cells of 8 no longer copy both operands at every node of
+  the fork tree. The larger operand is packed straight into one piece per block (a block owns its piece), and the
+  smaller one is copied once per node; the inner loop carries its four sums as arguments instead of a record per step.
+  The same bits as 0.1.8.0 (`tests/t8.bend`). An MLP training epoch on MNIST: 4.9 to 3.9 s on one thread, 5.0 to 4.0 s
+  on 16. At these sizes (a product is about 1.3 ms of work) more threads add little: the cost of splitting and joining
+  weighs as much as the work.
 - `0.1.8.0`: products with two or more rows (`Mat.matmul`, `Mat.matmul_nt`, `Mat.matmul_tn`) pack
   A's rows and B's columns once into cells of 8 F32, so the inner loop reads 8 numbers per array access. The additions
   keep `dotr`'s order (product p to partial sum p mod 4, combined as `dotr` combines them after k products), so the
