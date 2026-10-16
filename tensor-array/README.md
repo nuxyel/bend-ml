@@ -18,7 +18,7 @@ def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 12
 
 - `Mat<r, c>` stores `r*c` numbers in an `Array<F32>`, row by row (index `i*c + j`). The dimensions are **erased** type parameters.
 - An `Array` is affine (a single owner), so **every operation also returns what it read**: `Mat.matmul(a, b)` returns `MMul{a, b, c}`. Use `Mat.clone` when you need two copies.
-- `par` (in the products) is the log2 of the number of blocks computed in parallel; `0` is sequential. It splits the rows of `C`, or the columns when `n = 1` (matrix · vector). Each block works on a copy (`Array.clone`, cheap) of `A` and `B`.
+- `par` (in the products) is the log2 of the most blocks computed in parallel; `0` is sequential. It splits the rows of `C`, or the columns when `n = 1` (matrix · vector). Since 0.1.11.0 it is an upper bound: a product splits only when it does at least 2^23 multiply-adds and each cell of `C` sums at least 64 of them (`split_depth`), and otherwise runs sequentially; the bits are the same at every depth.
 
 ## Operations
 
@@ -118,6 +118,10 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 
 ## Versions
 
+- `0.1.11.0` (not published yet): the products choose their split depth from the work (`split_depth`): `par` or 0. On 16
+  threads a weight gradient over 8 tokens of SmolLM2-135M's sizes (1536 x 8 by 8 x 576) goes from 9.3 to 2.8 ms at `par`
+  3, one over 32 tokens from 10.2 to 5.9 ms, and MNIST's small last layer from 0.083 to 0.034 ms; products large enough
+  to gain keep their split and their time. The same bits (`tests/split.bend`).
 - `0.1.10.0`: accumulating products, `Mat.matmul_acc`, `Mat.matmul_nt_acc`, `Mat.matmul_tn_acc`
   and `Mat.col_sums_acc`, which add the product into a matrix they are given instead of returning a new one. Each cell
   of the product is computed as before and added once to the cell of C, so the result has the bits of `Mat.add(C,
