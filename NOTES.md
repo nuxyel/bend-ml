@@ -1060,3 +1060,8 @@ change.
   hash `0xcd90bcc8501745cf08bdce89fc915900` (`--verdict` ok for both). From a clean folder, `tests/split.bend` against the
   published tensor-array gives its expected lines; the demos, the benchmarks and the README point at both, and `make
   check-full` is 61/61 with the GPT-2 tokenizer against tiktoken on the published 0.1.3.0.
+
+## v1.3.1 (2026-10-16)
+
+A patch release with bpe-tokenizer 0.1.3.0 (encoding 2x faster) and tensor-array 0.1.11.0 (the split depth from the
+work). CI on the release pull request (#11): 61/61.
