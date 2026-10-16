@@ -42,26 +42,44 @@ def dotr(k: Nat, +ia: U32, +ib: U32, +sa: U32, +sb: U32, a0: F32, a1: F32, a2: F
 def dotg(k: Nat, +ia: U32, +ib: U32, +sa: U32, +sb: U32, acc: F32, ra: Array<F32> & F32, rb: Array<F32> & F32) -> R:
   dotr(k, ia, ib, sa, sb, acc, 0.0, 0.0, 0.0, ra, rb)
 
+# writes one cell of C: c[idx] = x, or c[idx] = c[idx] + x when ac (an accumulating product, 0.1.10.0). x is computed
+# exactly as without ac and added once, so C + A·B has the bits of adding a separately computed A·B to C.
+
+def cwr_add(+idx: U32, +x: F32, r: Array<F32> & F32) -> Array<F32>:
+  match r:
+    case Tuple{c, +v}:
+      Array.set(F32, c, idx, (v + x : F32))
+
+def cwr(ac: Bool, +idx: U32, +x: F32, c: Array<F32>) -> Array<F32>:
+  match ac:
+    case True{}:
+      cwr_add(idx, x, Array.get(F32, c, idx))
+    case False{}:
+      Array.set(F32, c, idx, x)
+
 # row i of C, columns j.. ; r is the product of the current column (already computed)
 
-def gcols(mleft: Nat, +kn: Nat, +ia0: U32, +ib0: U32, +sa: U32, +sb: U32, +bcol: U32, +cidx: U32, c: Array<F32>, r: R) -> G:
+def gcols(+ac: Bool, mleft: Nat, +kn: Nat, +ia0: U32, +ib0: U32, +sa: U32, +sb: U32, +bcol: U32, +cidx: U32, c: Array<F32>, r: R) -> G:
   match mleft r:
     case 0n R{a, b, +x}:
-      G{a, b, Array.set(F32, c, cidx, x)}
+      G{a, b, cwr(ac, cidx, x, c)}
     case 1n+p R{a, b, +x}:
-      gcols(p, kn, ia0, (ib0 + bcol : U32), sa, sb, bcol, (cidx + 1 : U32), Array.set(F32, c, cidx, x), dotg(kn, ia0, (ib0 + bcol : U32), sa, sb, 0.0, Array.get(F32, a, ia0), Array.get(F32, b, (ib0 + bcol : U32))))
+      gcols(ac, p, kn, ia0, (ib0 + bcol : U32), sa, sb, bcol, (cidx + 1 : U32), cwr(ac, cidx, x, c), dotg(kn, ia0, (ib0 + bcol : U32), sa, sb, 0.0, Array.get(F32, a, ia0), Array.get(F32, b, (ib0 + bcol : U32))))
 
-def grows(nleft: Nat, +mm1: Nat, +kn: Nat, +i: U32, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, +mu: U32, g: G) -> G:
+def grows(+ac: Bool, nleft: Nat, +mm1: Nat, +kn: Nat, +i: U32, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, +mu: U32, g: G) -> G:
   match nleft g:
     case 0n G{a, b, c}:
       G{a, b, c}
     case 1n+p G{a, b, c}:
-      grows(p, mm1, kn, (i + 1 : U32), arow, sa, sb, bcol, mu, gcols(mm1, kn, (i * arow : U32), 0, sa, sb, bcol, (i * mu : U32), c, dotg(kn, (i * arow : U32), 0, sa, sb, 0.0, Array.get(F32, a, (i * arow : U32)), Array.get(F32, b, 0))))
+      grows(ac, p, mm1, kn, (i + 1 : U32), arow, sa, sb, bcol, mu, gcols(ac, mm1, kn, (i * arow : U32), 0, sa, sb, bcol, (i * mu : U32), c, dotg(kn, (i * arow : U32), 0, sa, sb, 0.0, Array.get(F32, a, (i * arow : U32)), Array.get(F32, b, 0))))
 
-# C (n x m) = A · B with k steps; c is the output array (with capacity n*m)
+# C (n x m) = A · B with k steps, or C + A · B when ac; c is the output array (with capacity n*m)
+
+def gemm_ac(+ac: Bool, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
+  grows(ac, n, Nat.sub(m, 1n), k, 0, arow, sa, sb, bcol, U32.from_nat(m), G{a, b, c})
 
 def gemm(+n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
-  grows(n, Nat.sub(m, 1n), k, 0, arow, sa, sb, bcol, U32.from_nat(m), G{a, b, c})
+  gemm_ac(False{}, n, m, k, arow, sa, sb, bcol, a, b, c)
 
 
 # ---------------------------------------------------------------------
@@ -109,15 +127,22 @@ def write_l(xs: List<&2, F32>, +idx: U32, c: Array<F32>) -> Array<F32>:
     case Con{h, t}:
       write_l(t, (idx + 1 : U32), Array.set(F32, c, idx, h))
 
-# c[idx..] += list
+# c[idx..] = list, or c[idx..] += list when ac
 
-def gp3(a: Array<F32>, b: Array<F32>, c: Array<F32>, xs: List<&2, F32>) -> G:
-  G{a, b, write_l(xs, 0, c)}
+def write_la(+ac: Bool, xs: List<&2, F32>, +idx: U32, c: Array<F32>) -> Array<F32>:
+  match xs:
+    case Nil{}:
+      c
+    case Con{+h, t}:
+      write_la(ac, t, (idx + 1 : U32), cwr(ac, idx, h, c))
+
+def gp3(+ac: Bool, a: Array<F32>, b: Array<F32>, c: Array<F32>, xs: List<&2, F32>) -> G:
+  G{a, b, write_la(ac, xs, 0, c)}
 
 def gp2(d: Nat, +n: Nat, +mm1: Nat, +kn: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, c: Array<F32>, pa: Array<F32> & Array<F32>, pb: Array<F32> & Array<F32>) -> G:
   match pa pb:
     case Tuple{a1, a2} Tuple{b1, b2}:
-      gp3(a1, b1, c, lpar(d, n, mm1, kn, 0, arow, sa, sb, bcol, Array.clone(F32, a2), Array.clone(F32, b2)))
+      gp3(False{}, a1, b1, c, lpar(d, n, mm1, kn, 0, arow, sa, sb, bcol, Array.clone(F32, a2), Array.clone(F32, b2)))
 
 # C (n x m) = A · B, with 2^d blocks of rows in parallel; returns A, B (intact) and C
 
@@ -155,15 +180,15 @@ def cpar(d: Nat, +cnt: Nat, +kn: Nat, +ia0: U32, +j0: U32, +sa: U32, +sb: U32, +
       x y = cpar(q, Nat.div(cnt, 2n), kn, ia0, j0, sa, sb, bcol, Array.clone(F32, a), Array.clone(F32, b)) cpar(q, Nat.sub(cnt, Nat.div(cnt, 2n)), kn, ia0, (j0 + U32.from_nat(Nat.div(cnt, 2n)) : U32), sa, sb, bcol, Array.clone(F32, a2), Array.clone(F32, b2))
       List.append(&2, F32, x, y)
 
-def cp2(d: Nat, +m: Nat, +kn: Nat, +sa: U32, +sb: U32, +bcol: U32, c: Array<F32>, pa: Array<F32> & Array<F32>, pb: Array<F32> & Array<F32>) -> G:
+def cp2(+ac: Bool, d: Nat, +m: Nat, +kn: Nat, +sa: U32, +sb: U32, +bcol: U32, c: Array<F32>, pa: Array<F32> & Array<F32>, pb: Array<F32> & Array<F32>) -> G:
   match pa pb:
     case Tuple{a1, a2} Tuple{b1, b2}:
-      gp3(a1, b1, c, cpar(d, m, kn, 0, 0, sa, sb, bcol, Array.clone(F32, a2), Array.clone(F32, b2)))
+      gp3(ac, a1, b1, c, cpar(d, m, kn, 0, 0, sa, sb, bcol, Array.clone(F32, a2), Array.clone(F32, b2)))
 
 # C (1 x m) = A (1 x k) · B, with 2^d blocks of columns in parallel
 
-def gemm_par_cols(d: Nat, +m: Nat, +k: Nat, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
-  cp2(d, m, k, sa, sb, bcol, c, Array.clone(F32, a), Array.clone(F32, b))
+def gemm_par_cols(+ac: Bool, d: Nat, +m: Nat, +k: Nat, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
+  cp2(ac, d, m, k, sa, sb, bcol, c, Array.clone(F32, a), Array.clone(F32, b))
 
 # ---------------------------------------------------------------------
 # element-wise operations (in place, by index)
@@ -782,24 +807,24 @@ def t8_cell(+tk: Nat, +tku: U32, +rot: Nat, +i: U32, +j: U32, a: Array<T8>, b: A
 type TG is Type:
   TG{a: Array<T8>, b: Array<T8>, c: Array<F32>}
 
-def t8_set(+idx: U32, c: Array<F32>, r: TR) -> TG:
+def t8_set(+ac: Bool, +idx: U32, c: Array<F32>, r: TR) -> TG:
   match r:
-    case TR{a, b, x}:
-      TG{a, b, Array.set(F32, c, idx, x)}
+    case TR{a, b, +x}:
+      TG{a, b, cwr(ac, idx, x, c)}
 
-def t8_cols(mleft: Nat, +tk: Nat, +tku: U32, +rot: Nat, +i: U32, +j: U32, +cidx: U32, g: TG) -> TG:
+def t8_cols(+ac: Bool, mleft: Nat, +tk: Nat, +tku: U32, +rot: Nat, +i: U32, +j: U32, +cidx: U32, g: TG) -> TG:
   match mleft g:
     case 0n g:
       g
     case 1n+p TG{a, b, c}:
-      t8_cols(p, tk, tku, rot, i, (j + 1 : U32), (cidx + 1 : U32), t8_set(cidx, c, t8_cell(tk, tku, rot, i, j, a, b)))
+      t8_cols(ac, p, tk, tku, rot, i, (j + 1 : U32), (cidx + 1 : U32), t8_set(ac, cidx, c, t8_cell(tk, tku, rot, i, j, a, b)))
 
-def t8_rows(nleft: Nat, +m: Nat, +tk: Nat, +tku: U32, +rot: Nat, +i: U32, +mu: U32, g: TG) -> TG:
+def t8_rows(+ac: Bool, nleft: Nat, +m: Nat, +tk: Nat, +tku: U32, +rot: Nat, +i: U32, +mu: U32, g: TG) -> TG:
   match nleft:
     case 0n:
       g
     case 1n+p:
-      t8_rows(p, m, tk, tku, rot, (i + 1 : U32), mu, t8_cols(m, tk, tku, rot, i, 0, (i * mu : U32), g))
+      t8_rows(ac, p, m, tk, tku, rot, (i + 1 : U32), mu, t8_cols(ac, m, tk, tku, rot, i, 0, (i * mu : U32), g))
 
 # rows i0 .. i0+cnt-1 of C as a list, in order (the parallel version's leaves)
 type TL is Type:
@@ -838,10 +863,10 @@ def t8_g(a: Array<F32>, b: Array<F32>, g: TG) -> G:
     case TG{ta, tb, c}:
       G{a, b, c}
 
-def t8_out_seq(+n: Nat, +m: Nat, +tk: Nat, +tku: U32, +rot: Nat, c: Array<F32>, p: PKK) -> G:
+def t8_out_seq(+ac: Bool, +n: Nat, +m: Nat, +tk: Nat, +tku: U32, +rot: Nat, c: Array<F32>, p: PKK) -> G:
   match p:
     case PKK{a, b, ta, tb}:
-      t8_g(a, b, t8_rows(n, m, tk, tku, rot, 0, U32.from_nat(m), TG{ta, tb, c}))
+      t8_g(a, b, t8_rows(ac, n, m, tk, tku, rot, 0, U32.from_nat(m), TG{ta, tb, c}))
 
 # ---- the parallel path (0.1.9.0): the larger operand is packed into one piece per block, so a block owns its piece;
 # the other operand is copied once per node of the fork tree (2^d - 1 copies), instead of both at every node ----
@@ -904,71 +929,75 @@ type RW is Type:
   RW{c: Array<F32>, xs: List<&2, F32>}
 
 # w numbers of xs into c from idx; what is left of xs comes back
-def cb_row(w: Nat, +idx: U32, c: Array<F32>, xs: List<&2, F32>) -> RW:
+def cb_row(+ac: Bool, w: Nat, +idx: U32, c: Array<F32>, xs: List<&2, F32>) -> RW:
   match w xs:
-    case 1n+p Con{h, t}:
-      cb_row(p, (idx + 1 : U32), Array.set(F32, c, idx, h), t)
+    case 1n+p Con{+h, t}:
+      cb_row(ac, p, (idx + 1 : U32), cwr(ac, idx, h, c), t)
     case _ _:
       RW{c, xs}
 
-def cb_rows(n: Nat, +i: U32, +j0: U32, +w: Nat, +mu: U32, r: RW) -> Array<F32>:
+def cb_rows(+ac: Bool, n: Nat, +i: U32, +j0: U32, +w: Nat, +mu: U32, r: RW) -> Array<F32>:
   match n r:
     case 0n RW{c, xs}:
       c
     case 1n+p RW{c, xs}:
-      cb_rows(p, (i + 1 : U32), j0, w, mu, cb_row(w, ((i * mu : U32) + j0 : U32), c, xs))
+      cb_rows(ac, p, (i + 1 : U32), j0, w, mu, cb_row(ac, w, ((i * mu : U32) + j0 : U32), c, xs))
 
-def cb_write(bs: List<&2, CB>, +n: Nat, +mu: U32, c: Array<F32>) -> Array<F32>:
+def cb_write(+ac: Bool, bs: List<&2, CB>, +n: Nat, +mu: U32, c: Array<F32>) -> Array<F32>:
   match bs:
     case Nil{}:
       c
     case Con{CB{+j0, +w, xs}, t}:
-      cb_write(t, n, mu, cb_rows(n, 0, j0, w, mu, RW{c, xs}))
+      cb_write(ac, t, n, mu, cb_rows(ac, n, 0, j0, w, mu, RW{c, xs}))
 
-def t8_pr2(+n: Nat, +m: Nat, +tk: Nat, +tku: U32, +rot: Nat, c: Array<F32>, ra: PKT, rb: PK) -> G:
+def t8_pr2(+ac: Bool, +n: Nat, +m: Nat, +tk: Nat, +tku: U32, +rot: Nat, c: Array<F32>, ra: PKT, rb: PK) -> G:
   match ra rb:
     case PKT{a, t} PK{b, tb}:
-      G{a, b, write_l(t8_rpar(t, n, m, tk, tku, rot, tb), 0, c)}
+      G{a, b, write_la(ac, t8_rpar(t, n, m, tk, tku, rot, tb), 0, c)}
 
-def t8_pc2(+n: Nat, +m: Nat, +tk: Nat, +tku: U32, +rot: Nat, c: Array<F32>, ra: PK, rb: PKT) -> G:
+def t8_pc2(+ac: Bool, +n: Nat, +m: Nat, +tk: Nat, +tku: U32, +rot: Nat, c: Array<F32>, ra: PK, rb: PKT) -> G:
   match ra rb:
     case PK{a, ta} PKT{b, t}:
-      G{a, b, cb_write(t8_cpar(t, m, 0, n, tk, tku, rot, ta), n, U32.from_nat(m), c)}
+      G{a, b, cb_write(ac, t8_cpar(t, m, 0, n, tk, tku, rot, ta), n, U32.from_nat(m), c)}
 
 # 2^d blocks along the larger of n (rows of C, pieces of A) and m (columns of C, pieces of B)
-def t8_par2(byrows: Bool, d: Nat, +n: Nat, +m: Nat, +k: Nat, +tk: Nat, +tku: U32, +rot: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
+def t8_par2(+ac: Bool, byrows: Bool, d: Nat, +n: Nat, +m: Nat, +k: Nat, +tk: Nat, +tku: U32, +rot: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
   match byrows:
     case True{}:
-      t8_pr2(n, m, tk, tku, rot, c, pk_tree(d, n, 0, tk, tku, U32.from_nat(k), arow, sa, a), pk_pack(m, tk, k, bcol, sb, b))
+      t8_pr2(ac, n, m, tk, tku, rot, c, pk_tree(d, n, 0, tk, tku, U32.from_nat(k), arow, sa, a), pk_pack(m, tk, k, bcol, sb, b))
     case False{}:
-      t8_pc2(n, m, tk, tku, rot, c, pk_pack(n, tk, k, arow, sa, a), pk_tree(d, m, 0, tk, tku, U32.from_nat(k), bcol, sb, b))
+      t8_pc2(ac, n, m, tk, tku, rot, c, pk_pack(n, tk, k, arow, sa, a), pk_tree(d, m, 0, tk, tku, U32.from_nat(k), bcol, sb, b))
 
-def gemm_t8b(d: Nat, +n: Nat, +m: Nat, +k: Nat, +tk: Nat, +tku: U32, +rot: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
+def gemm_t8b(+ac: Bool, d: Nat, +n: Nat, +m: Nat, +k: Nat, +tk: Nat, +tku: U32, +rot: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
   match d:
     case 0n:
-      t8_out_seq(n, m, tk, tku, rot, c, t8_pk2(pk_pack(n, tk, k, arow, sa, a), pk_pack(m, tk, k, bcol, sb, b)))
+      t8_out_seq(ac, n, m, tk, tku, rot, c, t8_pk2(pk_pack(n, tk, k, arow, sa, a), pk_pack(m, tk, k, bcol, sb, b)))
     case 1n+q:
-      t8_par2(Nat.is_le(m, n), 1n+q, n, m, k, tk, tku, rot, arow, sa, sb, bcol, a, b, c)
+      t8_par2(ac, Nat.is_le(m, n), 1n+q, n, m, k, tk, tku, rot, arow, sa, sb, bcol, a, b, c)
 
-# C (n x m) = A · B in cells of 8, sequential (d = 0) or with 2^d blocks of rows in parallel; A and B come back intact
+# C (n x m) = A · B (or C + A · B when ac) in cells of 8, sequential (d = 0) or with 2^d blocks of rows in parallel; A
+# and B come back intact
+def gemm_t8_ac(+ac: Bool, d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
+  gemm_t8b(ac, d, n, m, k, Nat.div(Nat.add(k, 7n), 8n), U32.from_nat(Nat.div(Nat.add(k, 7n), 8n)), Nat.mod(k, 4n), arow, sa, sb, bcol, a, b, c)
+
 def gemm_t8(d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
-  gemm_t8b(d, n, m, k, Nat.div(Nat.add(k, 7n), 8n), U32.from_nat(Nat.div(Nat.add(k, 7n), 8n)), Nat.mod(k, 4n), arow, sa, sb, bcol, a, b, c)
+  gemm_t8_ac(False{}, d, n, m, k, arow, sa, sb, bcol, a, b, c)
 
 # one row (matrix · vector): the scalar loop, by columns in parallel when d > 0; two or more rows: cells of 8
-def gemm_any3(one: Bool, d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
+def gemm_any3(+ac: Bool, one: Bool, d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
   match one d:
     case True{} 0n:
-      gemm(n, m, k, arow, sa, sb, bcol, a, b, c)
+      gemm_ac(ac, n, m, k, arow, sa, sb, bcol, a, b, c)
     case True{} 1n+q:
-      gemm_par_cols(1n+q, m, k, sa, sb, bcol, a, b, c)
+      gemm_par_cols(ac, 1n+q, m, k, sa, sb, bcol, a, b, c)
     case False{} d:
-      gemm_t8(d, n, m, k, arow, sa, sb, bcol, a, b, c)
+      gemm_t8_ac(ac, d, n, m, k, arow, sa, sb, bcol, a, b, c)
 
-def gemm_any2(d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
-  gemm_any3(Nat.is_le(n, 1n), d, n, m, k, arow, sa, sb, bcol, a, b, c)
+def gemm_any2(+ac: Bool, d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
+  gemm_any3(ac, Nat.is_le(n, 1n), d, n, m, k, arow, sa, sb, bcol, a, b, c)
 
-def gemm_any(d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
-  gemm_any2(d, n, m, k, arow, sa, sb, bcol, a, b, c)
+def gemm_any(+ac: Bool, d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
+  gemm_any2(ac, d, n, m, k, arow, sa, sb, bcol, a, b, c)
 
 def mmul_fin(-n: Nat, -k: Nat, -m: Nat, g: G) -> MMul<n, k, m>:
   match g:
@@ -986,7 +1015,7 @@ def mmul_tn_fin(-n: Nat, -k: Nat, -m: Nat, g: G) -> MMulTN<n, k, m>:
       MMulTN{Mat{a}, Mat{b}, Mat{c}}
 
 def mm_a(+n: Nat, +k: Nat, +m: Nat, d: Nat, a: Array<F32>, b: Array<F32>) -> MMul<n, k, m>:
-  mmul_fin(n, k, m, gemm_any(d, n, m, k, U32.from_nat(k), 1, U32.from_nat(m), 1, a, b, Array.new(F32, cap_depth(Nat.mul(n, m)), 0.0)))
+  mmul_fin(n, k, m, gemm_any(False{}, d, n, m, k, U32.from_nat(k), 1, U32.from_nat(m), 1, a, b, Array.new(F32, cap_depth(Nat.mul(n, m)), 0.0)))
 
 # C = A · B   (n x k) · (k x m); par = log2 of the number of parallel blocks (0 = sequential)
 
@@ -995,8 +1024,17 @@ def Mat.matmul(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: Mat<n, k>, b: Mat<k, m>) 
     case Mat{x} Mat{y}:
       mm_a(n, k, m, par, x, y)
 
+# C + A · B, into C (n x m); A and B come back with the result, as Mat.matmul returns them. Each cell of A · B is
+# computed as Mat.matmul computes it and added once to C's cell: the same bits as Mat.add(c, Mat.matmul(a, b)'s c),
+# without allocating the product or walking it a second time.
+
+def Mat.matmul_acc(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: Mat<n, k>, b: Mat<k, m>, c: Mat<n, m>) -> MMul<n, k, m>:
+  match a b c:
+    case Mat{x} Mat{y} Mat{z}:
+      mmul_fin(n, k, m, gemm_any(True{}, par, n, m, k, U32.from_nat(k), 1, U32.from_nat(m), 1, x, y, z))
+
 def mm_nt(+n: Nat, +k: Nat, +m: Nat, d: Nat, a: Array<F32>, b: Array<F32>) -> MMulNT<n, k, m>:
-  mmul_nt_fin(n, k, m, gemm_any(d, n, m, k, U32.from_nat(k), 1, 1, U32.from_nat(k), a, b, Array.new(F32, cap_depth(Nat.mul(n, m)), 0.0)))
+  mmul_nt_fin(n, k, m, gemm_any(False{}, d, n, m, k, U32.from_nat(k), 1, 1, U32.from_nat(k), a, b, Array.new(F32, cap_depth(Nat.mul(n, m)), 0.0)))
 
 # C = A · Bᵀ   (n x k) · (m x k)ᵀ: for weights stored with one row per output
 
@@ -1005,8 +1043,15 @@ def Mat.matmul_nt(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: Mat<n, k>, b: Mat<m, k
     case Mat{x} Mat{y}:
       mm_nt(n, k, m, par, x, y)
 
+# C + A · Bᵀ, into C (n x m)
+
+def Mat.matmul_nt_acc(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: Mat<n, k>, b: Mat<m, k>, c: Mat<n, m>) -> MMulNT<n, k, m>:
+  match a b c:
+    case Mat{x} Mat{y} Mat{z}:
+      mmul_nt_fin(n, k, m, gemm_any(True{}, par, n, m, k, U32.from_nat(k), 1, 1, U32.from_nat(k), x, y, z))
+
 def mm_tn(+n: Nat, +k: Nat, +m: Nat, d: Nat, a: Array<F32>, b: Array<F32>) -> MMulTN<n, k, m>:
-  mmul_tn_fin(n, k, m, gemm_any(d, n, m, k, 1, U32.from_nat(n), U32.from_nat(m), 1, a, b, Array.new(F32, cap_depth(Nat.mul(n, m)), 0.0)))
+  mmul_tn_fin(n, k, m, gemm_any(False{}, d, n, m, k, 1, U32.from_nat(n), U32.from_nat(m), 1, a, b, Array.new(F32, cap_depth(Nat.mul(n, m)), 0.0)))
 
 # C = Aᵀ · B   (k x n)ᵀ · (k x m): weight gradient, X^T · dY
 
@@ -1014,6 +1059,13 @@ def Mat.matmul_tn(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: Mat<k, n>, b: Mat<k, m
   match a b:
     case Mat{x} Mat{y}:
       mm_tn(n, k, m, par, x, y)
+
+# C + Aᵀ · B, into C (n x m): a weight gradient added into the gradient it accumulates, dW += Xᵀ · dY
+
+def Mat.matmul_tn_acc(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: Mat<k, n>, b: Mat<k, m>, c: Mat<n, m>) -> MMulTN<n, k, m>:
+  match a b c:
+    case Mat{x} Mat{y} Mat{z}:
+      mmul_tn_fin(n, k, m, gemm_any(True{}, par, n, m, k, 1, U32.from_nat(n), U32.from_nat(m), 1, x, y, z))
 
 # ---- element-wise and training operations ----
 
@@ -1085,6 +1137,14 @@ def Mat.col_sums(+n: Nat, +m: Nat, a: Mat<n, m>) -> MColSum<n, m>:
   match a:
     case Mat{d}:
       colsum_fin(n, m, gemm(1n, m, n, 0, 1, U32.from_nat(m), 1, Array.new(F32, cap_depth(n), 1.0), d, Array.new(F32, cap_depth(m), 0.0)))
+
+# s + the sum of each column, into s (1 x m): a bias gradient added into its accumulator, with the bits of
+# Mat.add(s, Mat.col_sums(a)'s s)
+
+def Mat.col_sums_acc(+n: Nat, +m: Nat, a: Mat<n, m>, s: Mat<1n, m>) -> MColSum<n, m>:
+  match a s:
+    case Mat{d} Mat{z}:
+      colsum_fin(n, m, gemm_ac(True{}, 1n, m, n, 0, 1, U32.from_nat(m), 1, Array.new(F32, cap_depth(n), 1.0), d, z))
 
 # mean cross-entropy and its gradient on the logits: (softmax - one-hot) / n.
 # labels has one entry per row (n); the gradient replaces the logits.
