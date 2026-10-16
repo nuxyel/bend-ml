@@ -8,7 +8,7 @@ Tensors in Bend 2 over a flat `Array<F32>`, **with the shape in the type**: the 
 
 ```python
 import Base
-import bend-ml-tensor-array@0.1.8.0/main.bend as TA
+import bend-ml-tensor-array@0.1.9.0/main.bend as TA
 
 def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 128n>:
   TA.Mat.matmul(100n, 784n, 128n, 3n, a, w)   # 3n = 2^3 = 8 parallel blocks
@@ -117,7 +117,7 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 
 ## Versions
 
-- `0.1.9.0` (not published yet): the parallel products in cells of 8 no longer copy both operands at every node of
+- `0.1.9.0`: the parallel products in cells of 8 no longer copy both operands at every node of
   the fork tree. The larger operand is packed straight into one piece per block (a block owns its piece), and the
   smaller one is copied once per node; the inner loop carries its four sums as arguments instead of a record per step.
   The same bits as 0.1.8.0 (`tests/t8.bend`). An MLP training epoch on MNIST: 4.9 to 3.9 s on one thread, 5.0 to 4.0 s
