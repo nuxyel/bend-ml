@@ -945,3 +945,28 @@ imports a file that is not in the repository, so the GPT-2 demo did not compile.
 step piped `make check-full` through `tee`, which hid the exit status, and the job passed with 48 of 50 checks. v1.2.6
 puts the demo back to v1.2.4's loader and runs that step with `pipefail`; its CI ran 50/50, including the GPT-2 demo
 against PyTorch. v1.2.5's release notes point to v1.2.6.
+
+## Accumulating products (tensor-array 0.1.10.0; 2026-10-17, not published yet)
+
+A training loop accumulates its weight gradient, `dW += Xᵀ · dY`, and with the products it had to do that in two steps:
+`Mat.matmul_tn` into a new matrix, then `Mat.add` into the gradient, a second pass over every weight plus an allocation.
+`Mat.matmul_acc`, `Mat.matmul_nt_acc`, `Mat.matmul_tn_acc` and `Mat.col_sums_acc` take the destination and add each cell
+of the product into it. The cell is computed exactly as before and added once, `c + x`, so the result has the bits of
+`Mat.add(c, A·B)`: `tests/acc.bend` checks it word for word on every path (one row, scalar and parallel by columns;
+cells of 8, sequential, parallel by rows and by columns), every layout and every k from 0 to 19, with special values in
+C; `reference/test_tensor_array.py` compares the four functions with NumPy. The code is one flag through the writers of
+C; `gemm` and `gemm_t8` keep their signatures and the other functions their bits.
+
+`dW += dYᵀ·X` repeated, idle machine, 9 alternated rounds, medians, one thread:
+
+| n x o x i | two steps | accumulating | ratio |
+|---|---|---|---|
+| 32 x 1536 x 576 (an MLP projection of SmolLM2-135M, 32 tokens) | 260 ms | 184 ms | 0.71 |
+| 8 x 1536 x 576 | 359 ms | 159 ms | 0.44 |
+| 128 x 1536 x 576 | 176 ms | 152 ms | 0.86 |
+| 100 x 128 x 784 (MNIST's first layer) | 175 ms | 154 ms | 0.88 |
+
+The pass it removes is proportional to the weights and the product to the weights times the rows, so the gain grows as
+the batch shrinks. On an MLP training epoch on MNIST the whole run is 3% faster (4.25 to 4.12 s, 15 rounds). At these
+sizes the parallel product (8 blocks, 16 threads) was slower than one thread for both versions (455 against 260 ms at
+32 x 1536 x 576): with few rows, splitting and joining costs more than it saves.
