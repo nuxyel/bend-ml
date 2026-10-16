@@ -37,15 +37,15 @@ only compiles with a proof that the number of elements does not change, even whe
 | Package | Version | What it is | Proved laws |
 |---|---|---|---|
 | [`bend-ml-nat-lemmas`](nat-lemmas) | 0.1.1.0 | `Nat` and `List` lemmas that Base does not have | `add_comm`, `add_assoc`, `mul_comm`, `mul_assoc`, `mul_dist`, `append_assoc`, `length_append`, `product_append`... (15) |
-| [`bend-ml-bpe-tokenizer`](bpe) | 0.1.2.0 | Byte-level BPE tokenizer (GPT-2 style) | **roundtrip** `decode(encode(s)) = s`, `vocab_bound`, `dec_append`, `train_wf`, `roundtrip_trained` |
+| [`bend-ml-bpe-tokenizer`](bpe) | 0.1.3.0 | Byte-level BPE tokenizer (GPT-2 style) | **roundtrip** `decode(encode(s)) = s`, `vocab_bound`, `dec_append`, `train_wf`, `roundtrip_trained` |
 | [`bend-ml-tensor`](tensor) | 0.1.2.0 | `Vec<n>` and `Mat<r,c>` with the shape in the type, over lists | `reshape_swap`, `reshape_flat` |
-| [`bend-ml-tensor-array`](tensor-array) | 0.1.10.0 | the same guarantees over a flat `Array<F32>`; `Bands<r,c>` for a parallel matrix · vector | `cap_ok`, `half_cover`, `leaf_len`, `band_len`; typed `matmul`, `matmul_nt`, `matmul_tn` (and their accumulating forms), `Bands.matvec` |
+| [`bend-ml-tensor-array`](tensor-array) | 0.1.11.0 | the same guarantees over a flat `Array<F32>`; `Bands<r,c>` for a parallel matrix · vector | `cap_ok`, `half_cover`, `leaf_len`, `band_len`; typed `matmul`, `matmul_nt`, `matmul_tn` (and their accumulating forms), `Bands.matvec` |
 | [`bend-ml-autograd`](autograd) | 0.1.1.0 | Automatic differentiation and layers with typed backward | **`reverse_eq_forward`** |
 | [`bend-ml-binary-read`](binary-read) | 0.1.0.0 | F32 weights read from a file straight into an `Array<F32>`; foreign code (C and JavaScript), kept out of the packages with laws | none: an effect, tested on both lanes |
 
 ```python
-import bend-ml-tensor-array@0.1.10.0/main.bend as TA
-import bend-ml-bpe-tokenizer@0.1.2.0/main.bend as BPE
+import bend-ml-tensor-array@0.1.11.0/main.bend as TA
+import bend-ml-bpe-tokenizer@0.1.3.0/main.bend as BPE
 ```
 
 <p align="center"><img src="docs/media/shots/law-roundtrip.png" alt="The roundtrip law as Bend states it, and ALL PROOFS CHECK" width="80%"></p>
