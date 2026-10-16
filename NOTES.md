@@ -1007,3 +1007,8 @@ capacity by doubling.
   published tensor-array give their expected lines, and `tests/read_f32.bend` against the published binary-read gives the
   same lines on both lanes; `reference/test_published.py` checks both; `make check-full` 59/59 with the GPT-2 demo on
   both packages from BendHub. Left: the package diagram in the README still shows five packages.
+
+## v1.3.0 (2026-10-16)
+
+A minor release with tensor-array 0.1.10.0 (accumulating products, the capacity by doubling) and the new
+binary-read 0.1.0.0. CI on the release pull request (#10): 59/59.
