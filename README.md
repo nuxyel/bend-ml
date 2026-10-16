@@ -13,7 +13,7 @@
 product of mismatched matrices does not compile, and the structural guarantees (a tokenizer that never loses a byte, a
 reverse mode that agrees with the forward mode, a parallel product that covers every row) are laws that Bend's kernel
 checks. Six packages are on BendHub, and two demos run on them: an MNIST classifier that trains, and GPT-2 small, which
-generates the same tokens as PyTorch. The current release is [v1.3.1](https://github.com/nuxyel/bend-ml/releases/tag/v1.3.1).
+generates the same tokens as PyTorch. The current release is [v1.3.2](https://github.com/nuxyel/bend-ml/releases/tag/v1.3.2).
 
 ## 01 · A shape error is a type error
 
@@ -74,19 +74,22 @@ same tokens as `transformers`; its typed layers are on BendHub as `bend-ml-llama
 
 ## 04 · How it compares
 
-Measured on 2026-10-11, on v1.2.2, next to six reference systems, in one session with one protocol (every number is a
-median of alternated rounds on an Intel Core Ultra 7 155H). The releases after it changed loading, tokenizing and the
-products used in training (section 05), not the per-token cost of GPT-2's generation shown here.
+Every release up to v1.2.2 was measured on 2026-10-11 next to six reference systems, in one session with one protocol
+(medians of alternated rounds on an Intel Core Ultra 7 155H). v1.3.2 was measured on 2026-10-16 with the same protocol,
+next to v1.2.2, PyTorch and NumPy again, which came out within 2% of their numbers of 2026-10-11; llama.cpp, llm.c,
+dfdx and candle keep theirs. GPT-2's cost per token is unchanged since v1.2.2 (139 ms on one thread, 107 on 16); what
+changed is the start (1.0 s instead of 5.4, at 831 MB instead of 1,464 MB) and training: an MNIST batch takes 20.0 ms
+instead of 29.9 on one thread, 7.7 instead of 12.8 on 16.
 
-<p align="center"><img src="docs/media/deck/frames/04-vs-references.webp" alt="GPT-2 small, ms per token: PyTorch 18.5 and 9.4, NumPy 18.5 and 11.2, llama.cpp 22.2 and 9.8, bend-ml 140 and 109, llm.c without a key/value cache 529 and 142, on 1 and 16 threads" width="90%"></p>
+<p align="center"><img src="docs/media/deck/frames/04-vs-references.webp" alt="GPT-2 small, ms per token: PyTorch 18.5 and 9.4, NumPy 18.5 and 11.2, llama.cpp 22.2 and 9.8, bend-ml v1.3.2 139 and 107, llm.c without a key/value cache 529 and 142, on 1 and 16 threads" width="90%"></p>
 
 <p align="center"><img src="docs/media/deck/frames/05-threads.webp" alt="ms per token by thread count: Bend keeps improving up to 22 threads" width="90%"></p>
 
-<p align="center"><img src="docs/media/deck/frames/06-mnist.webp" alt="MNIST, ms per batch at 16 threads and peak memory: bend-ml slower, with the smallest footprint" width="90%"></p>
+<p align="center"><img src="docs/media/deck/frames/06-mnist.webp" alt="MNIST, ms per batch at 16 threads and peak memory: bend-ml v1.3.2 7.7 ms, slower than the others, with the smallest footprint (107 MB)" width="90%"></p>
 
 ## 05 · Every release
 
-<p align="center"><img src="docs/media/deck/frames/03-history.webp" alt="GPT-2 ms per token by release, from v0.2 to v1.2.2, on 1 and 16 threads" width="90%"></p>
+<p align="center"><img src="docs/media/deck/frames/03-history.webp" alt="GPT-2 ms per token by release, from v0.2 to v1.3.2, on 1 and 16 threads" width="90%"></p>
 
 Since v1.2.2, each change keeps the output bits it had (checked word by word, or against PyTorch where the order of
 sums changed on purpose):
@@ -94,9 +97,10 @@ sums changed on purpose):
 | Release | What changed | Measured |
 |---|---|---|
 | v1.2.4 | Bend 2.0.37, with my fix for parallel code with an erased last parameter ([#1377](https://github.com/bendlang/bend/pull/1377)) | GPT-2 per token unchanged; the compiled program half the size |
-| v1.2.5 / v1.2.6 | `tensor-array` 0.1.8.0 and 0.1.9.0: products in cells of 8 numbers, parallel without per-block copies | a matrix product ~3x faster on one core; an MNIST training epoch (784-128-10, batches of 100) 8.7 → 3.9 s on one thread |
+| v1.2.5 / v1.2.6 | `tensor-array` 0.1.8.0 and 0.1.9.0: products in cells of 8 numbers, parallel without per-block copies | a matrix product ~3x faster on one core |
 | v1.3.0 | `tensor-array` 0.1.10.0: accumulating products (`C + A·B` in place) and array capacities computed by doubling; the new `bend-ml-binary-read` | a weight gradient 0.44–0.88 of the time; GPT-2's weights load in 0.8 s instead of 4.7 |
 | v1.3.1 | `bpe-tokenizer` 0.1.3.0 and `tensor-array` 0.1.11.0: an accumulator only the proofs read is erased; products split into parallel blocks only when the work pays | tokenizing 2x faster (19 KB: 25.2 → 12.3 s); a weight gradient over 8 tokens 3.3x faster on 16 threads |
+| v1.3.2 | the MNIST demo moves from `tensor-array` 0.1.3.0 to 0.1.11.0; the README and its figures measured again | an MNIST epoch 17.9 → 11.9 s on one thread, 7.3 → 4.4 s on 16, the same test hits |
 
 Versions are numbered as in [`docs/VERSIONING.md`](docs/VERSIONING.md); each release has its notes on GitHub.
 
