@@ -981,3 +981,22 @@ the same lemmas and no arithmetic about the number of doublings (`--verdict` ok)
 the same depth for every `n` up to 2000 and that the depth is the smallest at four large sizes. Native builds gain
 too, a little: an MNIST training epoch 4.26 to 4.19 s on one thread.
 
+
+## binary-read: the weights straight into an Array (2026-10-16, not published yet)
+
+Exp. 13's lever without waiting for Base. bendlang/bend#1430 proposed a read into an array for Base and was closed:
+Base keeps thin wrappers over system calls. So `binary-read/` is a library effect, `read_f32(file, offset, n, a)`, in C
+(`pread` straight into the array's block) and JavaScript (a buffer viewed as float32). It is foreign code, so
+`--verdict` fails for whatever imports it; `make check` checks that it is the package's only foreign def and that no
+package with laws imports it. The test runs on both lanes and found one difference before it was fixed: on a read cut
+short in the middle of a number, the C lane wrote the bytes it had and the JS lane wrote nothing; both now write the
+bytes over the cell's bits.
+
+GPT-2 small's matrices now load with it (`demos/gpt2/fast.bend`), against the committed loader on the same
+tensor-array 0.1.7.0, idle machine, 5 alternated rounds, medians: weights loaded in 4.7 → 0.8 s on one thread, 4.1 →
+0.6 s on 16; generation unchanged (4.6 s and 3.5 s for 32 tokens); peak memory 1463 → 1416 MB. The output is the same,
+logit for logit, and the 11 prompts match PyTorch as before (`make check-full`: 59/59).
+
+The same morning, the GPT-2 demo built with tensor-array 0.1.7.0, 0.1.9.0 and the local 0.1.10.0 (7 alternated rounds):
+the same output in all 42 runs, the same generation time, and the load 4.7 → 4.3 s on one thread with 0.1.10.0, the
+capacity by doubling.
