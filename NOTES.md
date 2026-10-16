@@ -1065,3 +1065,15 @@ change.
 
 A patch release with bpe-tokenizer 0.1.3.0 (encoding 2x faster) and tensor-array 0.1.11.0 (the split depth from the
 work). CI on the release pull request (#11): 61/61.
+
+## The README measured again for v1.3.2 (2026-10-16)
+
+The README's figures were measured on 2026-10-11 on v1.2.2. v1.3.2 (this commit's demos: the GPT-2 demo with
+binary-read, the MNIST demo moved from tensor-array 0.1.3.0 to 0.1.11.0) was measured with the same protocol next to
+v1.2.2, PyTorch and NumPy again; those three came out within 2% of 2026-10-11 (GPT-2 v1.2.2 138.2 / 111.1 ms per token
+against 140.4 / 108.9, PyTorch 18.55 against 18.5, NumPy 18.42 against 18.5; MNIST v1.2.2 29.94 / 12.84 ms per batch
+against 30.2 / 12.5), so llama.cpp, llm.c, dfdx and candle keep their numbers of 2026-10-11 and the figures say so.
+v1.3.2: GPT-2 138.8 ms per token on one thread, 107.1 on 16 (unchanged), the small run (load and one token) 1.0 s against
+5.4, peak 831 MB against 1,464 on one thread; MNIST 20.0 ms per batch against 29.9 on one thread, 7.7 against 12.8 on 16,
+peak 107 MB. Every output the same as before. `numbers.json` ("evidence", "rerun_2026_10_16") holds them; the deck
+(`docs/media/deck/readme.mjs`) shows v1.3.2.
