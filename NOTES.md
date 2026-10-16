@@ -915,8 +915,8 @@ Products with two or more rows pack A's rows and B's columns once into cells of 
 numbers per array access instead of one (the lead of 2026-10-13, checked first with sizes read at run time: 3.0-3.3x on
 an isolated product). The additions keep `dotr`'s order, so every result is the same bits as 0.1.7.0's apart from NaN
 payloads (`tensor-array/tests/t8.bend`); one-row products (`Bands.matvec*`, llama.bend's direct `gemm` calls) keep the
-scalar loop. Result, measured in BendTorch's MNIST (784-128-10, SGD, one epoch, 5 alternated rounds): 8.7 to 4.8 s on
-one thread, 6.0 to 4.7 s on 16; BendTorch's and llama.bend's exact outputs unchanged. A first version that built each
+scalar loop. Result, on an MLP training epoch on MNIST (784-128-10, SGD, batches of 100, 5 alternated rounds): 8.7 to
+4.8 s on one thread, 6.0 to 4.7 s on 16; the exact outputs of that training program and of llama.bend unchanged. A first version that built each
 cell through a list was 2.3x slower than 0.1.7.0: packing has to read the 8 numbers directly. The parallel path still
 copies its operands per block (next: B2).
 
@@ -929,8 +929,8 @@ copies its operands per block (next: B2).
 The parallel path in cells of 8 copied both packed operands at every node of the fork tree. Now the larger operand
 (A's rows or B's columns, whichever is longer) is packed straight into one piece per block, and the smaller one is
 copied once per node (`2^d - 1` copies); the split is by rows or by columns of C to match. The inner loop also passes
-its four sums as arguments instead of building a record per step. Same bits (`tests/t8.bend`; BendTorch `make bits`).
-MNIST epoch in BendTorch, 5 alternated rounds: 4.9 to 3.9 s on one thread, 5.0 to 4.0 s on 16. More threads still add
+its four sums as arguments instead of building a record per step. Same bits (`tests/t8.bend`, and the training program's
+exact outputs). The MNIST training epoch, 5 alternated rounds: 4.9 to 3.9 s on one thread, 5.0 to 4.0 s on 16. More threads still add
 little at this size: a 100 x 784 by 784 x 128 product is about 1.3 ms of work, and splitting it in 8 measured 1.5x
 faster at best in isolation (a version where every leaf owns all its data reached 2.8x), so the fork, the packing and
 the writes of C weigh as much as the work. A coarser grain (a whole step, or several products at once) is the lead.

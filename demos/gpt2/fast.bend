@@ -11,6 +11,7 @@ import bend-ml-tensor-array@0.1.7.0/main.bend as TA
 import bend-ml-tensor@0.1.2.0/main.bend as T
 import bend-ml-bpe-tokenizer@0.1.2.0/main.bend as BPE
 import ./load.bend as L
+import ../../binary-read/main.bend as R
 import ./tok.bend as K
 
 # the weight matrices are kept in 2^d row bands (TA.Bands), 2^(d + 1) for the 50257-row embedding, and
@@ -239,68 +240,37 @@ def get_list(+name: String, +n: Nat) -> IO(List<&2, F32>):
     check_size(wpath(name), n)
     L.read_floats(wpath(name), n)
 
-# reads the file in 1 MB blocks and writes each block straight into the matrix, so only one
-# block is a list at any time
-def stream_mat(-r: Nat, -c: Nat, k: Nat, +off: U32, +idx: U32, m: File & Result<&1, &1, U32 & String, List<&2, U32>>, acc: TA.Mat<r, c>) -> IO(TA.Mat<r, c>):
-  match k m:
-    case 0n Tuple{f, rs}:
-      do IO<TA.Mat<r, c>>:
-        File.close(f)
-        return acc
-    case 1n+p Tuple{f, rs}:
-      do IO<TA.Mat<r, c>>:
-        bs : List<&2, U32> <- IO.pass(List<&2, U32>, rs)
-        m2 : File & Result<&1, &1, U32 & String, List<&2, U32>> <- File.read_at(f, (off + 1048576 : U32), 1048576)
-        stream_mat(r, c, p, (off + 1048576 : U32), (idx + 262144 : U32), m2, TA.Mat.fill_at(r, c, idx, L.f32s(bs), acc))
+# ---- matrices: each one, or each band of one, is a single read straight into its Array ----
 
-def get_mat2(-r: Nat, -c: Nat, path: String, +n: Nat, z: TA.Mat<r, c>) -> IO(TA.Mat<r, c>):
+# the bytes a read must have answered: n numbers of 4 bytes, or the program stops
+def read_cmp(ok: Bool, +path: String, +got: U32, +want: Nat) -> IO(Unit):
+  match ok:
+    case True{}:
+      IO.pure(Unit, Unit{})
+    case False{}:
+      IO.die(Unit, 1, path ++ ": read " ++ U32.show(got) ++ " bytes, expected " ++ Nat.show(want) ++ "; run reference/gpt2_prep.py --split again")
+
+def read_done(-r: Nat, -c: Nat, p: File & (Array<F32> & Result<&1, &1, U32 & String, U32>), +want: Nat, +path: String) -> IO(TA.Mat<r, c>):
+  match p:
+    case Tuple{f, Tuple{a, res}}:
+      do IO<TA.Mat<r, c>>:
+        +n : U32 <- IO.pass(U32, res)
+        File.close(f)
+        read_cmp(U32.is_eq(n, U32.from_nat(want)), path, n, want)
+        return TA.Mat{a}
+
+# rr x c numbers starting at number `start` of the file, into a matrix of r rows (rr == r at run
+# time), read by bend-ml-binary-read's read_f32 into an Array sized as Mat.zeros would size it
+def get_band(+path: String, -r: Nat, +rr: Nat, +c: Nat, +start: Nat) -> IO(TA.Mat<r, c>):
   do IO<TA.Mat<r, c>>:
     f : File <- IO.try(File, File.open(path, "r"))
-    m : File & Result<&1, &1, U32 & String, List<&2, U32>> <- File.read_at(f, 0, 1048576)
-    stream_mat(r, c, L.blocks_of(Nat.mul(n, 4n), 1048576n), 0, 0, m, z)
+    p : File & (Array<F32> & Result<&1, &1, U32 & String, U32>) <- R.read_f32(f, U32.from_nat(Nat.mul(start, 4n)), U32.from_nat(Nat.mul(rr, c)), Array.new(F32, TA.cap_depth(Nat.mul(rr, c)), 0.0))
+    read_done(r, c, p, Nat.mul(Nat.mul(rr, c), 4n), path)
 
 def get_mat(+name: String, +r: Nat, +c: Nat) -> IO(TA.Mat<r, c>):
   do IO<TA.Mat<r, c>>:
     check_size(wpath(name), Nat.mul(r, c))
-    get_mat2(r, c, wpath(name), Nat.mul(r, c), TA.Mat.zeros(r, c))
-
-# ---- matrices kept in bands: each band is read from its own range of the file ----
-
-# writes the little-endian F32 numbers held in bs (4 bytes each) at index i, without building a
-# list of F32 first
-def fill_bytes(bs: List<&2, U32>, +i: U32, a: Array<F32>) -> Array<F32>:
-  match bs:
-    case Con{+b0, Con{+b1, Con{+b2, Con{+b3, t}}}}:
-      fill_bytes(t, (i + 1 : U32), Array.set(F32, a, i, L.f32_le(b0, b1, b2, b3)))
-    case _:
-      a
-
-def fill_bytes_mat(-r: Nat, -c: Nat, +i: U32, bs: List<&2, U32>, m: TA.Mat<r, c>) -> TA.Mat<r, c>:
-  match m:
-    case TA.Mat{d}:
-      TA.Mat{fill_bytes(bs, i, d)}
-
-# reads blocks of at most 1 MB until rem bytes have been read, so a band never takes numbers
-# that belong to the next one
-def stream_exact(k: Nat, -r: Nat, -c: Nat, +rem: Nat, +off: U32, +idx: U32, m: File & Result<&1, &1, U32 & String, List<&2, U32>>, acc: TA.Mat<r, c>) -> IO(TA.Mat<r, c>):
-  match k m:
-    case 0n Tuple{f, rs}:
-      do IO<TA.Mat<r, c>>:
-        File.close(f)
-        return acc
-    case 1n+p Tuple{f, rs}:
-      do IO<TA.Mat<r, c>>:
-        bs : List<&2, U32> <- IO.pass(List<&2, U32>, rs)
-        m2 : File & Result<&1, &1, U32 & String, List<&2, U32>> <- File.read_at(f, (off + 1048576 : U32), U32.from_nat(Nat.min(1048576n, Nat.sub(rem, 1048576n))))
-        stream_exact(p, r, c, Nat.sub(rem, 1048576n), (off + 1048576 : U32), (idx + 262144 : U32), m2, fill_bytes_mat(r, c, idx, bs, acc))
-
-# rr x c numbers starting at number `start` of the file, into a band of r rows (rr == r, see
-# load_tree; the Array is sized for rr * c numbers as Mat.zeros would size it)
-def get_band(path: String, -r: Nat, +rr: Nat, +c: Nat, +start: Nat) -> IO(TA.Mat<r, c>):
-  do IO<TA.Mat<r, c>>:
-    f : File <- IO.try(File, File.open(path, "r"))
-    m : File & Result<&1, &1, U32 & String, List<&2, U32>> <- File.read_at(f, U32.from_nat(Nat.mul(start, 4n)), U32.from_nat(Nat.min(1048576n, Nat.mul(Nat.mul(rr, c), 4n))))
-    stream_exact(L.blocks_of(Nat.mul(Nat.mul(rr, c), 4n), 1048576n), r, c, Nat.mul(Nat.mul(rr, c), 4n), U32.from_nat(Nat.mul(start, 4n)), 0, m, TA.Mat{Array.new(F32, TA.cap_depth(Nat.mul(rr, c)), 0.0)})
+    get_band(wpath(name), r, r, c, 0n)
 
 # fills the bands of b (whose shape comes from TA.Bands.zeros) in row order; rr is r at run time
 def load_tree(+c: Nat, -r: Nat, b: TA.Bands<r, c>, +rr: Nat, -e: {rr == r : Nat}, +path: String, +start: Nat) -> IO(TA.Bands<r, c>):
