@@ -16,7 +16,7 @@
 
 ```python
 import Base
-import bend-ml-bpe-tokenizer@0.1.2.0/main.bend as BPE
+import bend-ml-bpe-tokenizer@0.1.3.0/main.bend as BPE
 
 # BPE.encode(table, BPE.lift(bytes))   BPE.decode(table, ids)   BPE.train(30n, 0n, BPE.lift(bytes))
 ```
@@ -49,6 +49,7 @@ reference/.venv/bin/python reference/test_bpe.py
 
 ## Versions
 
+- `0.1.3.0`: encoding about 2x faster (19 KB of text: 25.2 to 12.3 s with GPT-2's table), the same ids and the same laws. `encode.go`'s `done`, which only the proofs read, is erased, so the compiled program no longer builds it; found by Mathews Fernando's [bend-lint](https://github.com/MattCozendey/bend-lint).
 - `0.1.2.0`: the same laws, with English comments and README.
 - `0.1.1.0`: adds `train_wf` and `roundtrip_trained`.
 - `0.1.0.0`: first publication (`roundtrip`, `vocab_bound`, `dec_append`).
