@@ -1037,3 +1037,21 @@ Public API, published 0.1.10.0 against this, 16 threads, 5 rounds, ms per produc
 MNIST epoch is unchanged (3.60 s on one thread, 3.30 on 16), since both of its large products stay above the threshold.
 Passing par 4 instead of 3 to MNIST's first layer was slower in the whole run (3.50 against 3.30 s on 16 threads), though
 faster in the micro-benchmark, so BendTorch keeps its `par` values. Left: on one thread a caller's `par` still splits.
+
+## BPE encoding 2x faster: an accumulator only the proofs read (bpe-tokenizer 0.1.3.0; 2026-10-16, not published yet)
+
+Found by Mathews Fernando (@MattCozendey) with his linter, [bend-lint](https://github.com/MattCozendey/bend-lint)
+(rule `performance/dead_accumulator`), which he ran on bend-ml and llama.bend. `encode.go` kept the rules already
+applied in `done`, a list that only grows and that only the proofs (`enc_known`, `enc_dec`) read; at run time it was
+built and freed for every word, up to the whole table. `done` is now erased (`-done`): the checker keeps it for the
+proofs (`--verdict` ok, `roundtrip` and the others unchanged), and the compiled program never builds it.
+
+19 KB of text (the first 19,000 bytes of tiny Shakespeare), one thread pinned to CPU 3, 3 alternated rounds: the GPT-2
+tokenizer 25.2 -> 12.3 s, the SmolLM2 tokenizer (llama.bend's `demo/tok.bend`) 24.9 -> 12.2 s, the same ids. Against
+tiktoken (`reference/test_gpt2_tok.py`) and `tokenizers` (llama.bend's `test_tok.py`, `test_detok.py`): 0 failures.
+`make check-full` 61/61. The demos still import the published 0.1.2.0 until 0.1.3.0 is published.
+
+The same run of his linter over the whole repository (performance rules): the other findings are in code that runs
+once or never at run time (`has`, `knl`, `wf.go`, `ids_ok`, the autograd's `Nat` model, the band constructors), or in
+benchmarks and upstream drafts; he measured `missed_fork` on tensor-array and `repeated_call` on the tokenizer as no
+change.
