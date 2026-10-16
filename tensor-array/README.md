@@ -8,7 +8,7 @@ Tensors in Bend 2 over a flat `Array<F32>`, **with the shape in the type**: the 
 
 ```python
 import Base
-import bend-ml-tensor-array@0.1.9.0/main.bend as TA
+import bend-ml-tensor-array@0.1.10.0/main.bend as TA
 
 def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 128n>:
   TA.Mat.matmul(100n, 784n, 128n, 3n, a, w)   # 3n = 2^3 = 8 parallel blocks
@@ -118,7 +118,7 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 
 ## Versions
 
-- `0.1.10.0` (not published yet): accumulating products, `Mat.matmul_acc`, `Mat.matmul_nt_acc`, `Mat.matmul_tn_acc`
+- `0.1.10.0`: accumulating products, `Mat.matmul_acc`, `Mat.matmul_nt_acc`, `Mat.matmul_tn_acc`
   and `Mat.col_sums_acc`, which add the product into a matrix they are given instead of returning a new one. Each cell
   of the product is computed as before and added once to the cell of C, so the result has the bits of `Mat.add(C,
   A·B)` (`tests/acc.bend`, on every path and layout), without allocating the product and walking it a second time. The
