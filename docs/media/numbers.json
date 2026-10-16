@@ -237,7 +237,7 @@
    "v1.3.2": 0.00032
   },
   "rerun_2026_10_16": {
-   "source": "bend2-lab results/2026-10-16 (gpt2, mnist, threads blocks; bend-ml v1.2.2 and v1.3.2, PyTorch and NumPy); the anchors match 2026-10-11 within 2%: GPT-2 v1.2.2 138.2 / 111.1 ms (was 140.4 / 108.9), PyTorch 18.55 (18.5), NumPy 18.42 (18.5); MNIST v1.2.2 29.94 / 12.84 ms (30.2 / 12.5), PyTorch 0.48 (0.48). llama.cpp, llm.c, dfdx and candle keep their 2026-10-11 numbers.",
+   "source": "my measurements of 2026-10-16 (gpt2, mnist, threads blocks; bend-ml v1.2.2 and v1.3.2, PyTorch and NumPy); the anchors match 2026-10-11 within 2%: GPT-2 v1.2.2 138.2 / 111.1 ms (was 140.4 / 108.9), PyTorch 18.55 (18.5), NumPy 18.42 (18.5); MNIST v1.2.2 29.94 / 12.84 ms (30.2 / 12.5), PyTorch 0.48 (0.48). llama.cpp, llm.c, dfdx and candle keep their 2026-10-11 numbers.",
    "gpt2_v122_anchor": {
     "1": 138.2,
     "16": 111.1
