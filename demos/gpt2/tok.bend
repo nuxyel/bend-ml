@@ -8,7 +8,7 @@
 # Unicode, so this is exact); invalid UTF-8 bytes count as letters.
 
 import Base
-import bend-ml-bpe-tokenizer@0.1.2.0/main.bend as BPE
+import bend-ml-bpe-tokenizer@0.1.3.0/main.bend as BPE
 import ./unicode.bend as U
 
 # ---- reading files ----
