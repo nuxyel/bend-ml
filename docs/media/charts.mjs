@@ -50,10 +50,10 @@ function bars(x0, y0, w, h, title, max, items) {
 // The benchmark charts are frames of the deck now (deck.mjs, deck/readme.mjs), built from numbers.json "evidence".
 
 {
-  const W = 1020, H = 560, bh = 92;
+  const W = 1020, H = 674, bh = 92;
   const P = {
     nat: [40, 226, 236], bpe: [356, 64, 300], ten: [356, 178, 300], aut: [356, 292, 300], arr: [356, 406, 300],
-    gpt: [736, 150, 244], mni: [736, 330, 244],
+    brd: [356, 520, 300], gpt: [736, 150, 244], mni: [736, 330, 244],
   };
   const box = (k, name, sub, marks) => {
     const [x, y, w] = P[k];
@@ -65,7 +65,7 @@ function bars(x0, y0, w, h, title, max, items) {
   };
   const R2 = (k) => [P[k][0] + P[k][2], P[k][1] + bh / 2], L2 = (k) => [P[k][0], P[k][1] + bh / 2];
   let b = `<defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="${C.b1}"/></marker></defs>`;
-  for (const [a, c] of [["nat", "bpe"], ["nat", "ten"], ["nat", "aut"], ["bpe", "gpt"], ["ten", "gpt"], ["arr", "gpt"], ["arr", "mni"], ["ten", "mni"]]) {
+  for (const [a, c] of [["nat", "bpe"], ["nat", "ten"], ["nat", "aut"], ["bpe", "gpt"], ["ten", "gpt"], ["arr", "gpt"], ["arr", "mni"], ["ten", "mni"], ["brd", "gpt"]]) {
     const [x1, y1] = R2(a), [x2, y2] = L2(c), mx = (x1 + x2) / 2;
     b += `<path d="M${x1} ${y1} C${mx} ${y1} ${mx} ${y2} ${x2 - 2} ${y2}" fill="none" stroke="${C.b1}" stroke-width="1.2" marker-end="url(#ar)"/>`;
   }
@@ -76,10 +76,11 @@ function bars(x0, y0, w, h, title, max, items) {
   b += box("ten", "tensor", "Mat<r,c> over lists", [["2 laws", C.grn], ["vs PyTorch", C.b00]]);
   b += box("aut", "autograd", "reverse mode = forward mode", [["1 law", C.grn], ["gradcheck", C.b00]]);
   b += box("arr", "tensor-array", "Mat<r,c> and Bands over a flat Array", [["4 laws", C.grn], ["vs PyTorch", C.b00], ["Array.new", C.ora]]);
+  b += box("brd", "binary-read", "F32 weights straight into an Array", [["foreign code", C.ora], ["C and JS lanes", C.b00]]);
   b += box("gpt", "GPT-2 demo", "same tokens as PyTorch", [["vs tiktoken", C.b00]]);
   b += box("mni", "MNIST demo", "typed training step", [["vs PyTorch", C.b00]]);
-  b += T(40, H - 26, "proved by the kernel", { size: 13, fill: C.grn, weight: 700 }) + T(230, H - 26, "tested against a reference", { size: 13, fill: C.b00, weight: 700 }) + T(470, H - 26, "trusted", { size: 13, fill: C.ora, weight: 700 }) + T(980, H - 26, "arrows: imports", { size: 13, fill: C.b1, anchor: "end" });
-  out("diagram.svg", svg(W, H, "The five packages, how they import each other, and what is proved, tested or trusted", b));
+  b += T(40, H - 26, "proved by the kernel", { size: 13, fill: C.grn, weight: 700 }) + T(230, H - 26, "tested against a reference", { size: 13, fill: C.b00, weight: 700 }) + T(470, H - 26, "trusted or foreign", { size: 13, fill: C.ora, weight: 700 }) + T(980, H - 26, "arrows: imports", { size: 13, fill: C.b1, anchor: "end" });
+  out("diagram.svg", svg(W, H, "The six packages, how they import each other, and what is proved, tested, trusted or foreign", b));
 }
 
 {

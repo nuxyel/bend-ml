@@ -33,7 +33,7 @@
   "source": "NOTES.md, experiment 10"
  },
  "project": {
-  "packages": 5,
+  "packages": 6,
   "laws": 27,
   "checks_quick": 40,
   "checks_full": 48,
