@@ -172,6 +172,47 @@ def r_colsum(+n: Nat, +m: Nat, fa: String) -> IO(Unit):
     a : TA.Mat<n, m> <- load(n, m, fa)
     r_colsum2(n, m, TA.Mat.col_sums(n, m, a))
 
+# the accumulating products: C + A·B (nn, nt, tn) and s + col_sums(A) (cs), C read from fc
+def r_acc_nn(+n: Nat, +k: Nat, +m: Nat, +p: Nat, fa: String, fb: String, fc: String) -> IO(Unit):
+  do IO<Unit>:
+    a : TA.Mat<n, k> <- load(n, k, fa)
+    b : TA.Mat<k, m> <- load(k, m, fb)
+    c : TA.Mat<n, m> <- load(n, m, fc)
+    r_nn2(n, k, m, TA.Mat.matmul_acc(n, k, m, p, a, b, c))
+
+def r_acc_nt(+n: Nat, +k: Nat, +m: Nat, +p: Nat, fa: String, fb: String, fc: String) -> IO(Unit):
+  do IO<Unit>:
+    a : TA.Mat<n, k> <- load(n, k, fa)
+    b : TA.Mat<m, k> <- load(m, k, fb)
+    c : TA.Mat<n, m> <- load(n, m, fc)
+    r_nt2(n, k, m, TA.Mat.matmul_nt_acc(n, k, m, p, a, b, c))
+
+def r_acc_tn(+n: Nat, +k: Nat, +m: Nat, +p: Nat, fa: String, fb: String, fc: String) -> IO(Unit):
+  do IO<Unit>:
+    a : TA.Mat<k, n> <- load(k, n, fa)
+    b : TA.Mat<k, m> <- load(k, m, fb)
+    c : TA.Mat<n, m> <- load(n, m, fc)
+    r_tn2(n, k, m, TA.Mat.matmul_tn_acc(n, k, m, p, a, b, c))
+
+def r_acc_cs(+n: Nat, +m: Nat, fa: String, fc: String) -> IO(Unit):
+  do IO<Unit>:
+    a : TA.Mat<n, m> <- load(n, m, fa)
+    c : TA.Mat<1n, m> <- load(1n, m, fc)
+    r_colsum2(n, m, TA.Mat.col_sums_acc(n, m, a, c))
+
+def r_acc(nn: Bool, nt: Bool, tn: Bool, cs: Bool, args: List<String>) -> IO(Unit):
+  match nn nt tn cs args:
+    case True{} _ _ _ Con{p, Con{n, Con{k, Con{m, Con{fa, Con{fb, Con{fc, Nil{}}}}}}}}:
+      r_acc_nn(nat(n), nat(k), nat(m), nat(p), fa, fb, fc)
+    case False{} True{} _ _ Con{p, Con{n, Con{k, Con{m, Con{fa, Con{fb, Con{fc, Nil{}}}}}}}}:
+      r_acc_nt(nat(n), nat(k), nat(m), nat(p), fa, fb, fc)
+    case False{} False{} True{} _ Con{p, Con{n, Con{k, Con{m, Con{fa, Con{fb, Con{fc, Nil{}}}}}}}}:
+      r_acc_tn(nat(n), nat(k), nat(m), nat(p), fa, fb, fc)
+    case False{} False{} False{} True{} Con{n, Con{m, Con{fa, Con{fc, Nil{}}}}}:
+      r_acc_cs(nat(n), nat(m), fa, fc)
+    case _ _ _ _ _:
+      IO.print("invalid usage")
+
 def labs(+bs: List<&2, U32>) -> List<&2, Nat>:
   match bs:
     case Nil{}:
@@ -298,10 +339,19 @@ def dispatch1(isb: Bool, +mode: String, rest: List<String>) -> IO(Unit):
     case False{} xs:
       dispatch2(String.eq(mode, "nn"), String.eq(mode, "nt"), String.eq(mode, "tn"), String.eq(mode, "bias"), String.eq(mode, "relu"), String.eq(mode, "relu_bwd"), String.eq(mode, "sgd"), String.eq(mode, "add"), String.eq(mode, "colsum"), String.eq(mode, "ce"), String.eq(mode, "hits"), xs)
 
+def dispatch0(isa: Bool, +mode: String, rest: List<String>) -> IO(Unit):
+  match isa rest:
+    case True{} Con{+l, xs}:
+      r_acc(String.eq(l, "nn"), String.eq(l, "nt"), String.eq(l, "tn"), String.eq(l, "cs"), xs)
+    case True{} _:
+      IO.print("invalid usage")
+    case False{} xs:
+      dispatch1(String.eq(mode, "bands"), mode, xs)
+
 def dispatch(args: List<String>) -> IO(Unit):
   match args:
     case Con{prog, Con{+mode, rest}}:
-      dispatch1(String.eq(mode, "bands"), mode, rest)
+      dispatch0(String.eq(mode, "acc"), mode, rest)
     case _:
       IO.print("invalid usage")
 

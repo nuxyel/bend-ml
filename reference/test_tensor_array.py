@@ -49,6 +49,18 @@ def main():
             check(f"matmul nt   {n}x{k}·({m}x{k})ᵀ par=2", bend("nt", 2, n, k, m, w("a", A), w("bt", B.T.copy())), A @ B)
             check(f"matmul tn   ({k}x{n})ᵀ·{k}x{m} par=2", bend("tn", 2, n, k, m, w("at", A.T.copy()), w("b", B)), A @ B)
 
+        # the accumulating products (0.1.10.0): C + A·B into C, on one row and on several, sequential and parallel
+        for (n, k, m) in [(1, 7, 5), (2, 3, 4), (9, 5, 11), (16, 20, 8), (100, 12, 10)]:
+            A = rng.standard_normal((n, k)).astype(np.float32)
+            B = rng.standard_normal((k, m)).astype(np.float32)
+            C = rng.standard_normal((n, m)).astype(np.float32)
+            for par in (0, 2):
+                check(f"matmul_acc    C + {n}x{k}·{k}x{m} par={par}", bend("acc", "nn", par, n, k, m, w("a", A), w("b", B), w("c", C)), C + A @ B)
+                check(f"matmul_nt_acc C + {n}x{k}·({m}x{k})ᵀ par={par}", bend("acc", "nt", par, n, k, m, w("a", A), w("bt", B.T.copy()), w("c", C)), C + A @ B)
+                check(f"matmul_tn_acc C + ({k}x{n})ᵀ·{k}x{m} par={par}", bend("acc", "tn", par, n, k, m, w("at", A.T.copy()), w("b", B), w("c", C)), C + A @ B)
+            s = rng.standard_normal(m).astype(np.float32)
+            check(f"col_sums_acc  s + col_sums {n}x{m}", bend("acc", "cs", n, m, w("x", C), w("s", s)), s + C.sum(axis=0))
+
         X = rng.standard_normal((6, 5)).astype(np.float32) * 2
         b = rng.standard_normal(5).astype(np.float32)
         check("add_row (bias)", bend("bias", 6, 5, w("x", X), w("b", b)), X + b)
