@@ -481,9 +481,22 @@ def snd_nat(r: Nat & Nat) -> Nat:
     case Tuple{d, p}:
       p
 
-# the depth d such that an Array with 2^d slots holds n elements
-def cap_depth(n: Nat) -> Nat:
-  fst_nat(cap_pair(n))
+# the same pair by doubling (0.1.10.0): p doubles until n <= p, log2(n) steps in a tail loop, where cap_pair takes n
+# steps of a recursion that is not a tail call, each with a comparison of up to n steps. Its fuel is n, which always
+# suffices (2^n >= n); if it ran out, the answer would be cap_pair's, so the law below needs no arithmetic about how
+# many doublings there are. ok is leb(n, p), computed by the caller (match only inspects a parameter).
+def cap_dbl(f: Nat, ok: Bool, +n: Nat, +d: Nat, +p: Nat) -> Nat & Nat:
+  match f ok:
+    case _ True{}:
+      (d, p)
+    case 0n False{}:
+      cap_pair(n)
+    case 1n+g False{}:
+      cap_dbl(g, leb(n, Nat.add(p, p)), n, 1n+d, Nat.add(p, p))
+
+# the depth d such that an Array with 2^d slots holds n elements (the smallest such d)
+def cap_depth(+n: Nat) -> Nat:
+  fst_nat(cap_dbl(n, leb(n, 1n), n, 0n, 1n))
 
 # ---- lemmas ----
 
@@ -574,7 +587,18 @@ def cap_inv(n: Nat) -> {snd_nat(cap_pair(n)) == pow2(fst_nat(cap_pair(n))) : Nat
     case 1n++m:
       cap_succ(m, cap_inv(m))
 
-def cap_final(n: Nat, pr: {snd_nat(cap_pair(n)) == pow2(fst_nat(cap_pair(n))) : Nat} & {True{} == leb(n, snd_nat(cap_pair(n))) : Bool}) -> {True{} == leb(n, pow2(cap_depth(n))) : Bool}:
+# the invariant of cap_dbl: whichever way it ends (n <= p found, or the fuel out and cap_pair's answer), the second
+# component is 2^(first) and is >= n
+def dbl_inv(f: Nat, ok: Bool, +n: Nat, +d: Nat, +p: Nat, e: {ok == leb(n, p) : Bool}, i1: {p == pow2(d) : Nat}) -> {snd_nat(cap_dbl(f, ok, n, d, p)) == pow2(fst_nat(cap_dbl(f, ok, n, d, p))) : Nat} & {True{} == leb(n, snd_nat(cap_dbl(f, ok, n, d, p))) : Bool}:
+  match f ok:
+    case _ True{}:
+      (i1, e)
+    case 0n False{}:
+      cap_inv(n)
+    case 1n+g False{}:
+      dbl_inv(g, leb(n, Nat.add(p, p)), n, 1n+d, Nat.add(p, p), {==}, step_eq(d, p, i1))
+
+def dbl_final(n: Nat, pr: {snd_nat(cap_dbl(n, leb(n, 1n), n, 0n, 1n)) == pow2(fst_nat(cap_dbl(n, leb(n, 1n), n, 0n, 1n))) : Nat} & {True{} == leb(n, snd_nat(cap_dbl(n, leb(n, 1n), n, 0n, 1n))) : Bool}) -> {True{} == leb(n, pow2(cap_depth(n))) : Bool}:
   match pr:
     case Tuple{i1, i2}:
       %i1 : {True{} == leb(n, _) : Bool}
@@ -586,7 +610,7 @@ law cap_ok:
   {True{} == leb(n, pow2(cap_depth(n))) : Bool}
 
 def cap_ok(n):
-  cap_final(n, cap_inv(n))
+  dbl_final(n, dbl_inv(n, leb(n, 1n), n, 0n, 1n, {==}, {==}))
 
 # r x c of zeros, with the exact capacity (smallest power of 2)
 
