@@ -91,6 +91,10 @@ def main():
         run("compile tensor-array/tests/split.bend", [BEND, "tensor-array/tests/split.bend", "-o", split])
         run("split_depth picks 0 or par, and par 4 gives par 0's bits (tensor-array/tests/split.bend)", [split, "--threads", "16"],
             lambda o, c: o.strip() == '"0 3 0 0 3 0 4\\n0 0 0 0 0 0"')
+        parseq = os.path.join(d, "parseq")
+        run("compile tensor-array/tests/parseq.bend", [BEND, "tensor-array/tests/parseq.bend", "-o", parseq])
+        run("parallel = sequential: 11,664 products at depths 1-4 give depth 0's bits (tensor-array/tests/parseq.bend)", [parseq, "--threads", "16"],
+            lambda o, c: o.strip() == '"0 11664"')
     run("tensor-array/tests/checked.bend rejects wrong label counts", [BEND, "tensor-array/tests/checked.bend"], lambda o, c: o.strip() == "[1n, 0n, 0n, 1n, 0n, 0n]")
 
     # 3. tests against the Python references
