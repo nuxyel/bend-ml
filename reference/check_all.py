@@ -87,6 +87,10 @@ def main():
         cap = os.path.join(d, "cap")
         run("compile tensor-array/tests/cap.bend", [BEND, "tensor-array/tests/cap.bend", "-o", cap])
         run("cap_depth by doubling equals the n-step cap_pair (tensor-array/tests/cap.bend)", [cap], lambda o, c: o.strip() == "0")
+        split = os.path.join(d, "split")
+        run("compile tensor-array/tests/split.bend", [BEND, "tensor-array/tests/split.bend", "-o", split])
+        run("split_depth picks 0 or par, and par 4 gives par 0's bits (tensor-array/tests/split.bend)", [split, "--threads", "16"],
+            lambda o, c: o.strip() == '"0 3 0 0 3 0 4\\n0 0 0 0 0 0"')
     run("tensor-array/tests/checked.bend rejects wrong label counts", [BEND, "tensor-array/tests/checked.bend"], lambda o, c: o.strip() == "[1n, 0n, 0n, 1n, 0n, 0n]")
 
     # 3. tests against the Python references
