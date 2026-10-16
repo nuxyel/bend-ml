@@ -50,7 +50,7 @@ import bend-ml-bpe-tokenizer@0.1.3.0/main.bend as BPE
 
 <p align="center"><img src="docs/media/shots/law-roundtrip.png" alt="The roundtrip law as Bend states it, and ALL PROOFS CHECK" width="80%"></p>
 
-<p align="center"><img src="docs/media/diagram.svg" alt="The five packages: nat-lemmas is imported by bpe-tokenizer, tensor and autograd; tensor-array stands alone; the GPT-2 demo uses bpe-tokenizer, tensor and tensor-array; the MNIST demo uses tensor and tensor-array" width="90%"></p>
+<p align="center"><img src="docs/media/diagram.svg" alt="The six packages: nat-lemmas is imported by bpe-tokenizer, tensor and autograd; tensor-array stands alone; binary-read is foreign code; the GPT-2 demo uses bpe-tokenizer, tensor, tensor-array and binary-read; the MNIST demo uses tensor and tensor-array" width="90%"></p>
 
 Every package passes `bend X/main.bend --verdict`, the re-check by Bend's Lean-proved kernel, with no `@unsafe` and no
 `?TODO`. Numbers are a different matter: `F32` is not a real number, so the numerics are tested against PyTorch, NumPy and
