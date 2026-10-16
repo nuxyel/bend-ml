@@ -122,7 +122,10 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
   and `Mat.col_sums_acc`, which add the product into a matrix they are given instead of returning a new one. Each cell
   of the product is computed as before and added once to the cell of C, so the result has the bits of `Mat.add(C,
   A·B)` (`tests/acc.bend`, on every path and layout), without allocating the product and walking it a second time. The
-  other functions are unchanged and give the same bits as 0.1.9.0.
+  other functions are unchanged and give the same bits as 0.1.9.0. The capacity of a new array (`cap_depth`, the
+  smallest `d` with `n <= 2^d`, behind the law `cap_ok`) is now found by doubling, in log2(n) steps of a tail loop,
+  instead of n steps each with a comparison of up to n steps: the same capacity (`tests/cap.bend`), 2% off an MNIST
+  training epoch in the native build, and the difference between 247 s and 4.3 s for 50 batches in the JavaScript build.
 - `0.1.9.0`: the parallel products in cells of 8 no longer copy both operands at every node of
   the fork tree. The larger operand is packed straight into one piece per block (a block owns its piece), and the
   smaller one is copied once per node; the inner loop carries its four sums as arguments instead of a record per step.
