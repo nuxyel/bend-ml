@@ -733,32 +733,28 @@ def pk_line(tl: Nat, +q0: U32, +lim: U32, +base: U32, +st: U32, +o: U32, r: PK) 
     case 1n+q PK{a, t}:
       pk_line(q, (q0 + 8 : U32), lim, (base + (st * 8 : U32) : U32), st, (o + 1 : U32), pk_g0(q0, lim, base, st, o, t, Array.get(F32, a, base)))
 
-# lines count lines; line i starts at i * lstep (in a), its cells at i * tku (in t)
-def pk_lines(cnt: Nat, +tk: Nat, +tku: U32, +ku: U32, +i: U32, +lstep: U32, +st: U32, r: PK) -> PK:
+# lines count lines; source line i starts at i * lstep (in a), and goes to cell row o (cells o * tku .. in t)
+def pk_lines(cnt: Nat, +tk: Nat, +tku: U32, +ku: U32, +i: U32, +o: U32, +lstep: U32, +st: U32, r: PK) -> PK:
   match cnt:
     case 0n:
       r
     case 1n+p:
-      pk_lines(p, tk, tku, ku, (i + 1 : U32), lstep, st, pk_line(tk, 0, ku, (i * lstep : U32), st, (i * tku : U32), r))
+      pk_lines(p, tk, tku, ku, (i + 1 : U32), (o + 1 : U32), lstep, st, pk_line(tk, 0, ku, (i * lstep : U32), st, (o * tku : U32), r))
 
 def pk_pack(+cnt: Nat, +tk: Nat, +k: Nat, +lstep: U32, +st: U32, a: Array<F32>) -> PK:
-  pk_lines(cnt, tk, U32.from_nat(tk), U32.from_nat(k), 0, lstep, st, PK{a, Array.new(T8, cap_depth(Nat.mul(cnt, tk)), t8_zero())})
+  pk_lines(cnt, tk, U32.from_nat(tk), U32.from_nat(k), 0, 0, lstep, st, PK{a, Array.new(T8, cap_depth(Nat.mul(cnt, tk)), t8_zero())})
+
+# the dot of two lines of cells: tk cells from ia (in a) and ib (in b); ra, rb hold the arrays and the cells at ia, ib,
+# already read. Product q of a cell goes to sum q mod 4, the first four before the last four, as dotr adds them.
+def t8_dot(tk: Nat, +ia: U32, +ib: U32, s0: F32, s1: F32, s2: F32, s3: F32, ra: Array<T8> & T8, rb: Array<T8> & T8) -> TD:
+  match tk ra rb:
+    case 0n Tuple{a, x} Tuple{b, y}:
+      TD{a, b, s0, s1, s2, s3}
+    case 1n+p Tuple{a, T8{x0, x1, x2, x3, x4, x5, x6, x7}} Tuple{b, T8{y0, y1, y2, y3, y4, y5, y6, y7}}:
+      t8_dot(p, (ia + 1 : U32), (ib + 1 : U32), ((s0 + (x0 * y0 : F32) : F32) + (x4 * y4 : F32) : F32), ((s1 + (x1 * y1 : F32) : F32) + (x5 * y5 : F32) : F32), ((s2 + (x2 * y2 : F32) : F32) + (x6 * y6 : F32) : F32), ((s3 + (x3 * y3 : F32) : F32) + (x7 * y7 : F32) : F32), Array.get(T8, a, (ia + 1 : U32)), Array.get(T8, b, (ib + 1 : U32)))
 
 type TD is Type:
   TD{a: Array<T8>, b: Array<T8>, s0: F32, s1: F32, s2: F32, s3: F32}
-
-# product q of a cell goes to sum q mod 4, the first four before the last four, as dotr adds them
-def t8_step(s0: F32, s1: F32, s2: F32, s3: F32, ra: Array<T8> & T8, rb: Array<T8> & T8) -> TD:
-  match ra rb:
-    case Tuple{a2, T8{x0, x1, x2, x3, x4, x5, x6, x7}} Tuple{b2, T8{y0, y1, y2, y3, y4, y5, y6, y7}}:
-      TD{a2, b2, ((s0 + (x0 * y0 : F32) : F32) + (x4 * y4 : F32) : F32), ((s1 + (x1 * y1 : F32) : F32) + (x5 * y5 : F32) : F32), ((s2 + (x2 * y2 : F32) : F32) + (x6 * y6 : F32) : F32), ((s3 + (x3 * y3 : F32) : F32) + (x7 * y7 : F32) : F32)}
-
-def t8_dot(tk: Nat, +ia: U32, +ib: U32, d: TD) -> TD:
-  match tk d:
-    case 0n d:
-      d
-    case 1n+p TD{a, b, s0, s1, s2, s3}:
-      t8_dot(p, (ia + 1 : U32), (ib + 1 : U32), t8_step(s0, s1, s2, s3, Array.get(T8, a, ia), Array.get(T8, b, ib)))
 
 # dotr's final sum after k products: the sums sit rotated by k mod 4 when its loop ends
 def t8_comb(+rot: Nat, +s0: F32, +s1: F32, +s2: F32, +s3: F32) -> F32:
@@ -781,7 +777,7 @@ def t8_fin(+rot: Nat, d: TD) -> TR:
       TR{a, b, t8_comb(rot, s0, s1, s2, s3)}
 
 def t8_cell(+tk: Nat, +tku: U32, +rot: Nat, +i: U32, +j: U32, a: Array<T8>, b: Array<T8>) -> TR:
-  t8_fin(rot, t8_dot(tk, (i * tku : U32), (j * tku : U32), TD{a, b, 0.0, 0.0, 0.0, 0.0}))
+  t8_fin(rot, t8_dot(tk, (i * tku : U32), (j * tku : U32), 0.0, 0.0, 0.0, 0.0, Array.get(T8, a, (i * tku : U32)), Array.get(T8, b, (j * tku : U32))))
 
 type TG is Type:
   TG{a: Array<T8>, b: Array<T8>, c: Array<F32>}
@@ -829,14 +825,6 @@ def t8_lfin(l: TL) -> List<&2, F32>:
     case TL{a, b, out}:
       List.reverse(&2, F32, out)
 
-def t8_lpar(d: Nat, +cnt: Nat, +m: Nat, +tk: Nat, +tku: U32, +rot: Nat, +i: U32, ra: Array<T8> & Array<T8>, rb: Array<T8> & Array<T8>) -> List<&2, F32>:
-  match d ra rb:
-    case 0n Tuple{a, a2} Tuple{b, b2}:
-      t8_lfin(t8_lrows(cnt, m, tk, tku, rot, i, TL{a, b, Nil{}}))
-    case 1n++q Tuple{a, a2} Tuple{b, b2}:
-      x y = t8_lpar(q, Nat.div(cnt, 2n), m, tk, tku, rot, i, Array.clone(T8, a), Array.clone(T8, b)) t8_lpar(q, Nat.sub(cnt, Nat.div(cnt, 2n)), m, tk, tku, rot, (i + U32.from_nat(Nat.div(cnt, 2n)) : U32), Array.clone(T8, a2), Array.clone(T8, b2))
-      List.append(&2, F32, x, y)
-
 type PKK is Type:
   PKK{a: Array<F32>, b: Array<F32>, ta: Array<T8>, tb: Array<T8>}
 
@@ -855,21 +843,116 @@ def t8_out_seq(+n: Nat, +m: Nat, +tk: Nat, +tku: U32, +rot: Nat, c: Array<F32>, 
     case PKK{a, b, ta, tb}:
       t8_g(a, b, t8_rows(n, m, tk, tku, rot, 0, U32.from_nat(m), TG{ta, tb, c}))
 
-def t8_out_par(d: Nat, +n: Nat, +m: Nat, +tk: Nat, +tku: U32, +rot: Nat, c: Array<F32>, p: PKK) -> G:
-  match p:
-    case PKK{a, b, ta, tb}:
-      G{a, b, write_l(t8_lpar(d, n, m, tk, tku, rot, 0, Array.clone(T8, ta), Array.clone(T8, tb)), 0, c)}
+# ---- the parallel path (0.1.9.0): the larger operand is packed into one piece per block, so a block owns its piece;
+# the other operand is copied once per node of the fork tree (2^d - 1 copies), instead of both at every node ----
 
-def gemm_t8b(d: Nat, +n: Nat, +m: Nat, +k: Nat, +tk: Nat, +tku: U32, +rot: Nat, c: Array<F32>, p: PKK) -> G:
+type PT is Type:
+  PLeaf{t: Array<T8>}
+  PNode{l: PT, r: PT}
+
+type PKT is Type:
+  PKT{a: Array<F32>, t: PT}
+
+def pkt_leaf(r: PK) -> PKT:
+  match r:
+    case PK{a, t}:
+      PKT{a, PLeaf{t}}
+
+def pkt_then(r: PKT, k: Array<F32> -> PT -> PKT) -> PKT:
+  match r:
+    case PKT{a, t}:
+      k(a, t)
+
+# lines i .. i+cnt-1 of a, packed into 2^d pieces (halves of the line count, as the fork tree splits them)
+def pk_tree(+d: Nat, +cnt: Nat, +i: U32, +tk: Nat, +tku: U32, +ku: U32, +lstep: U32, +st: U32, a: Array<F32>) -> PKT:
   match d:
     case 0n:
-      t8_out_seq(n, m, tk, tku, rot, c, p)
+      pkt_leaf(pk_lines(cnt, tk, tku, ku, i, 0, lstep, st, PK{a, Array.new(T8, cap_depth(Nat.mul(cnt, tk)), t8_zero())}))
     case 1n+q:
-      t8_out_par(1n+q, n, m, tk, tku, rot, c, p)
+      pkt_then(pk_tree(q, Nat.div(cnt, 2n), i, tk, tku, ku, lstep, st, a), a2 => l => pkt_then(pk_tree(q, Nat.sub(cnt, Nat.div(cnt, 2n)), (i + U32.from_nat(Nat.div(cnt, 2n)) : U32), tk, tku, ku, lstep, st, a2), a3 => r => PKT{a3, PNode{l, r}}))
+
+def t8_with2(-R: Type, p: Array<T8> & Array<T8>, k: Array<T8> -> Array<T8> -> R) -> R:
+  match p:
+    case Tuple{x, y}:
+      k(x, y)
+
+# split by rows of C: the pieces are A's rows, B is shared; the result is C's rows in order
+def t8_rpar(t: PT, +cnt: Nat, +m: Nat, +tk: Nat, +tku: U32, +rot: Nat, b: Array<T8>) -> List<&2, F32>:
+  match t:
+    case PLeaf{a}:
+      t8_lfin(t8_lrows(cnt, m, tk, tku, rot, 0, TL{a, b, Nil{}}))
+    case PNode{l, r}:
+      t8_with2(List<&2, F32>, Array.clone(T8, b), b1 => b2 => (
+        x y = t8_rpar(l, Nat.div(cnt, 2n), m, tk, tku, rot, b1) t8_rpar(r, Nat.sub(cnt, Nat.div(cnt, 2n)), m, tk, tku, rot, b2)
+        List.append(&2, F32, x, y)))
+
+# a block of C's columns j0 .. j0+w-1 for every row, row by row
+type CB is Data:
+  CB{j0: U32, w: Nat, xs: List<&2, F32>}
+
+# split by columns of C: the pieces are B's columns, A is shared
+def t8_cpar(t: PT, +cnt: Nat, +j0: U32, +n: Nat, +tk: Nat, +tku: U32, +rot: Nat, a: Array<T8>) -> List<&2, CB>:
+  match t:
+    case PLeaf{b}:
+      [CB{j0, cnt, t8_lfin(t8_lrows(n, cnt, tk, tku, rot, 0, TL{a, b, Nil{}}))}]
+    case PNode{l, r}:
+      t8_with2(List<&2, CB>, Array.clone(T8, a), a1 => a2 => (
+        x y = t8_cpar(l, Nat.div(cnt, 2n), j0, n, tk, tku, rot, a1) t8_cpar(r, Nat.sub(cnt, Nat.div(cnt, 2n)), (j0 + U32.from_nat(Nat.div(cnt, 2n)) : U32), n, tk, tku, rot, a2)
+        List.append(&2, CB, x, y)))
+
+type RW is Type:
+  RW{c: Array<F32>, xs: List<&2, F32>}
+
+# w numbers of xs into c from idx; what is left of xs comes back
+def cb_row(w: Nat, +idx: U32, c: Array<F32>, xs: List<&2, F32>) -> RW:
+  match w xs:
+    case 1n+p Con{h, t}:
+      cb_row(p, (idx + 1 : U32), Array.set(F32, c, idx, h), t)
+    case _ _:
+      RW{c, xs}
+
+def cb_rows(n: Nat, +i: U32, +j0: U32, +w: Nat, +mu: U32, r: RW) -> Array<F32>:
+  match n r:
+    case 0n RW{c, xs}:
+      c
+    case 1n+p RW{c, xs}:
+      cb_rows(p, (i + 1 : U32), j0, w, mu, cb_row(w, ((i * mu : U32) + j0 : U32), c, xs))
+
+def cb_write(bs: List<&2, CB>, +n: Nat, +mu: U32, c: Array<F32>) -> Array<F32>:
+  match bs:
+    case Nil{}:
+      c
+    case Con{CB{+j0, +w, xs}, t}:
+      cb_write(t, n, mu, cb_rows(n, 0, j0, w, mu, RW{c, xs}))
+
+def t8_pr2(+n: Nat, +m: Nat, +tk: Nat, +tku: U32, +rot: Nat, c: Array<F32>, ra: PKT, rb: PK) -> G:
+  match ra rb:
+    case PKT{a, t} PK{b, tb}:
+      G{a, b, write_l(t8_rpar(t, n, m, tk, tku, rot, tb), 0, c)}
+
+def t8_pc2(+n: Nat, +m: Nat, +tk: Nat, +tku: U32, +rot: Nat, c: Array<F32>, ra: PK, rb: PKT) -> G:
+  match ra rb:
+    case PK{a, ta} PKT{b, t}:
+      G{a, b, cb_write(t8_cpar(t, m, 0, n, tk, tku, rot, ta), n, U32.from_nat(m), c)}
+
+# 2^d blocks along the larger of n (rows of C, pieces of A) and m (columns of C, pieces of B)
+def t8_par2(byrows: Bool, d: Nat, +n: Nat, +m: Nat, +k: Nat, +tk: Nat, +tku: U32, +rot: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
+  match byrows:
+    case True{}:
+      t8_pr2(n, m, tk, tku, rot, c, pk_tree(d, n, 0, tk, tku, U32.from_nat(k), arow, sa, a), pk_pack(m, tk, k, bcol, sb, b))
+    case False{}:
+      t8_pc2(n, m, tk, tku, rot, c, pk_pack(n, tk, k, arow, sa, a), pk_tree(d, m, 0, tk, tku, U32.from_nat(k), bcol, sb, b))
+
+def gemm_t8b(d: Nat, +n: Nat, +m: Nat, +k: Nat, +tk: Nat, +tku: U32, +rot: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
+  match d:
+    case 0n:
+      t8_out_seq(n, m, tk, tku, rot, c, t8_pk2(pk_pack(n, tk, k, arow, sa, a), pk_pack(m, tk, k, bcol, sb, b)))
+    case 1n+q:
+      t8_par2(Nat.is_le(m, n), 1n+q, n, m, k, tk, tku, rot, arow, sa, sb, bcol, a, b, c)
 
 # C (n x m) = A · B in cells of 8, sequential (d = 0) or with 2^d blocks of rows in parallel; A and B come back intact
 def gemm_t8(d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
-  gemm_t8b(d, n, m, k, Nat.div(Nat.add(k, 7n), 8n), U32.from_nat(Nat.div(Nat.add(k, 7n), 8n)), Nat.mod(k, 4n), c, t8_pk2(pk_pack(n, Nat.div(Nat.add(k, 7n), 8n), k, arow, sa, a), pk_pack(m, Nat.div(Nat.add(k, 7n), 8n), k, bcol, sb, b)))
+  gemm_t8b(d, n, m, k, Nat.div(Nat.add(k, 7n), 8n), U32.from_nat(Nat.div(Nat.add(k, 7n), 8n)), Nat.mod(k, 4n), arow, sa, sb, bcol, a, b, c)
 
 # one row (matrix · vector): the scalar loop, by columns in parallel when d > 0; two or more rows: cells of 8
 def gemm_any3(one: Bool, d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
