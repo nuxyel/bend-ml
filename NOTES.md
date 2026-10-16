@@ -970,3 +970,14 @@ The pass it removes is proportional to the weights and the product to the weight
 the batch shrinks. On an MLP training epoch on MNIST the whole run is 3% faster (4.25 to 4.12 s, 15 rounds). At these
 sizes the parallel product (8 blocks, 16 threads) was slower than one thread for both versions (455 against 260 ms at
 32 x 1536 x 576): with few rows, splitting and joining costs more than it saves.
+
+The same version also changes how a new array's capacity is computed. `cap_depth(n)`, the smallest `d` with
+`n <= 2^d`, came from `cap_pair`, a recursion on `n` (not a tail call) where each step compares two unary numbers, up to
+`n` steps: quadratic in `n` when it runs at run time. In the JavaScript build it overflowed the stack on any array of more
+than ~40,000 numbers, and with a larger stack it was 98% of the time of an MNIST run (247 s for 50 batches against 4.3 s
+with the fix). `cap_dbl` doubles a power of two until it holds `n`, log2(n) steps in a tail loop. Its fuel is `n`,
+always enough; if it ran out the answer would be `cap_pair`'s, so the law `cap_ok` (`n <= 2^cap_depth(n)`) is proved by
+the same lemmas and no arithmetic about the number of doublings (`--verdict` ok). `tests/cap.bend` checks that both give
+the same depth for every `n` up to 2000 and that the depth is the smallest at four large sizes. Native builds gain
+too, a little: an MNIST training epoch 4.26 to 4.19 s on one thread.
+
