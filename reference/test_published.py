@@ -63,8 +63,55 @@ def main() -> Nat:
 """
 
 
+# bend-ml-binary-read is foreign code (no laws): read 1.0 and -2.5 back from a file, on the JS and the C lane
+READ = """import Base
+import {br}/main.bend as R
+
+def show3(r: Array<F32> & F32) -> String:
+  match r:
+    case Tuple{{a, x}}:
+      F32.show(x)
+
+def show2(r: Array<F32> & F32) -> String:
+  match r:
+    case Tuple{{a, x}}:
+      F32.show(x) ++ " " ++ show3(Array.get(F32, a, 1))
+
+def show(p: File & (Array<F32> & Result<&1, &1, U32 & String, U32>)) -> IO(Unit):
+  match p:
+    case Tuple{{f, Tuple{{a, r}}}}:
+      do IO<Unit>:
+        +n : U32 <- IO.pass(U32, r)
+        File.close(f)
+        IO.print(U32.show(n) ++ " " ++ show2(Array.get(F32, a, 0)))
+
+def main() -> IO(Unit):
+  do IO<Unit>:
+    f : File <- IO.try(File, File.open("w.bin", "r"))
+    p : File & (Array<F32> & Result<&1, &1, U32 & String, U32>) <- R.read_f32(f, 0, 2, Array.new(F32, 1n, 0.0))
+    show(p)
+"""
+
+
+def check_read():
+    br = f"bend-ml-binary-read@{VERS['bend-ml-binary-read']}"
+    with tempfile.TemporaryDirectory() as d:
+        open(os.path.join(d, "w.bin"), "wb").write(bytes([0, 0, 128, 63, 0, 0, 32, 192]))
+        f = os.path.join(d, "read.bend")
+        open(f, "w").write(READ.format(br=br))
+        js = subprocess.run([BEND, f], capture_output=True, text=True, env=ENV, cwd=d)
+        cc = subprocess.run([BEND, f, "-o", os.path.join(d, "read")], capture_output=True, text=True, env=ENV, cwd=d)
+        c = subprocess.run([os.path.join(d, "read")], capture_output=True, text=True, cwd=d) if cc.returncode == 0 else cc
+    outs = [js.stdout.strip(), c.stdout.strip()]
+    ok = outs == ["8 1 -2.5", "8 1 -2.5"]
+    print(("ok   " if ok else "ERROR ") + f"published {br.replace('bend-ml-', '')} on the JS and C lanes")
+    if not ok:
+        print(outs, (js.stderr + c.stderr)[:800])
+    return ok
+
+
 def main():
-    missing = [p for p in NEED if p not in VERS]
+    missing = [p for p in NEED + ["bend-ml-binary-read"] if p not in VERS]
     if missing:
         sys.exit(f"ERROR: version missing from the README table: {missing}")
     src = PROGRAM.format(nl=f"bend-ml-nat-lemmas@{VERS['bend-ml-nat-lemmas']}",
@@ -81,6 +128,7 @@ def main():
     print(("ok   " if ok else "ERROR ") + "published packages " + ", ".join(f"{k.replace('bend-ml-', '')}@{v}" for k, v in VERS.items() if k in NEED))
     if not ok:
         print(out[:800])
+    ok = check_read() and ok
     sys.exit(0 if ok else 1)
 
 
