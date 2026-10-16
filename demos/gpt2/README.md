@@ -4,7 +4,7 @@ Inference of GPT-2 small written in Bend: pre-tokenizer, BPE tokenizer with the 
 
 Two implementations, with identical output:
 
-- `fast.bend` (v1.2.2): weights in row bands (`Bands`) when there are more than 2 threads, so each matrix · vector product runs its bands in parallel without copying the weights. Every band is read from its own range of the weight file, which is size-checked first. On an idle machine, 36 forward passes take 3.5 s on 16 threads and 4.7 s on one, about 0.1 to 0.13 s per token; see `BENCHMARK.md`.
+- `fast.bend` (v1.3.2): weights in row bands (`Bands`) when there are more than 2 threads, so each matrix · vector product runs its bands in parallel without copying the weights. Every band is read straight into its array from its own range of the weight file (`bend-ml-binary-read`, since v1.3.0), which is size-checked first: the weights load in 0.8 s on one thread instead of 4.7. On an idle machine, 36 forward passes take 3.5 s on 16 threads and 4.7 s on one, about 0.1 to 0.13 s per token; see `BENCHMARK.md`.
 - `gpt2.bend` (v0.2): matrices as lists, kept as the baseline. ~3 s per token.
 
 ## Run (from the repository root)

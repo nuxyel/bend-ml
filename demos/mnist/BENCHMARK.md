@@ -4,6 +4,14 @@ Versions follow [`docs/VERSIONING.md`](../../docs/VERSIONING.md) (renumbered on 
 
 **Summary (v0.3):** the results are **identical** (same loss, same accuracy after 1 and after 3 epochs). In v0.2 Bend took **544 s per epoch** (~1800x PyTorch); in v0.3, with matrices in a flat `Array` and parallel products, it takes **6.6 s** (~33x PyTorch with 16 threads, ~22x with 1). The difference between v0.2 and v0.3 is the data structure, not the language; what is left is scalar code against BLAS/SIMD. Re-measured on 2026-10-04 on an idle machine: 7.0, 7.0 and 7.2 s per epoch for Bend (the 6.6 s of the tables below are the original runs) and 0.18 to 0.20 s for PyTorch, i.e. ~35x.
 
+## v1.3.2: the demo on `bend-ml-tensor-array@0.1.11.0` (2026-10-16)
+
+The demo had stayed on 0.1.3.0 since v0.3. On 0.1.11.0 (products in cells of 8, parallel blocks without per-block
+copies, the split chosen from the work), one epoch of SGD at lr 0.1, 5 alternated rounds, medians, one thread pinned to
+CPU 3: **17.9 → 11.9 s on one thread, 7.3 → 4.4 s on 16**. The loss moves in its last digit, 0.5204771 → 0.52047706
+(PyTorch: 0.520477), and the test hits are the same, 9129. A separate run of the same day, as the README's figures
+measure it (ms per batch, the difference of a 600- and a 50-batch run): 29.9 → 20.0 on one thread, 12.8 → 7.7 on 16; PyTorch 0.48 and 0.56.
+
 ## v0.3: flat `Array` (`demos/mnist/fast.bend`, package `bend-ml-tensor-array@0.1.1.0`)
 
 | | 1 epoch | loss / hits after 1, 2, 3 epochs |

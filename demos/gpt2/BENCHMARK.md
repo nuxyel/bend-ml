@@ -4,6 +4,14 @@ Versions follow [`docs/VERSIONING.md`](../../docs/VERSIONING.md) (renumbered on 
 
 **Summary (v0.3):** GPT-2 small with 124 M parameters runs in Bend and **generates exactly the same tokens as PyTorch**, with logits equal to within 6e-4 over 11 prompts (2e-4 on the first 3). In v0.2 it took ~3 s per token (~150x PyTorch); in v0.3 (matrix · vector products over `Array`) it takes **~0.1 s per token**: ~5x PyTorch with 16 threads (21 ms per forward pass of 11 tokens) and ~2x PyTorch with 1 thread (55 ms). What still weighs is loading the weights (9 s against ~1 s), because the 124 M numbers become trees of nodes (~1.5 GB of resident memory at the peak).
 
+## v1.3.0 to v1.3.2: loading with binary-read (2026-10-16)
+
+The bands are read straight into their arrays by `bend-ml-binary-read` instead of 1 MB blocks returned as lists of
+bytes. Against the loader of v1.2.6, 5 alternated rounds: weights loaded in 4.7 → 0.8 s on one thread, 4.1 → 0.6 s on 16,
+peak memory 1,463 → 1,416 MB, the same output logit for logit. The cost per token does not change: the evidence run of
+the same day gives 138.8 ms on one thread and 107.1 on 16 for v1.3.2, against 138.2 and 111.1 for v1.2.2; its small run
+(load and one token) 1.0 s against 5.4.
+
 ## v1.2.2: four partial sums in the dot product (package `bend-ml-tensor-array@0.1.7.0`, Bend 2.0.36)
 
 The dot product inside every matrix product keeps four partial sums, rotated at each step, instead of one

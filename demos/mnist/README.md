@@ -4,7 +4,7 @@ A two-layer network trained with plain SGD. **Every matrix product, every gradie
 
 There are two implementations, with identical results:
 
-- `fast.bend` (v2): written with [`bend-ml-tensor-array`](../../tensor-array) (flat `Array`, parallel products). **about 7 s per epoch** (6.6 s in the original runs, 7.0 to 7.2 s when re-measured on 2026-10-04).
+- `fast.bend`: written with [`bend-ml-tensor-array`](../../tensor-array) (flat `Array`, parallel products). Since v1.3.2, on `tensor-array` 0.1.11.0: **4.4 s per epoch on 16 threads, 11.9 s on one** (7.3 s and 17.9 s on 0.1.3.0, which it used from v0.3 to v1.3.1; 2026-10-16, 5 alternated rounds).
 - `train.bend` (v1): matrices as lists, kept as the baseline. 544 s per epoch.
 
 ## Run (from the repository root)
