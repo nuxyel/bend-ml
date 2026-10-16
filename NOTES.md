@@ -1081,3 +1081,12 @@ peak 107 MB. Every output the same as before. `numbers.json` ("evidence", "rerun
 ## v1.3.2 (2026-10-16)
 
 The MNIST demo on tensor-array 0.1.11.0 and the README measured again (pull request #12, CI 61/61).
+
+## Parallel = sequential, as a property (laws track L1; 2026-10-16)
+
+`tensor-array/tests/parseq.bend` checks that every split depth 1-4 gives depth 0's bits on a grid (n, m 1-9, six values
+of k, three layouts, plain and accumulating): 11,664 products, all equal, in `make check`. Against 8 deliberate faults in
+the split, it caught three the other tests missed (a one-row product's right columns starting at the larger half; empty
+row and column blocks). The reason they were missed: `tests/acc.bend` compares two outputs of the same parallel code,
+and `reference/test_tensor_array.py`'s small shapes have run at depth 0 since `split_depth` (0.1.11.0), so the public
+API's tests no longer reached the parallel paths. A law that the split never changes a bit is the next step (L2).
