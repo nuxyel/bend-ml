@@ -946,7 +946,7 @@ step piped `make check-full` through `tee`, which hid the exit status, and the j
 puts the demo back to v1.2.4's loader and runs that step with `pipefail`; its CI ran 50/50, including the GPT-2 demo
 against PyTorch. v1.2.5's release notes point to v1.2.6.
 
-## Accumulating products (tensor-array 0.1.10.0; 2026-10-17, not published yet)
+## Accumulating products (tensor-array 0.1.10.0; 2026-10-16, not published yet)
 
 A training loop accumulates its weight gradient, `dW += Xᵀ · dY`, and with the products it had to do that in two steps:
 `Mat.matmul_tn` into a new matrix, then `Mat.add` into the gradient, a second pass over every weight plus an allocation.
