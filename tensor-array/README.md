@@ -28,10 +28,11 @@ def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 12
 | `Mat.matmul` | `Mat<n,k> · Mat<k,m> = Mat<n,m>` |
 | `Mat.matmul_nt` | `Mat<n,k> · Mat<m,k>ᵀ = Mat<n,m>` (weights with one row per output) |
 | `Mat.matmul_tn` | `Mat<k,n>ᵀ · Mat<k,m> = Mat<n,m>` (weight gradient: `Xᵀ · dY`) |
+| `Mat.matmul_acc`, `Mat.matmul_nt_acc`, `Mat.matmul_tn_acc` | the same products added into a `C: Mat<n,m>` it is given, `C + A·B`, without allocating the product (a gradient that accumulates: `dW += Xᵀ · dY`); the bits of `Mat.add(C, A·B)` |
 | `Mat.add_row` | adds a bias `Mat<1,m>` to each row of `Mat<n,m>` |
 | `Mat.relu`, `Mat.relu_bwd` | the activation and the gradient that passes through it |
 | `Mat.sgd`, `Mat.add` | `w - lr·dw` and `a + b` |
-| `Mat.col_sums` | `Mat<n,m> -> Mat<1,m>` |
+| `Mat.col_sums`, `Mat.col_sums_acc` | `Mat<n,m> -> Mat<1,m>`; the second adds the sums into a `Mat<1,m>` it is given |
 | `Mat.softmax_ce` | mean cross-entropy and its gradient `(softmax − one-hot)/n` |
 | `Mat.count_correct` | argmax hits per row |
 | `Mat.read_row`, `Mat.write_row` | a row as a list |
@@ -117,6 +118,11 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 
 ## Versions
 
+- `0.1.10.0` (not published yet): accumulating products, `Mat.matmul_acc`, `Mat.matmul_nt_acc`, `Mat.matmul_tn_acc`
+  and `Mat.col_sums_acc`, which add the product into a matrix they are given instead of returning a new one. Each cell
+  of the product is computed as before and added once to the cell of C, so the result has the bits of `Mat.add(C,
+  A·B)` (`tests/acc.bend`, on every path and layout), without allocating the product and walking it a second time. The
+  other functions are unchanged and give the same bits as 0.1.9.0.
 - `0.1.9.0`: the parallel products in cells of 8 no longer copy both operands at every node of
   the fork tree. The larger operand is packed straight into one piece per block (a block owns its piece), and the
   smaller one is copied once per node; the inner loop carries its four sums as arguments instead of a record per step.
