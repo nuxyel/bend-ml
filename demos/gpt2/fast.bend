@@ -7,11 +7,11 @@
 # Run from the repository root, after `reference/gpt2_prep.py --split`.
 
 import Base
-import bend-ml-tensor-array@0.1.7.0/main.bend as TA
+import bend-ml-tensor-array@0.1.10.0/main.bend as TA
 import bend-ml-tensor@0.1.2.0/main.bend as T
 import bend-ml-bpe-tokenizer@0.1.2.0/main.bend as BPE
 import ./load.bend as L
-import ../../binary-read/main.bend as R
+import bend-ml-binary-read@0.1.0.0/main.bend as R
 import ./tok.bend as K
 
 # the weight matrices are kept in 2^d row bands (TA.Bands), 2^(d + 1) for the 50257-row embedding, and
