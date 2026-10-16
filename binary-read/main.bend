@@ -1,5 +1,7 @@
 # bend-ml-binary-read: little-endian F32 numbers from a file, read straight into an Array<F32>.
 #
+#   import bend-ml-binary-read@0.1.0.0/main.bend as R
+#
 # File.read_at answers a List<U32> with one cell per byte, and building and walking that list is
 # what loading model weights costs (NOTES.md, exp. 13; bendlang/bend#1573). This effect reads the
 # bytes into the array's own cells instead, with no list in between. The idea and its shape come

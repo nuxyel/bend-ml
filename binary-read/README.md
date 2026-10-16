@@ -1,6 +1,6 @@
 # bend-ml-binary-read
 
-Reads little-endian `F32` numbers from a file straight into an `Array<F32>`, for loading model weights. Not published yet; it would go to BendHub as `bend-ml-binary-read@0.1.0.0`.
+Reads little-endian `F32` numbers from a file straight into an `Array<F32>`, for loading model weights. On BendHub as `bend-ml-binary-read@0.1.0.0`.
 
 - Bend: **2.0.37** · License: MIT.
 - **Foreign code.** `read_f32` is a library effect written in C (`read_f32.c`) and JavaScript (`read_f32.js`). `bend binary-read/main.bend` says so (`1 def relies on unsafe or foreign code: read_f32`), and `--verdict` fails for any file that imports it, used or not. Import it only where weights are loaded, never in a file that holds laws; none of the other bend-ml packages imports it, and `make check` checks that.
