@@ -8,7 +8,7 @@ Tensors in Bend 2 over a flat `Array<F32>`, **with the shape in the type**: the 
 
 ```python
 import Base
-import bend-ml-tensor-array@0.1.7.0/main.bend as TA
+import bend-ml-tensor-array@0.1.8.0/main.bend as TA
 
 def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 128n>:
   TA.Mat.matmul(100n, 784n, 128n, 3n, a, w)   # 3n = 2^3 = 8 parallel blocks
@@ -117,7 +117,7 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 
 ## Versions
 
-- `0.1.8.0` (not published yet): products with two or more rows (`Mat.matmul`, `Mat.matmul_nt`, `Mat.matmul_tn`) pack
+- `0.1.8.0`: products with two or more rows (`Mat.matmul`, `Mat.matmul_nt`, `Mat.matmul_tn`) pack
   A's rows and B's columns once into cells of 8 F32, so the inner loop reads 8 numbers per array access. The additions
   keep `dotr`'s order (product p to partial sum p mod 4, combined as `dotr` combines them after k products), so the
   results are the same bits as 0.1.7.0's, apart from which NaN payload comes out; `tensor-array/tests/t8.bend` checks it
