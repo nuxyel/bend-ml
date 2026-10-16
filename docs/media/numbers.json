@@ -35,9 +35,9 @@
  "project": {
   "packages": 6,
   "laws": 27,
-  "checks_quick": 40,
-  "checks_full": 48,
-  "bend": "2.0.36",
+  "checks_quick": 53,
+  "checks_full": 61,
+  "bend": "2.0.37",
   "lean": "4.34.0"
  },
  "ratios": {
