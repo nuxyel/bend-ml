@@ -937,3 +937,11 @@ the writes of C weigh as much as the work. A coarser grain (a whole step, or sev
 
 - Published: `bend-ml-tensor-array@0.1.9.0`, hash `0x4b971e2f6428dc3f80dcd5a04dedc5f2` (`--verdict` ok, no `@unsafe`). From a
   clean folder, `tests/t8.bend` against the published package gives `0 0 0 0 0 0 0 0`; `reference/test_published.py` ok.
+
+## v1.2.5 and v1.2.6 (2026-10-16)
+
+v1.2.5 released the faster products. It also carried, by mistake, a work-in-progress `demos/gpt2/fast.bend` whose loader
+imports a file that is not in the repository, so the GPT-2 demo did not compile. CI did not catch it: the full-checks
+step piped `make check-full` through `tee`, which hid the exit status, and the job passed with 48 of 50 checks. v1.2.6
+puts the demo back to v1.2.4's loader and runs that step with `pipefail`; its CI ran 50/50, including the GPT-2 demo
+against PyTorch. v1.2.5's release notes point to v1.2.6.
