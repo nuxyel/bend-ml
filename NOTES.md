@@ -1016,7 +1016,7 @@ binary-read 0.1.0.0. CI on the release pull request (#10): 59/59.
 ## The split depth from the work (tensor-array 0.1.11.0; 2026-10-16)
 
 At 8-32 rows against SmolLM2-sized weights the parallel products were slower on 16 threads than on one (B3's
-measurement). A sweep of the three products at depths 0-4 on 16 threads (bend2-lab `experiments/2026-10-16-b8-split`,
+measurement). A sweep of the three products at depths 0-4 on 16 threads (2026-10-16,
 18 shapes from MNIST, the tiny Llama and a SmolLM2-135M fine-tune, 3 rounds) shows two things:
 
 - `matmul` and `matmul_nt` gain only from 2^23 multiply-adds up (100 x 784 x 128: 1.2x at depth 4; 128 x 576 x 1536:
