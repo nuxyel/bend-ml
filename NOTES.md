@@ -1012,3 +1012,28 @@ capacity by doubling.
 
 A minor release with tensor-array 0.1.10.0 (accumulating products, the capacity by doubling) and the new
 binary-read 0.1.0.0. CI on the release pull request (#10): 59/59.
+
+## The split depth from the work (tensor-array 0.1.11.0; 2026-10-16, not published yet)
+
+At 8-32 rows against SmolLM2-sized weights the parallel products were slower on 16 threads than on one (B3's
+measurement). A sweep of the three products at depths 0-4 on 16 threads (bend2-lab `experiments/2026-10-16-b8-split`,
+18 shapes from MNIST, the tiny Llama and a SmolLM2-135M fine-tune, 3 rounds) shows two things:
+
+- `matmul` and `matmul_nt` gain only from 2^23 multiply-adds up (100 x 784 x 128: 1.2x at depth 4; 128 x 576 x 1536:
+  2.5x), and mostly at depth 4; depths 1-3 often lose against 0. The best case on 16 threads is 2.5x.
+- `matmul_tn` with a short inner dimension, a weight gradient over a few tokens, loses at every depth: 1536 x 8 x 576
+  takes 2.8 ms sequentially and 7.7-10.2 ms split. Each block hands its rows of C back as a list that is then written
+  into C, a cost per cell of C that 8 or 32 multiply-adds per cell do not pay for.
+
+`split_depth(par, n, m, k)` gives `par` when the product does at least 2^23 multiply-adds and k >= 64, and 0 otherwise;
+the six public products use it, and the kernels keep the depth they are given (so `tests/t8.bend` and `tests/acc.bend`
+still cover every parallel path). The bits do not depend on the depth: `tests/split.bend` checks the rule on its edges
+and par 4 against par 0 on 128 x 100 x 784 for the six products, on 1 and 16 threads. `make check-full` 61/61.
+
+Public API, published 0.1.10.0 against this, 16 threads, 5 rounds, ms per product at par 3: 1536 x 8 x 576 (tn) 9.28 ->
+2.82; 1536 x 32 x 576 (tn) 10.23 -> 5.89; 576 x 32 x 1536 (tn) 6.49 -> 5.83; 8 x 576 x 1536 (nt) 2.18 -> 1.77; 100 x
+128 x 10 (nt) 0.083 -> 0.034; the larger ones unchanged within the spread (1536 x 128 x 576 15.9 -> 16.3, 100 x 784 x 128
+1.39 -> 1.41, 128 x 576 x 1536 8.50 -> 8.50). BendTorch on it: `make check` the same counts, `make bits` identical; an
+MNIST epoch is unchanged (3.60 s on one thread, 3.30 on 16), since both of its large products stay above the threshold.
+Passing par 4 instead of 3 to MNIST's first layer was slower in the whole run (3.50 against 3.30 s on 16 threads), though
+faster in the micro-benchmark, so BendTorch keeps its `par` values. Left: on one thread a caller's `par` still splits.
