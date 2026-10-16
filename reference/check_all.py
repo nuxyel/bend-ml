@@ -49,6 +49,20 @@ def main():
         results.append(clean)
         print(f"{'ok  ' if clean else 'ERROR'} {f}: no @unsafe or ?TODO")
 
+    # 1b. binary-read: the one package with foreign code, kept to one def and out of the packages with laws
+    run("binary-read/main.bend: read_f32 is its only foreign def", [BEND, "binary-read/main.bend"],
+        lambda o, c: "1 def relies on unsafe or foreign code" in o and re.findall(r"^- (\S+)$", o, re.M) == ["read_f32"])
+    laws = [f"{p}/main.bend" for p in ["nat-lemmas", "bpe", "tensor", "tensor-array", "autograd"]]
+    clean = not any("binary-read" in open(os.path.join(ROOT, f)).read() for f in laws)
+    results.append(clean)
+    print(f"{'ok  ' if clean else 'ERROR'} no package with laws imports binary-read")
+    want = "".join(l[3:] for l in open(os.path.join(ROOT, "binary-read/tests/read_f32.bend")) if l.startswith("#| "))
+    run("binary-read/tests/read_f32.bend on the JS lane", [BEND, "binary-read/tests/read_f32.bend"], lambda o, c: o.strip() == want.strip())
+    with tempfile.TemporaryDirectory() as d:
+        rf = os.path.join(d, "rf")
+        run("compile binary-read/tests/read_f32.bend", [BEND, "binary-read/tests/read_f32.bend", "-o", rf])
+        run("binary-read/tests/read_f32.bend on the C lane", [rf], lambda o, c: o.strip() == want.strip())
+
     # 2. shape errors that MUST fail to check
     for f, msg in [("tensor/tests/bad_matmul.bend", "expected"), ("tensor/tests/bad_reshape.bend", "expected"), ("tensor-array/tests/bad_matmul.bend", "expected"), ("tensor-array/tests/bad_grad.bend", "expected"), ("examples/runtime_batch_bad.bend", "expected"), ("examples/symbolic_reshape_bad.bend", "expected"), ("examples/square_transpose_bad.bend", "expected"), ("tensor-array/tests/bad_bands.bend", "expected")]:
         run(f"{f} must be a type error", [BEND, f], lambda o, c, m=msg: "SOME PROOFS FAIL" in o and m in o)
