@@ -63,6 +63,10 @@ def main():
         c_out = os.path.join(d, "par_bands.c")
         run("Bands.matvec compiles to a parallel join (no sequential fallback)", [BEND, "tensor-array/tests/par_bands.bend", "-o", c_out],
             lambda o, c: c == 0 and os.path.exists(c_out) and re.search(r"FID_\w*_BMV_J\d+", open(c_out).read()) is not None)
+    with tempfile.TemporaryDirectory() as d:
+        t8 = os.path.join(d, "t8")
+        run("compile tensor-array/tests/t8.bend", [BEND, "tensor-array/tests/t8.bend", "-o", t8])
+        run("the products in cells of 8 give the scalar loop's bits (tensor-array/tests/t8.bend)", [t8], lambda o, c: o.strip().strip('"') == "0 0 0 0 0 0 0 0")
     run("tensor-array/tests/checked.bend rejects wrong label counts", [BEND, "tensor-array/tests/checked.bend"], lambda o, c: o.strip() == "[1n, 0n, 0n, 1n, 0n, 0n]")
 
     # 3. tests against the Python references
