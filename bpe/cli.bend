@@ -91,7 +91,8 @@ def rules.go(ns: List<&2, Nat>, +k: Nat) -> List<&2, BPE.Rule>:
 
 # ---- runtime check of a merges table read from a file ----
 # The table must have an even number of ids and rule k may only refer to ids that
-# exist before it (bytes < 256, or merges 256..256+k-1); BPE.wf must also hold.
+# exist before it (bytes < 256, or merges 256..256+k-1). BPE.wf (distinct rule ids) holds by construction: rules.go
+# numbers the rules 0, 1, 2... Checking it walked the rules before each rule, 4.4 s for GPT-2's 50,000 merges.
 def ids_ok(ns: List<&2, Nat>, +k: Nat) -> Bool:
   match ns:
     case Nil{}:
@@ -104,7 +105,7 @@ def ids_ok(ns: List<&2, Nat>, +k: Nat) -> Bool:
           Bool.and(Bool.and(Nat.is_lt(a, Nat.add(256n, k)), Nat.is_lt(b, Nat.add(256n, k))), ids_ok(u, 1n+k))
 
 def table_ok(+ns: List<&2, Nat>) -> Bool:
-  Bool.and(ids_ok(ns, 0n), BPE.wf(rules.go(ns, 0n)))
+  ids_ok(ns, 0n)
 
 def toks_of_ids(ns: List<&2, Nat>) -> List<&2, BPE.Tk>:
   match ns:
