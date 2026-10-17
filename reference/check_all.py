@@ -95,6 +95,10 @@ def main():
         run("compile tensor-array/tests/parseq.bend", [BEND, "tensor-array/tests/parseq.bend", "-o", parseq])
         run("parallel = sequential: 11,664 products at depths 1-4 give depth 0's bits (tensor-array/tests/parseq.bend)", [parseq, "--threads", "16"],
             lambda o, c: o.strip() == '"0 11664"')
+        onerow = os.path.join(d, "onerow")
+        run("compile tensor-array/tests/onerow.bend", [BEND, "tensor-array/tests/onerow.bend", "-o", onerow])
+        run("one row at par 4 runs the scalar loop: 50,257 x 768 gives par 0's bits (tensor-array/tests/onerow.bend)", [onerow, "--threads", "16"],
+            lambda o, c: o.strip() == '"0 0 0"')
     run("tensor-array/tests/checked.bend rejects wrong label counts", [BEND, "tensor-array/tests/checked.bend"], lambda o, c: o.strip() == "[1n, 0n, 0n, 1n, 0n, 0n]")
 
     # 3. tests against the Python references
