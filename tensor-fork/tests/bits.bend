@@ -7,6 +7,10 @@
 # the number of products: "0 0 14832". The counts sit in 16-bit fields of one U32; only "not 0" matters.
 # Second line: the six public products at par 4 against tensor-array's at par 0 on 128 x 100 by 100 x 784 (above
 # split_depth's threshold), differing words of each: "0 0 0 0 0 0".
+# Third line: matmul, matmul_nt and matmul_tn_acc at par 6 on 512 x 576 by 576 x 1536 (big enough for the packing to
+# run in blocks too), then par1..par4 with a kernel over blocks of 0..cnt-1 at depths 0..6 and cnt = 0, 1, 7, 100,
+# 1000 against the same kernel in one loop, differing words in every array (the ones only read included):
+# "0 0 0 0 0 0 0".
 import Base
 import bend-ml-tensor-array@0.1.12.0/main.bend as TA
 import ../main.bend as TF
@@ -152,8 +156,135 @@ def api(+n: Nat, +k: Nat, +m: Nat, +par: Nat, +seed: U32) -> String:
   U32.show(nn) ++ " " ++ U32.show(nt) ++ " " ++ U32.show(tn) ++ " " ++ U32.show(an) ++ " " ++ U32.show(at) ++ " " ++ U32.show(aw)
 
 
+def big() -> String:
+  +nn = diff(Nat.mul(512n, 1536n), mm_c(512n, 576n, 1536n, TF.matmul(512n, 576n, 1536n, 6n, TA.Mat{arr(Nat.mul(512n, 576n), 21)}, TA.Mat{arr(Nat.mul(576n, 1536n), 22)})), mm_c(512n, 576n, 1536n, TA.Mat.matmul(512n, 576n, 1536n, 0n, TA.Mat{arr(Nat.mul(512n, 576n), 21)}, TA.Mat{arr(Nat.mul(576n, 1536n), 22)})))
+  +nt = diff(Nat.mul(512n, 1536n), mm_nt_c(512n, 576n, 1536n, TF.matmul_nt(512n, 576n, 1536n, 6n, TA.Mat{arr(Nat.mul(512n, 576n), 23)}, TA.Mat{arr(Nat.mul(576n, 1536n), 24)})), mm_nt_c(512n, 576n, 1536n, TA.Mat.matmul_nt(512n, 576n, 1536n, 0n, TA.Mat{arr(Nat.mul(512n, 576n), 23)}, TA.Mat{arr(Nat.mul(576n, 1536n), 24)})))
+  +tn = diff(Nat.mul(576n, 1536n), mm_tn_c(576n, 512n, 1536n, TF.matmul_tn_acc(576n, 512n, 1536n, 6n, TA.Mat{arr(Nat.mul(512n, 576n), 25)}, TA.Mat{arr(Nat.mul(512n, 1536n), 26)}, TA.Mat{arr(Nat.mul(576n, 1536n), 27)})), mm_tn_c(576n, 512n, 1536n, TA.Mat.matmul_tn_acc(576n, 512n, 1536n, 0n, TA.Mat{arr(Nat.mul(512n, 576n), 25)}, TA.Mat{arr(Nat.mul(512n, 1536n), 26)}, TA.Mat{arr(Nat.mul(576n, 1536n), 27)})))
+  U32.show(nn) ++ " " ++ U32.show(nt) ++ " " ++ U32.show(tn)
+
+# ---- par1..par4: x[i] = f(i, ...) on the last array, the others read ----
+
+def k1_set(+i: U32, r: Array<F32> & F32) -> Array<F32>:
+  match r:
+    case Tuple{a, +x}:
+      Array.set(F32, a, i, ((x * 2.0 : F32) + U32.to_f32(i) : F32))
+
+def k1(k: Nat, +i: U32, a: Array<F32>) -> Array<F32>:
+  match k:
+    case 0n:
+      a
+    case 1n+q:
+      k1(q, (i + 1 : U32), k1_set(i, Array.get(F32, a, i)))
+
+def l1(+e: Unit, +i0: U32, +cnt: Nat, a: Array<F32>) -> Array<F32>:
+  k1(cnt, i0, a)
+
+def k2_add(+i: U32, +v: F32, +s: F32, x: Array<F32>, r: Array<F32> & F32) -> TF.B2<F32, F32>:
+  match r:
+    case Tuple{y, +w}:
+      TF.B2{x, Array.set(F32, y, i, ((v * s : F32) + w : F32))}
+
+# y[i] = x[i] * s + y[i], for the arrays (x, y)
+def k2_set(+i: U32, +s: F32, y: Array<F32>, r: Array<F32> & F32) -> TF.B2<F32, F32>:
+  match r:
+    case Tuple{x, +v}:
+      k2_add(i, v, s, x, Array.get(F32, y, i))
+
+def k2(k: Nat, +i: U32, +s: F32, r: TF.B2<F32, F32>) -> TF.B2<F32, F32>:
+  match k r:
+    case 0n r:
+      r
+    case 1n+q TF.B2{x, y}:
+      k2(q, (i + 1 : U32), s, k2_set(i, s, y, Array.get(F32, x, i)))
+
+def l2(+e: F32, +i0: U32, +cnt: Nat, r: TF.B2<F32, F32>) -> TF.B2<F32, F32>:
+  k2(cnt, i0, e, r)
+
+def b3_of(z: Array<F32>, r: TF.B2<F32, F32>) -> TF.B3<F32, F32, F32>:
+  match r:
+    case TF.B2{x, y}:
+      TF.B3{z, x, y}
+
+# (z, x, y): y[i] = x[i] * z[i] + y[i]
+def k3_s(+i: U32, x: Array<F32>, y: Array<F32>, r: Array<F32> & F32) -> TF.B3<F32, F32, F32>:
+  match r:
+    case Tuple{z, +s}:
+      b3_of(z, k2_set(i, s, y, Array.get(F32, x, i)))
+
+def k3(k: Nat, +i: U32, r: TF.B3<F32, F32, F32>) -> TF.B3<F32, F32, F32>:
+  match k r:
+    case 0n r:
+      r
+    case 1n+q TF.B3{z, x, y}:
+      k3(q, (i + 1 : U32), k3_s(i, x, y, Array.get(F32, z, i)))
+
+def l3(+e: Unit, +i0: U32, +cnt: Nat, r: TF.B3<F32, F32, F32>) -> TF.B3<F32, F32, F32>:
+  k3(cnt, i0, r)
+
+def b4_of(u: Array<F32>, r: TF.B3<F32, F32, F32>) -> TF.B4<F32, F32, F32, F32>:
+  match r:
+    case TF.B3{z, x, y}:
+      TF.B4{u, z, x, y}
+
+# (u, z, x, y): y[i] = x[i] * z[i] + y[i], then u[i] read and added: y[i] += u[i] (as one more k3 over (u, ...))
+def k4_s(+i: U32, z: Array<F32>, x: Array<F32>, y: Array<F32>, r: Array<F32> & F32) -> TF.B4<F32, F32, F32, F32>:
+  match r:
+    case Tuple{u, +s}:
+      b4_of(u, k3_s(i, x, y, Array.get(F32, z, i)))
+
+def k4(k: Nat, +i: U32, r: TF.B4<F32, F32, F32, F32>) -> TF.B4<F32, F32, F32, F32>:
+  match k r:
+    case 0n r:
+      r
+    case 1n+q TF.B4{u, z, x, y}:
+      k4(q, (i + 1 : U32), k4_s(i, z, x, y, Array.get(F32, u, i)))
+
+def l4(+e: Unit, +i0: U32, +cnt: Nat, r: TF.B4<F32, F32, F32, F32>) -> TF.B4<F32, F32, F32, F32>:
+  k4(cnt, i0, r)
+
+def c2(+cnt: Nat, +s: U32, a: TF.B2<F32, F32>, b: TF.B2<F32, F32>) -> U32:
+  match a b:
+    case TF.B2{x1, y1} TF.B2{x2, y2}:
+      (diff(cnt, x1, x2) + diff(cnt, y1, y2) : U32)
+
+def c3(+cnt: Nat, a: TF.B3<F32, F32, F32>, b: TF.B3<F32, F32, F32>) -> U32:
+  match a b:
+    case TF.B3{z1, x1, y1} TF.B3{z2, x2, y2}:
+      ((diff(cnt, z1, z2) + diff(cnt, x1, x2) : U32) + diff(cnt, y1, y2) : U32)
+
+def c4(+cnt: Nat, a: TF.B4<F32, F32, F32, F32>, b: TF.B4<F32, F32, F32, F32>) -> U32:
+  match a b:
+    case TF.B4{u1, z1, x1, y1} TF.B4{u2, z2, x2, y2}:
+      (((diff(cnt, u1, u2) + diff(cnt, z1, z2) : U32) + diff(cnt, x1, x2) : U32) + diff(cnt, y1, y2) : U32)
+
+# the four checks at one depth and one count
+def blk(+d: Nat, +cnt: Nat, +s: U32) -> U32:
+  +p1 = diff(cnt, TF.par1(~Unit, ~F32, ~l1, Unit{}, d, cnt, arr(cnt, s)), k1(cnt, 0, arr(cnt, s)))
+  +p2 = c2(cnt, s, TF.par2(~F32, ~F32, ~F32, ~l2, 0.5, d, cnt, arr(cnt, s), arr(cnt, (s + 1 : U32))), k2(cnt, 0, 0.5, TF.B2{arr(cnt, s), arr(cnt, (s + 1 : U32))}))
+  +p3 = c3(cnt, TF.par3(~Unit, ~F32, ~F32, ~F32, ~l3, Unit{}, d, cnt, arr(cnt, s), arr(cnt, (s + 1 : U32)), arr(cnt, (s + 2 : U32))), k3(cnt, 0, TF.B3{arr(cnt, s), arr(cnt, (s + 1 : U32)), arr(cnt, (s + 2 : U32))}))
+  +p4 = c4(cnt, TF.par4(~Unit, ~F32, ~F32, ~F32, ~F32, ~l4, Unit{}, d, cnt, arr(cnt, s), arr(cnt, (s + 1 : U32)), arr(cnt, (s + 2 : U32)), arr(cnt, (s + 3 : U32))), k4(cnt, 0, TF.B4{arr(cnt, s), arr(cnt, (s + 1 : U32)), arr(cnt, (s + 2 : U32)), arr(cnt, (s + 3 : U32))}))
+  (((p1 * 16777216 : U32) + (p2 * 65536 : U32) : U32) + ((p3 * 256 : U32) + p4 : U32) : U32)
+
+def bcnt(cs: List<&2, Nat>, +d: Nat, acc: U32) -> U32:
+  match cs:
+    case Nil{}:
+      acc
+    case Con{+c, r}:
+      bcnt(r, d, (acc + blk(d, c, (U32.from_nat(c) + 5 : U32)) : U32))
+
+def bdep(di: Nat, acc: U32) -> U32:
+  match di:
+    case 0n:
+      acc
+    case 1n++p:
+      bdep(p, bcnt([0n, 1n, 7n, 100n, 1000n], p, acc))
+
+def blocks() -> String:
+  +r = bdep(7n, 0)
+  U32.show(U32.shrn(r, 24n)) ++ " " ++ U32.show(U32.and(U32.shrn(r, 16n), 255)) ++ " " ++ U32.show(U32.and(U32.shrn(r, 8n), 255)) ++ " " ++ U32.show(U32.and(r, 255))
+
 def main() -> IO(Unit):
   do IO<Unit>:
     IO.print(report(gl(7n, gd(5n, 0))))
     IO.print(api(128n, 100n, 784n, 4n, 11))
-
+    IO.print(big() ++ " " ++ blocks())
