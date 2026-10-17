@@ -39,7 +39,10 @@ NOTES exp. 10).
    (`~/.bend/bend2/base.bend`). A version bump goes in `NOTES.md`.
 2. Run the checker on every change; it takes a fraction of a second.
 3. Every proof is real: no `@unsafe`, no `?TODO`, no axioms. A law that cannot be proved yet is
-   recorded in `NOTES.md` as debt and left out of the README.
+   recorded in `NOTES.md` as debt and left out of the README. Two packages stand outside the proofs, by Renan's
+   decision, and no package with laws imports them: `binary-read` (foreign code, one def) and `tensor-fork` (Base's
+   `@unsafe` `Array.fork`, all Bend; decided 2026-10-16). `make check` pins the list of defs each one has outside the
+   proofs, so it cannot grow unnoticed. A new exception is Renan's call.
 4. Prove structure (shapes, sizes, composition); test numbers. `F32` is not a real number, so numerics
    are validated against PyTorch / NumPy / tiktoken by the scripts in `reference/`.
 5. Every proved law appears in its package README in plain language, and in `reference/list_laws.py`.
