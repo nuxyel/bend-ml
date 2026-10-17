@@ -122,6 +122,39 @@ def depth_go(f: Nat, ok: Bool, +n: U32, +p: U32, d: Nat) -> Nat:
 def depth(+n: Nat) -> Nat:
   depth_go(32n, U32.is_le(U32.from_nat(n), 1), U32.from_nat(n), 1, 0n)
 
+# ---- packing in parallel: tensor-array's pk_pack, its lines in 2^d blocks ----
+
+type PE is Data:
+  PE{tk: Nat, tku: U32, ku: U32, lstep: U32, st: U32}
+
+def pk_b2(r: TA.PK) -> B2<F32, TA.T8>:
+  match r:
+    case TA.PK{a, t}:
+      B2{a, t}
+
+# lines i0 .. i0+cnt-1 into their cells
+def pk_leaf(+e: PE, +i0: U32, +cnt: Nat, r: B2<F32, TA.T8>) -> B2<F32, TA.T8>:
+  match e r:
+    case PE{+tk, +tku, +ku, +lstep, +st} B2{a, t}:
+      pk_b2(TA.pk_lines(cnt, tk, tku, ku, i0, i0, lstep, st, TA.PK{a, t}))
+
+def pk_of(r: B2<F32, TA.T8>) -> TA.PK:
+  match r:
+    case B2{a, t}:
+      TA.PK{a, t}
+
+# one block below 16384 cells (MNIST's 100 x 784 and 128 x 784 pack faster in one), else 2^d
+def pk_d(big: Bool, d: Nat) -> Nat:
+  match big:
+    case True{}:
+      d
+    case False{}:
+      0n
+
+@unsafe
+def pk_par(d: Nat, +cnt: Nat, +tk: Nat, +k: Nat, +lstep: U32, +st: U32, a: Array<F32>) -> TA.PK:
+  pk_of(par2(~PE, ~F32, ~TA.T8, ~pk_leaf, PE{tk, U32.from_nat(tk), U32.from_nat(k), lstep, st}, pk_d(Nat.is_le(16384n, Nat.mul(cnt, tk)), d), cnt, a, Array.new(TA.T8, depth(Nat.mul(cnt, tk)), TA.t8_zero())))
+
 def tg_c(g: TA.TG) -> Array<F32>:
   match g:
     case TA.TG{a, b, c}:
@@ -178,8 +211,8 @@ def t8_go(+ac: Bool, d: Nat, +n: Nat, +m: Nat, +tk: Nat, +tku: U32, +rot: Nat, c
 # C (n x m) = A · B (or C + A · B when ac), n >= 2, with 2^d blocks sharing A, B and C; in any layout of TA.gemm_any
 # (arow, sa, sb, bcol); A and B come back intact
 @unsafe
-def gemm_fork(+ac: Bool, d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> TA.G:
-  t8_go(ac, d, n, m, Nat.div(Nat.add(k, 7n), 8n), U32.from_nat(Nat.div(Nat.add(k, 7n), 8n)), Nat.mod(k, 4n), c, TA.t8_pk2(TA.pk_pack(n, Nat.div(Nat.add(k, 7n), 8n), k, arow, sa, a), TA.pk_pack(m, Nat.div(Nat.add(k, 7n), 8n), k, bcol, sb, b)))
+def gemm_fork(+ac: Bool, +d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> TA.G:
+  t8_go(ac, d, n, m, Nat.div(Nat.add(k, 7n), 8n), U32.from_nat(Nat.div(Nat.add(k, 7n), 8n)), Nat.mod(k, 4n), c, TA.t8_pk2(pk_par(d, n, Nat.div(Nat.add(k, 7n), 8n), k, arow, sa, a), pk_par(d, m, Nat.div(Nat.add(k, 7n), 8n), k, bcol, sb, b)))
 
 # two or more rows: the shared tree when d > 0, tensor-array's sequential cells at d = 0
 def gemm_rows(+ac: Bool, d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> TA.G:
