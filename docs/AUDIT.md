@@ -58,9 +58,10 @@ Besides laws, **types** carry guarantees that no law restates: `Mat.matmul : Mat
 - The tokenizer against `tiktoken`: `test_gpt2_tok.py`, plus the seeded fuzz test `test_fuzz_bpe.py`.
 - The packages **as published**: `test_published.py` imports each one from BendHub at the version in the README.
 - The two packages outside the proofs: `binary-read` (foreign C and JavaScript, one def, both lanes) and `tensor-fork`
-  (tensor-array's products over Base's `@unsafe` `Array.fork`): its bits against tensor-array's on 14,832 products,
-  with A and B checked intact, on 1 and 16 threads (and the JS lane in `make check-full`). That its parallel blocks never
-  write the shared operands or each other's cells is sampled, not proved; `make check` pins its list of `@unsafe` defs.
+  (tensor-array's products and `par1`..`par4` over Base's `@unsafe` `Array.fork`): its bits against tensor-array's on
+  14,835 products, with A and B checked intact, and `par1`..`par4` against one loop at depths 0-6, on 1 and 16 threads
+  (and the JS lane in `make check-full`). That its parallel blocks never write the shared operands or each other's cells
+  is sampled, not proved; `make check` pins its list of `@unsafe` defs.
 - Everything above runs in CI on every push (`.github/workflows/ci.yml`).
 
 ## 5. Known gaps (also listed in the READMEs and `NOTES.md`)
