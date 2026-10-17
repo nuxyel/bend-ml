@@ -102,6 +102,7 @@ sums changed on purpose):
 | v1.3.0 | `tensor-array` 0.1.10.0: accumulating products (`C + A·B` in place) and array capacities computed by doubling; the new `bend-ml-binary-read` | a weight gradient 0.44–0.88 of the time; GPT-2's weights load in 0.8 s instead of 4.7 |
 | v1.3.1 | `bpe-tokenizer` 0.1.3.0 and `tensor-array` 0.1.11.0: an accumulator only the proofs read is erased; products split into parallel blocks only when the work pays | tokenizing 2x faster (19 KB: 25.2 → 12.3 s); a weight gradient over 8 tokens 3.3x faster on 16 threads |
 | v1.3.2 | the MNIST demo moves from `tensor-array` 0.1.3.0 to 0.1.11.0; the README and its figures measured again | an MNIST epoch 17.9 → 11.9 s on one thread, 7.3 → 4.4 s on 16, the same test hits |
+| v1.4.0 | the new `bend-ml-tensor-fork`: tensor-array's products with the parallel blocks sharing their operands (`@unsafe`, outside the proofs); `tensor-array` 0.1.12.0: a product with one row runs sequentially | an MNIST epoch with tensor-fork 12.0 → 6.2 s on one thread, 4.4 → 3.0 s on 16, the same bits; one row against GPT-2's 50,257 x 768 weights at par 4: 9.5 GB → 565 MB |
 
 Versions are numbered as in [`docs/VERSIONING.md`](docs/VERSIONING.md); each release has its notes on GitHub.
 
