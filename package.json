@@ -1,0 +1,9 @@
+{
+  "dependencies": {},
+  "devDependencies": {
+    "bend-lint": "^0.1.0"
+  },
+  "trustedDependencies": [
+    "bend-lint"
+  ]
+}

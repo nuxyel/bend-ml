@@ -1,0 +1,19 @@
+{
+  "packages": {
+    "bend-lint-rules": "0.1.0.0"
+  },
+  "rules": {
+    "bend-lint-rules/performance/append_in_loop": "warning",
+    "bend-lint-rules/performance/bang_after_fork": "warning",
+    "bend-lint-rules/performance/dead_accumulator": "warning",
+    "bend-lint-rules/performance/deep_call_in_fork": "warning",
+    "bend-lint-rules/performance/drop_in_bang": "warning",
+    "bend-lint-rules/performance/eager_branch": "warning",
+    "bend-lint-rules/performance/gpu_fit": "warning",
+    "bend-lint-rules/performance/list_index_loop": "warning",
+    "bend-lint-rules/performance/loop_invariant_call": "warning",
+    "bend-lint-rules/performance/missed_fork": "warning",
+    "bend-lint-rules/performance/repeated_call": "warning",
+    "bend-lint-rules/performance/unused_result": "warning"
+  }
+}
