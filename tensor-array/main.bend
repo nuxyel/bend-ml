@@ -1,6 +1,6 @@
 # bend-ml-tensor-array: tensors over a flat Array<F32>, with the shape in the type.
 #
-#   import bend-ml-tensor-array@0.1.11.0/main.bend as TA
+#   import bend-ml-tensor-array@0.1.12.0/main.bend as TA
 #
 # Mat<r, c> stores r*c numbers in an Array<F32>, row by row (index i*c + j). The
 # dimensions are erased type parameters: the same guarantee as bend-ml-tensor
@@ -185,7 +185,8 @@ def cp2(+ac: Bool, d: Nat, +m: Nat, +kn: Nat, +sa: U32, +sb: U32, +bcol: U32, c:
     case Tuple{a1, a2} Tuple{b1, b2}:
       gp3(ac, a1, b1, c, cpar(d, m, kn, 0, 0, sa, sb, bcol, Array.clone(F32, a2), Array.clone(F32, b2)))
 
-# C (1 x m) = A (1 x k) · B, with 2^d blocks of columns in parallel
+# C (1 x m) = A (1 x k) · B, with 2^d blocks of columns in parallel. Since 0.1.12.0 no product calls it (one row runs
+# the scalar loop, see gemm_any3): it clones both operands at every node. Kept for callers of earlier versions.
 
 def gemm_par_cols(+ac: Bool, d: Nat, +m: Nat, +k: Nat, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
   cp2(ac, d, m, k, sa, sb, bcol, c, Array.clone(F32, a), Array.clone(F32, b))
@@ -1007,14 +1008,16 @@ def gemm_t8_ac(+ac: Bool, d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U3
 def gemm_t8(d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
   gemm_t8_ac(False{}, d, n, m, k, arow, sa, sb, bcol, a, b, c)
 
-# one row (matrix · vector): the scalar loop, by columns in parallel when d > 0; two or more rows: cells of 8
+# one row (matrix · vector): the scalar loop at every depth; two or more rows: cells of 8. Up to 0.1.11.0 one row in
+# parallel ran gemm_par_cols, which clones both operands at every node of the fork tree: a 50,257 x 768 weight matrix at
+# depth 4 ran out of the default heap (5.1 GB) and 8192 x 2048 took 124 ms against 10 ms sequentially. Packing the
+# matrix into cells of 8 instead costs more than the product, which reads each weight once (64 ms against 24 at
+# 50,257 x 768). Matrix · vector in parallel is Bands.matvec. Measured 2026-10-16 (NOTES.md).
 def gemm_any3(+ac: Bool, one: Bool, d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
-  match one d:
-    case True{} 0n:
+  match one:
+    case True{}:
       gemm_ac(ac, n, m, k, arow, sa, sb, bcol, a, b, c)
-    case True{} 1n+q:
-      gemm_par_cols(ac, 1n+q, m, k, sa, sb, bcol, a, b, c)
-    case False{} d:
+    case False{}:
       gemm_t8_ac(ac, d, n, m, k, arow, sa, sb, bcol, a, b, c)
 
 def gemm_any2(+ac: Bool, d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> G:
