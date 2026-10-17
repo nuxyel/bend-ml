@@ -1178,3 +1178,33 @@ merges: 212 → 14 ms), the same output. `wf` holds by construction there, since
 (`has`/`wf` with a `match` instead of `Bool.or`/`Bool.and`) gained 18% and is not taken: `has` and `wf` are the
 predicates of the package's laws, and the package does not change. `reference/test_bpe.py` 0 failures, the six
 malformed-merges cases still refused; fuzz 30/30; `make check` 62/62.
+
+## bend-ml-tensor-fork 0.1.1.0: blocks of any kernel, packing in blocks (2026-10-17)
+
+From BendTorch's phase 3 (parallelism where it pays), measured on one decoder block at SmolLM2's sizes (BendTorch's
+`demo/smol_block.bend`: 512 rows, AdamW under MSE; 16 threads, 3 steps a run, 3 runs). A `perf` profile on 16 threads,
+cut into 1 ms slices and counting the threads at work in each, showed 43% of the step's wall time with three threads or
+fewer at work; the largest share inside this package was packing A and B (sequential) and `TA.cap_depth` sizing the
+output arrays.
+
+- `par1`..`par4`: any kernel `f(e, i0, cnt, arrays)` over 2^d blocks of a range, on up to four arrays shared through
+  `Array.fork` (`@unsafe`), `e` a reusable record (`Data`) with what else `f` needs. The kernel writes only its block's
+  range; then the bits are those of one loop over the whole range, at every depth and thread count. BendTorch runs its
+  optimizer step and its element-wise layers on them.
+- Packing in blocks of lines (`par2` over tensor-array's `pk_lines`) when a product splits and an operand holds 16384
+  cells or more. Below that MNIST's 100 x 784 and 128 x 784 packed faster in one piece (an epoch on 16 threads was 0.1-0.2
+  s slower with every operand in blocks; the 16-thread epoch varies by that much between runs, so I gated it by size).
+- The output arrays sized by doubling a `U32` (`depth`) instead of `TA.cap_depth`; the same capacities.
+- Block step at 135M's sizes 562 → 527 ms per 3 steps, at 360M's 1303 → 1238 ms (both 6%); one thread unchanged.
+- `tests/bits.bend`, third line: three products at par 6 on 512 x 576 x 1536 (their packing runs in blocks; the old
+  grid's operands are all below 16384 cells) and `par1`..`par4` at depths 0-6, cnt = 0, 1, 7, 100, 1000, against one
+  loop: 0 differing words. Three planted faults caught (765,956, 766,974 and 141 words). `make check` 62/62; bend-lint
+  has no finding in the package.
+
+Tried and not adopted: leaves computing 2 x 2 tiles of C (two lines of A against two lines of B per pass over k, packed
+two lines to a cell; each dot keeps its order, 0 differing words). On one P-core 11% slower than one dot at a time;
+alone on an E-core 13% faster; 14 copies of the program at once, one per core, 2x faster on the E-cores; but inside one
+16-thread product 4-25% slower at every split depth, and the block step 20% slower. The emitted C of the dot is 8 loads
+and 16 scalar F32 operations per cell with no spills that matter: the cells are bound by the chain of additions in a
+fixed order, not by reads. Raising the split depth (BendTorch's `par` 4 → 8, 16 → 256 blocks) paid instead: the block
+step 763 → 577 ms per 3 steps at 135M, 1840 → 1313 ms at 360M, by balancing the P- and E-cores.
