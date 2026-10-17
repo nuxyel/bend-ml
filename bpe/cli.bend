@@ -102,6 +102,7 @@ def ids_ok(ns: List<&2, Nat>, +k: Nat) -> Bool:
         case Nil{}:
           False{}
         case Con{+b, u}:
+          # bend-lint: disable-next bend-lint-rules/performance/eager_branch -- on a valid table the walk reaches the end anyway not-expected-because: a whole encode with GPT-2's 50,000 merges takes 55 ms (2026-10-17, NOTES)
           Bool.and(Bool.and(Nat.is_lt(a, Nat.add(256n, k)), Nat.is_lt(b, Nat.add(256n, k))), ids_ok(u, 1n+k))
 
 def table_ok(+ns: List<&2, Nat>) -> Bool:
