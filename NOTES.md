@@ -1143,3 +1143,8 @@ tensor-array's sequential code. The GPU route and the one-row tree of the protot
   slower in both builds, a terminal redrawing; the medians match the copy measured earlier, 11.8 → 6.0 and 4.3 → 2.9).
 - Published: `bend-ml-tensor-fork@0.1.0.0`, hash `0xd8eb8357f30e6c7a242507aee97fab7e`. BendHub accepts a package whose
   check fails on `@unsafe` code. The MNIST timing above already imports the published package.
+
+## v1.4.0 (2026-10-17)
+
+`bend-ml-tensor-fork` 0.1.0.0 (new, outside the proofs) and tensor-array 0.1.12.0 (one row runs sequentially), released
+through pull request #13 (CI green, 71/71).
