@@ -1,6 +1,9 @@
 # Draft issue for bendlang/bend: the same dot-product loop compiles 10-20% apart depending on code around it
 
-Status: draft, not posted. Reproduced on Bend 2.0.37, clang 22, Core Ultra 7 155H (2026-10-16).
+Status: posted as https://github.com/bendlang/bend/issues/1648 (2026-10-16), with the numbers of 2.0.37 and of main
+e5527d5b (14-18% there) and the files linked at bend-ml d603403. Checked for duplicates first (searched "BLK_SHR",
+"clang schedule loop", "alignment performance"): none. Reproduced on Bend 2.0.37 and main e5527d5b, clang 22, Core
+Ultra 7 155H.
 
 ---
 
