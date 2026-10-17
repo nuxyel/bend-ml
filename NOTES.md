@@ -1121,3 +1121,25 @@ end (inside llama.bend's generation: -9.9% at SmolLM2-135M, -1.0% at 360M, +13.5
 product over the same fork tree is much faster in training (an MNIST epoch 4.3 → 2.9 s on 16 threads, 11.8 → 6.0 s on
 one, the same loss and hits) but makes a package's check fail (`@unsafe`), so it goes into a separate package outside the
 proved ones, not into tensor-array.
+
+## bend-ml-tensor-fork 0.1.0.0: the products over a shared fork tree, outside the proofs (2026-10-16)
+
+The general product over Base's `@unsafe` `Array.fork`, measured above, as its own package (Renan's decision: the same
+bits and a large gain in training, but `@unsafe`, so outside the packages with laws, as `binary-read` is for foreign
+code). `tensor-fork/main.bend` takes tensor-array 0.1.12.0's `Mat` values and returns its result types; the six products
+keep tensor-array's signatures and go through its `split_depth`. Two or more rows that split: A and B packed once into
+cells of 8, the packed operands and C shared through `Array.fork` down the tree, each leaf running tensor-array's
+`t8_rows`/`t8_cols` into its rows or columns of C (by rows when n >= m, as tensor-array splits). Everything else runs
+tensor-array's sequential code. The GPU route and the one-row tree of the prototype were left out.
+
+- `bend tensor-fork/main.bend`: 14 defs rely on unsafe code, the five of the tree and what reaches it; `make check`
+  pins that list, checks that no package with laws imports it, and runs `tests/bits.bend` at 1 and 16 threads
+  (`make check-full` adds the JS lane, which needs `main` as IO: a pure `main` overflowed the JS stack).
+- `tests/bits.bend`: 14,832 products against tensor-array at depth 0 (every layout, both modes, the `parseq` grid at
+  depths 0-4 and six larger shapes at 0-6), 0 differing words in C and in A and B; the six public products at par 4
+  against tensor-array's at par 0, 0. Three planted faults caught (5,282, 60,557 and 22,740 differing words).
+- MNIST epoch with the demo's seven products from the package, 5 alternated rounds on the idle machine, medians: 12.0 →
+  6.2 s on one thread, 4.4 → 3.0 s on 16, loss 0.52047706 and 9129 hits in every run (two rounds on one thread ran 2 s
+  slower in both builds, a terminal redrawing; the medians match the copy measured earlier, 11.8 → 6.0 and 4.3 → 2.9).
+- Published: `bend-ml-tensor-fork@0.1.0.0`, hash `0xd8eb8357f30e6c7a242507aee97fab7e`. BendHub accepts a package whose
+  check fails on `@unsafe` code. The MNIST timing above already imports the published package.
