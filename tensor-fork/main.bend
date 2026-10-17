@@ -1,13 +1,15 @@
-# bend-ml-tensor-fork: bend-ml-tensor-array's products, with the parallel blocks sharing their operands.
+# bend-ml-tensor-fork: bend-ml-tensor-array's products, with the parallel blocks sharing their operands; and par1..par4,
+# any kernel over blocks of a range sharing up to four arrays.
 #
 #   import bend-ml-tensor-array@0.1.12.0/main.bend as TA
-#   import bend-ml-tensor-fork@0.1.0.0/main.bend as TF
+#   import bend-ml-tensor-fork@0.1.1.0/main.bend as TF
 #   TF.matmul(n, k, m, par, a, b)      # the same arguments, result type and bits as TA.Mat.matmul
 #
 # The six products (matmul, matmul_nt, matmul_tn and their accumulating forms) take tensor-array's Mat values and
 # return its result types. A product that splits (tensor-array's split_depth, two or more rows) packs A and B once into
-# cells of 8, as the sequential path does, and every node of the fork tree shares the two packed operands and C through
-# Base's Array.fork: two handles to one block, no copy. Each leaf runs tensor-array's cells (t8_rows, t8_cols) straight
+# cells of 8, as the sequential path does (in blocks of lines when an operand holds 16384 cells or more), and every
+# node of the fork tree shares the two packed operands and C through Base's Array.fork: two handles to one block, no
+# copy. Each leaf runs tensor-array's cells (t8_rows, t8_cols) straight
 # into its own rows (or columns) of C. tensor-array's parallel path instead clones an operand at every node and hands
 # each block's cells back as a list that is then written into C. A product that does not split, and a product with one
 # row, runs tensor-array's sequential code. The bits are those of tensor-array at depth 0, at every depth and thread
