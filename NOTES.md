@@ -1148,3 +1148,22 @@ tensor-array's sequential code. The GPU route and the one-row tree of the protot
 
 `bend-ml-tensor-fork` 0.1.0.0 (new, outside the proofs) and tensor-array 0.1.12.0 (one row runs sequentially), released
 through pull request #13 (CI green, 71/71).
+
+## bend-lint on every change since its last pass (2026-10-17)
+
+Mathews Fernando's bend-lint is now a dev dependency (`package.json`, `bend-lint.json` with its 12 performance rules,
+`make lint`), run before each release; a finding is measured before it is taken (Renan, 2026-10-17). Its last pass
+here was on `a3063bd` (2026-10-11). On the 19 Bend files changed since: 16 findings, none taken:
+
+- tensor-array: `missed_fork` on `Bands.zeros`, `bfill`, `blist` (built once at load; he measured forking them as no
+  change), `repeated_call` on `pow2` (only in proofs' types, never run).
+- bpe: `eager_branch` on `has`, `knl`, `wf.go`, `below` and `missed_fork` on `exp.go` (training-time checks and proofs,
+  run once per call of `train`, or never at run time).
+- GPT-2 demo: `list_index_loop` on `slice64(q, off)` in `attn` (12 slices of a 768-list per layer, against 124 M
+  multiply-adds per token: below the noise), `eager_branch` on `ids_ok` and `repeated_call` on `lcl` in the tokenizer
+  (he measured `lcl` in llama.bend's copy as no change).
+
+Found next to it, not by a rule: a profile of GPT-2 generation (one thread, 40 tokens) spends 18.6% in `span_fade` and
+12.8% in `term_drop`, the runtime taking apart list nodes that are shared (the attention reads the key/value cache, lists
+passed with `+`, for every head). llama.bend keeps its cache in arrays; the GPT-2 demo is the list baseline, so this
+stays as it is.
