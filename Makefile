@@ -3,7 +3,7 @@ export BEND_NO_TELEMETRY := 1
 export PATH := $(HOME)/.bend/bin:$(HOME)/.elan/bin:$(PATH)
 PY := reference/.venv/bin/python
 
-.PHONY: setup setup-lite check check-full laws bench media clean
+.PHONY: setup setup-lite check check-full laws bench media clean lint
 
 setup:            ## Bend, Lean, Python venv, MNIST and GPT-2 data
 	scripts/setup.sh
@@ -29,3 +29,6 @@ media:            ## regenerate the README images and the presentation video (ne
 
 clean:
 	rm -rf reference/__pycache__ .scratch
+
+lint:             ## bend-lint's performance rules over the Bend code: a report, not a gate; measure a finding before taking it
+	bunx bend-lint --jobs max
