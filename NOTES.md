@@ -1208,3 +1208,5 @@ alone on an E-core 13% faster; 14 copies of the program at once, one per core, 2
 and 16 scalar F32 operations per cell with no spills that matter: the cells are bound by the chain of additions in a
 fixed order, not by reads. Raising the split depth (BendTorch's `par` 4 → 8, 16 → 256 blocks) paid instead: the block
 step 763 → 577 ms per 3 steps at 135M, 1840 → 1313 ms at 360M, by balancing the P- and E-cores.
+- Published: `bend-ml-tensor-fork@0.1.1.0`, hash `0x7426570b56a9f08f09fe41b970d661b9`; `reference/test_published.py` now
+  imports it from BendHub and checks a split product and `par1` against one block.
