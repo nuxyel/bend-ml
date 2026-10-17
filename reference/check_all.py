@@ -64,8 +64,9 @@ def main():
         run("binary-read/tests/read_f32.bend on the C lane", [rf], lambda o, c: o.strip() == want.strip())
 
     # 1c. tensor-fork: the one package whose parallel blocks share arrays through Base's @unsafe Array.fork; its unsafe
-    # defs are exactly the fork tree and what reaches it, no package with laws imports it, and it gives tensor-array's bits
-    fork_defs = ["rpar", "cpar", "t8_tree", "t8_go", "gemm_fork", "gemm_rows", "gemm_any2", "gemm_any", "matmul", "matmul_acc",
+    # defs are exactly the blocks, the fork tree and what reaches them, no package with laws imports it, and it gives tensor-array's bits
+    fork_defs = ["blocks1", "join2", "blocks2", "join3", "blocks3", "join4", "blocks4", "par1", "par2", "par3", "par4", "pk_par",
+                 "rpar", "cpar", "t8_tree", "t8_go", "gemm_fork", "gemm_rows", "gemm_any2", "gemm_any", "matmul", "matmul_acc",
                  "matmul_nt", "matmul_nt_acc", "matmul_tn", "matmul_tn_acc"]
     run("tensor-fork/main.bend: its @unsafe defs are the fork tree and what reaches it", [BEND, "tensor-fork/main.bend"],
         lambda o, c: f"{len(fork_defs)} defs rely on unsafe or foreign code" in o and re.findall(r"^- (\S+)$", o, re.M) == fork_defs)
@@ -76,11 +77,11 @@ def main():
         tf = os.path.join(d, "tf")
         run("compile tensor-fork/tests/bits.bend", [BEND, "tensor-fork/tests/bits.bend", "-o", tf])
         for t in ["1", "16"]:
-            run(f"tensor-fork gives tensor-array's bits, A and B intact: 14,832 products and the six public ones ({t} threads)",
-                [tf, "--threads", t], lambda o, c: o.split() == ["0", "0", "14832", "0", "0", "0", "0", "0", "0"])
+            run(f"tensor-fork gives tensor-array's bits, A and B intact: 14,832 products, the six public ones, three big ones, par1..par4 ({t} threads)",
+                [tf, "--threads", t], lambda o, c: o.split() == ["0", "0", "14832"] + ["0"] * 13)
     if FULL:
         run("tensor-fork/tests/bits.bend on the JS lane", [BEND, "tensor-fork/tests/bits.bend"],
-            lambda o, c: re.findall(r"^[0-9 ]+$", o, re.M) == ["0 0 14832", "0 0 0 0 0 0"])
+            lambda o, c: re.findall(r"^[0-9 ]+$", o, re.M) == ["0 0 14832", "0 0 0 0 0 0", "0 0 0 0 0 0 0"])
 
     # 2. shape errors that MUST fail to check
     for f, msg in [("tensor/tests/bad_matmul.bend", "expected"), ("tensor/tests/bad_reshape.bend", "expected"), ("tensor-array/tests/bad_matmul.bend", "expected"), ("tensor-array/tests/bad_grad.bend", "expected"), ("examples/runtime_batch_bad.bend", "expected"), ("examples/symbolic_reshape_bad.bend", "expected"), ("examples/square_transpose_bad.bend", "expected"), ("tensor-array/tests/bad_bands.bend", "expected")]:
