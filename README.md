@@ -40,6 +40,7 @@ only compiles with a proof that the number of elements does not change, even whe
 | [`bend-ml-tensor-array`](tensor-array) | 0.1.12.0 | the same guarantees over a flat `Array<F32>`; `Bands<r,c>` for a parallel matrix · vector | `cap_ok`, `half_cover`, `leaf_len`, `band_len`; typed `matmul`, `matmul_nt`, `matmul_tn` (and their accumulating forms), `Bands.matvec` |
 | [`bend-ml-autograd`](autograd) | 0.1.1.0 | Automatic differentiation and layers with typed backward | **`reverse_eq_forward`** |
 | [`bend-ml-binary-read`](binary-read) | 0.1.0.0 | F32 weights read from a file straight into an `Array<F32>`; foreign code (C and JavaScript), kept out of the packages with laws | none: an effect, tested on both lanes |
+| [`bend-ml-tensor-fork`](tensor-fork) | 0.1.0.0 | tensor-array's six products with the parallel blocks sharing A, B and C (`Array.fork`, `@unsafe` in Base) instead of copying them: an MNIST epoch 12.0 → 6.2 s on one thread, 4.4 → 3.0 s on 16 | none: the same bits as tensor-array, tested on 14,832 products; kept out of the packages with laws |
 
 ```python
 import bend-ml-tensor-array@0.1.12.0/main.bend as TA
