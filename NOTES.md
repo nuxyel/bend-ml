@@ -1167,3 +1167,14 @@ Found next to it, not by a rule: a profile of GPT-2 generation (one thread, 40 t
 12.8% in `term_drop`, the runtime taking apart list nodes that are shared (the attention reads the key/value cache, lists
 passed with `+`, for every head). llama.bend keeps its cache in arrays; the GPT-2 demo is the list baseline, so this
 stays as it is.
+
+## The CLI's table check without `BPE.wf` (2026-10-17)
+
+From bend-lint's `eager_branch` on `has`/`wf.go`, measured at GPT-2's 50,000 merges (bend2-lab
+`experiments/2026-10-17-lint-scale`): `bpe/cli.bend` checked every merges table it read with `ids_ok` and `BPE.wf`,
+and `wf` walks the rules before each rule, O(n²): 4,395 ms per `encode` of one line, against 55 ms without it (10,000
+merges: 212 → 14 ms), the same output. `wf` holds by construction there, since `rules.go` numbers the rules 0, 1,
+2... (the demos' tokenizers already skip it for that reason), so `table_ok` is `ids_ok` alone. The lint's own fix
+(`has`/`wf` with a `match` instead of `Bool.or`/`Bool.and`) gained 18% and is not taken: `has` and `wf` are the
+predicates of the package's laws, and the package does not change. `reference/test_bpe.py` 0 failures, the six
+malformed-merges cases still refused; fuzz 30/30; `make check` 62/62.
