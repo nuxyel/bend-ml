@@ -8,7 +8,7 @@ Tensors in Bend 2 over a flat `Array<F32>`, **with the shape in the type**: the 
 
 ```python
 import Base
-import bend-ml-tensor-array@0.1.11.0/main.bend as TA
+import bend-ml-tensor-array@0.1.12.0/main.bend as TA
 
 def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 128n>:
   TA.Mat.matmul(100n, 784n, 128n, 3n, a, w)   # 3n = 2^3 = 8 parallel blocks
@@ -18,7 +18,7 @@ def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 12
 
 - `Mat<r, c>` stores `r*c` numbers in an `Array<F32>`, row by row (index `i*c + j`). The dimensions are **erased** type parameters.
 - An `Array` is affine (a single owner), so **every operation also returns what it read**: `Mat.matmul(a, b)` returns `MMul{a, b, c}`. Use `Mat.clone` when you need two copies.
-- `par` (in the products) is the log2 of the most blocks computed in parallel; `0` is sequential. It splits the rows of `C`, or the columns when `n = 1` (matrix · vector). Since 0.1.11.0 it is an upper bound: a product splits only when it does at least 2^23 multiply-adds and each cell of `C` sums at least 64 of them (`split_depth`), and otherwise runs sequentially; the bits are the same at every depth.
+- `par` (in the products) is the log2 of the most blocks computed in parallel; `0` is sequential. It splits the rows of `C`; a product with one row (matrix · vector) runs sequentially at every `par` since 0.1.12.0 (for matrix · vector in parallel, use `Bands`). Since 0.1.11.0 it is an upper bound: a product splits only when it does at least 2^23 multiply-adds and each cell of `C` sums at least 64 of them (`split_depth`), and otherwise runs sequentially; the bits are the same at every depth.
 
 ## Operations
 
@@ -118,6 +118,10 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 
 ## Versions
 
+- `0.1.12.0`: a product with one row runs the scalar loop at every `par`. Up to 0.1.11.0 it split by columns and
+  cloned both operands at every node: one row against a 50,257 x 768 matrix at `par` 4 peaked at 9.5 GB (now 565 MB)
+  or ran out of the default heap, and 8192 x 2048 took 124 ms on 16 threads (now 9.9). The same bits
+  (`tests/onerow.bend`). `Bands.matvec` is unchanged.
 - `0.1.11.0`: the products choose their split depth from the work (`split_depth`): `par` or 0. On 16
   threads a weight gradient over 8 tokens of SmolLM2-135M's sizes (1536 x 8 by 8 x 576) goes from 9.3 to 2.8 ms at `par`
   3, one over 32 tokens from 10.2 to 5.9 ms, and MNIST's small last layer from 0.083 to 0.034 ms; products large enough
