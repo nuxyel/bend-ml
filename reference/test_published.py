@@ -110,8 +110,61 @@ def check_read():
     return ok
 
 
+# bend-ml-tensor-fork is outside the proofs (no laws): a product at split_depth's threshold split in 4 blocks against tensor-array's in one, and
+# par1 over 4 blocks against one loop, on the C lane at 4 threads
+FORK = """import Base
+import {ta}/main.bend as TA
+import {tf}/main.bend as TF
+
+def c_of(r: TA.MMul<128n, 512n, 128n>) -> Array<F32>:
+  match r:
+    case TA.MMul{{a, b, TA.Mat{{c}}}}:
+      c
+
+def sum(k: Nat, +i: U32, acc: F32, r: Array<F32> & F32) -> F32:
+  match k r:
+    case 0n Tuple{{a, x}}:
+      acc
+    case 1n+q Tuple{{a, +x}}:
+      sum(q, (i + 1 : U32), (acc + x : F32), Array.get(F32, a, (i + 1 : U32)))
+
+def tot(+n: Nat, a: Array<F32>) -> F32:
+  sum(n, 0, 0.0, Array.get(F32, a, 0))
+
+def dbl(k: Nat, +i: U32, a: Array<F32>) -> Array<F32>:
+  match k:
+    case 0n:
+      a
+    case 1n+q:
+      dbl(q, (i + 1 : U32), Array.set(F32, a, i, U32.to_f32(i)))
+
+def leaf(+e: Unit, +i0: U32, +k: Nat, a: Array<F32>) -> Array<F32>:
+  dbl(k, i0, a)
+
+def main() -> IO(Unit):
+  do IO<Unit>:
+    IO.print(F32.show(tot(16384n, c_of(TF.matmul(128n, 512n, 128n, 2n, TA.Mat.fill(128n, 512n, 0.5), TA.Mat.fill(512n, 128n, 3.0))))) ++ " " ++ F32.show(tot(16384n, c_of(TA.Mat.matmul(128n, 512n, 128n, 0n, TA.Mat.fill(128n, 512n, 0.5), TA.Mat.fill(512n, 128n, 3.0))))))
+    IO.print(F32.show(tot(1000n, TF.par1(~Unit, ~F32, ~leaf, Unit{{}}, 2n, 1000n, Array.new(F32, 10n, 0.0)))) ++ " " ++ F32.show(tot(1000n, dbl(1000n, 0, Array.new(F32, 10n, 0.0)))))
+"""
+
+
+def check_fork():
+    tf = f"bend-ml-tensor-fork@{VERS['bend-ml-tensor-fork']}"
+    with tempfile.TemporaryDirectory() as d:
+        f = os.path.join(d, "fork.bend")
+        open(f, "w").write(FORK.format(ta=f"bend-ml-tensor-array@{VERS['bend-ml-tensor-array']}", tf=tf))
+        cc = subprocess.run([BEND, f, "-o", os.path.join(d, "fork")], capture_output=True, text=True, env=ENV, cwd=d)
+        c = subprocess.run([os.path.join(d, "fork"), "--threads", "4"], capture_output=True, text=True, cwd=d) if cc.returncode == 0 else cc
+    lines = [l.split() for l in c.stdout.strip().splitlines()]
+    ok = len(lines) == 2 and all(len(l) == 2 and l[0] == l[1] for l in lines)
+    print(("ok   " if ok else "ERROR ") + f"published {tf.replace('bend-ml-', '')}: a split product and par1 give the one-block bits")
+    if not ok:
+        print(c.stdout[:400], (cc.stderr + c.stderr)[:800])
+    return ok
+
+
 def main():
-    missing = [p for p in NEED + ["bend-ml-binary-read"] if p not in VERS]
+    missing = [p for p in NEED + ["bend-ml-binary-read", "bend-ml-tensor-fork"] if p not in VERS]
     if missing:
         sys.exit(f"ERROR: version missing from the README table: {missing}")
     src = PROGRAM.format(nl=f"bend-ml-nat-lemmas@{VERS['bend-ml-nat-lemmas']}",
@@ -129,6 +182,7 @@ def main():
     if not ok:
         print(out[:800])
     ok = check_read() and ok
+    ok = check_fork() and ok
     sys.exit(0 if ok else 1)
 
 
