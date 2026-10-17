@@ -108,6 +108,20 @@ def par3(~E: Data, ~A: Type, ~B: Type, ~C: Type, ~f: @+e: E -> @+i0: U32 -> @+cn
 def par4(~E: Data, ~A: Type, ~B: Type, ~C: Type, ~D: Type, ~f: @+e: E -> @+i0: U32 -> @+cnt: Nat -> B4<A, B, C, D> -> B4<A, B, C, D>, +e: E, d: Nat, +cnt: Nat, a: Array<A>, b: Array<B>, c: Array<C>, x: Array<D>) -> B4<A, B, C, D>:
   blocks4(~E, ~A, ~B, ~C, ~D, ~f, e, d, 0, cnt, Array.fork(A, a), Array.fork(B, b), Array.fork(C, c), Array.fork(D, x))
 
+# the smallest d with 2^d >= n (TA.cap_depth's answer) by doubling a U32: log2(n) steps, where cap_depth compares Nats
+# (a share of every product's time at 512 x 1536)
+def depth_go(f: Nat, ok: Bool, +n: U32, +p: U32, d: Nat) -> Nat:
+  match f ok:
+    case _ True{}:
+      d
+    case 0n False{}:
+      d
+    case 1n+g False{}:
+      depth_go(g, U32.is_le(n, (p + p : U32)), n, (p + p : U32), 1n+d)
+
+def depth(+n: Nat) -> Nat:
+  depth_go(32n, U32.is_le(U32.from_nat(n), 1), U32.from_nat(n), 1, 0n)
+
 def tg_c(g: TA.TG) -> Array<F32>:
   match g:
     case TA.TG{a, b, c}:
@@ -192,7 +206,7 @@ def gemm_any(+ac: Bool, d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32,
 def matmul(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: TA.Mat<n, k>, b: TA.Mat<k, m>) -> TA.MMul<n, k, m>:
   match a b:
     case TA.Mat{x} TA.Mat{y}:
-      TA.mmul_fin(n, k, m, gemm_any(False{}, TA.split_depth(par, n, m, k), n, m, k, U32.from_nat(k), 1, U32.from_nat(m), 1, x, y, Array.new(F32, TA.cap_depth(Nat.mul(n, m)), 0.0)))
+      TA.mmul_fin(n, k, m, gemm_any(False{}, TA.split_depth(par, n, m, k), n, m, k, U32.from_nat(k), 1, U32.from_nat(m), 1, x, y, Array.new(F32, depth(Nat.mul(n, m)), 0.0)))
 
 # C + A · B, into C
 def matmul_acc(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: TA.Mat<n, k>, b: TA.Mat<k, m>, c: TA.Mat<n, m>) -> TA.MMul<n, k, m>:
@@ -204,7 +218,7 @@ def matmul_acc(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: TA.Mat<n, k>, b: TA.Mat<k
 def matmul_nt(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: TA.Mat<n, k>, b: TA.Mat<m, k>) -> TA.MMulNT<n, k, m>:
   match a b:
     case TA.Mat{x} TA.Mat{y}:
-      TA.mmul_nt_fin(n, k, m, gemm_any(False{}, TA.split_depth(par, n, m, k), n, m, k, U32.from_nat(k), 1, 1, U32.from_nat(k), x, y, Array.new(F32, TA.cap_depth(Nat.mul(n, m)), 0.0)))
+      TA.mmul_nt_fin(n, k, m, gemm_any(False{}, TA.split_depth(par, n, m, k), n, m, k, U32.from_nat(k), 1, 1, U32.from_nat(k), x, y, Array.new(F32, depth(Nat.mul(n, m)), 0.0)))
 
 # C + A · Bᵀ, into C
 def matmul_nt_acc(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: TA.Mat<n, k>, b: TA.Mat<m, k>, c: TA.Mat<n, m>) -> TA.MMulNT<n, k, m>:
@@ -216,7 +230,7 @@ def matmul_nt_acc(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: TA.Mat<n, k>, b: TA.Ma
 def matmul_tn(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: TA.Mat<k, n>, b: TA.Mat<k, m>) -> TA.MMulTN<n, k, m>:
   match a b:
     case TA.Mat{x} TA.Mat{y}:
-      TA.mmul_tn_fin(n, k, m, gemm_any(False{}, TA.split_depth(par, n, m, k), n, m, k, 1, U32.from_nat(n), U32.from_nat(m), 1, x, y, Array.new(F32, TA.cap_depth(Nat.mul(n, m)), 0.0)))
+      TA.mmul_tn_fin(n, k, m, gemm_any(False{}, TA.split_depth(par, n, m, k), n, m, k, 1, U32.from_nat(n), U32.from_nat(m), 1, x, y, Array.new(F32, depth(Nat.mul(n, m)), 0.0)))
 
 # C + Aᵀ · B, into C: dW += Xᵀ · dY
 def matmul_tn_acc(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: TA.Mat<k, n>, b: TA.Mat<k, m>, c: TA.Mat<n, m>) -> TA.MMulTN<n, k, m>:
