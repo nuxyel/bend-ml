@@ -283,8 +283,27 @@ def blocks() -> String:
   +r = bdep(7n, 0)
   U32.show(U32.shrn(r, 24n)) ++ " " ++ U32.show(U32.and(U32.shrn(r, 16n), 255)) ++ " " ++ U32.show(U32.and(U32.shrn(r, 8n), 255)) ++ " " ++ U32.show(U32.and(r, 255))
 
-def main() -> IO(Unit):
+def test_main() -> IO(Unit):
   do IO<Unit>:
     IO.print(report(gl(7n, gd(5n, 0))))
     IO.print(api(128n, 100n, 784n, 4n, 11))
     IO.print(big() ++ " " ++ blocks())
+
+# This program takes no arguments. Since Bend 2.0.38 a runtime option goes between +RTS and -RTS, and one written
+# without them arrives here as an argument while the program runs on the default thread count, so a check of 1 and 16
+# threads would pass without testing them: any argument is an error.
+def alone(args: List<String>, go: IO(Unit)) -> IO(Unit):
+  match args:
+    case Nil{}:
+      go
+    case Con{p, Nil{}}:
+      go
+    case Con{p, Con{a, t}}:
+      do IO<Unit>:
+        IO.print_err("unexpected argument " ++ a ++ ": this program takes none (runtime options go between +RTS and -RTS)")
+        IO.exit(2)
+
+def main() -> IO(Unit):
+  do IO<Unit>:
+    args : List<String> <- IO.args()
+    alone(args, test_main())

@@ -1,0 +1,9 @@
+# Lines scripts/check_rts.py accepts with --threads or --gpu outside +RTS ... -RTS: `<path glob>` or `<path glob>:<text>`.
+NOTES.md                                   # the log: how each run was made at the time
+docs/upstream/*                            # drafts and posted reports, as they ran on Bend 2.0.35-2.0.37
+CLAUDE.md:A bare `./x --threads 16`        # the pitfall itself, explaining the bare form
+CLAUDE.md:`--gpu off` goes in the same bracket  # the same pitfall
+reference/mnist_torch.py                   # the PyTorch twin's own --threads, not a Bend program's
+tensor-gpu/main.bend:or with `--gpu off`   # a comment in published source; it changes with tensor-gpu's next version
+scripts/gen_tensor_gpu.py:or with `--gpu off`  # the generator of that comment
+reference/check_all.py:refuses a bare --threads 16  # the check that a test program refuses a bare option

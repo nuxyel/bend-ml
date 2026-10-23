@@ -107,6 +107,7 @@ sums changed on purpose):
 | v1.5.0 | `bend-ml-tensor-fork` 0.1.1.0: `par1`..`par4` (any kernel over blocks of shared arrays), A and B packed in blocks when big, output arrays sized without `cap_depth` | a training step of one SmolLM2-135M-sized block on 16 threads 6% faster; the products' bits unchanged |
 | v1.6.0 | the new `bend-ml-tensor-gpu`: tensor-array's six products as one GPU call each; `tensor-array` 0.1.14.0: `matmul_precise`, long dot products summed in blocks of 1024 | the same bits as tensor-array on the GPU and on the CPU threads |
 | v1.6.1 | Bend 2.0.38: a compiled program's runtime options now go between `+RTS` and `-RTS` | GPT-2 per token unchanged (136.2 against 136.6 ms on one thread, 106.1 against 105.0 on 16); the binary 4 KB smaller |
+| v1.6.2 | the checks guard the runtime options: one outside `+RTS ... -RTS` fails them, test programs refuse arguments, and a probe checks that 1 and 16 threads use 1 and several cores | the packages and their bits unchanged |
 
 Versions are numbered as in [`docs/VERSIONING.md`](docs/VERSIONING.md); each release has its notes on GitHub.
 

@@ -61,5 +61,24 @@ def big(+n: Nat, +k: Nat, +m: Nat, +par: Nat, +seed: U32) -> String:
   +aw = diff(nm, mm_tn_c(n, k, m, TA.Mat.matmul_tn_acc(n, k, m, par, TA.Mat{arr(nk, seed)}, TA.Mat{arr(km, s1)}, TA.Mat{arr(nm, s2)})), mm_tn_c(n, k, m, TA.Mat.matmul_tn_acc(n, k, m, 0n, TA.Mat{arr(nk, seed)}, TA.Mat{arr(km, s1)}, TA.Mat{arr(nm, s2)})))
   U32.show(nn) ++ " " ++ U32.show(nt) ++ " " ++ U32.show(tn) ++ " " ++ U32.show(an) ++ " " ++ U32.show(at) ++ " " ++ U32.show(aw)
 
-def main() -> String:
-  edges() ++ "\n" ++ big(128n, 100n, 784n, 4n, 11)
+def test_main() -> IO(Unit):
+  IO.print(edges() ++ "\n" ++ big(128n, 100n, 784n, 4n, 11))
+
+# This program takes no arguments. Since Bend 2.0.38 a runtime option goes between +RTS and -RTS, and one written
+# without them arrives here as an argument while the program runs on the default thread count, so a check of 1 and 16
+# threads would pass without testing them: any argument is an error.
+def alone(args: List<String>, go: IO(Unit)) -> IO(Unit):
+  match args:
+    case Nil{}:
+      go
+    case Con{p, Nil{}}:
+      go
+    case Con{p, Con{a, t}}:
+      do IO<Unit>:
+        IO.print_err("unexpected argument " ++ a ++ ": this program takes none (runtime options go between +RTS and -RTS)")
+        IO.exit(2)
+
+def main() -> IO(Unit):
+  do IO<Unit>:
+    args : List<String> <- IO.args()
+    alone(args, test_main())

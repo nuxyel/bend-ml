@@ -65,6 +65,9 @@ NOTES exp. 10).
 - A compiled program's runtime options go between `+RTS` and `-RTS` (since 2.0.38): `./x +RTS --threads 16 -RTS`.
   A bare `./x --threads 16` passes `--threads 16` to the program and runs on the default thread count with no error,
   so a thread-count test silently tests nothing. `--gpu off` goes in the same bracket.
+  Three guards (2026-10-23): `scripts/check_rts.py` (in the checks, with `rts-allow.txt`) fails on one written outside
+  the bracket; test programs that take no arguments refuse any; `scripts/rts_probe.py` checks, locally, that 1 and 16
+  threads use 1 and several cores.
 - `match` only inspects a parameter or a pattern variable; a computed value (including a destructuring
   `let` of a call) needs its own def or a parameter computed by the caller.
 - No mutual recursion. Termination reads arguments left to right: each must be passed unchanged until one

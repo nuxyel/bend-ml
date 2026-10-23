@@ -85,5 +85,24 @@ def gd(di: Nat, acc: U32) -> U32:
     case 1n++p:
       gd(p, gn(9n, 1n+p, acc))
 
-def main() -> String:
-  U32.show(gd(4n, 0)) ++ " " ++ Nat.show(Nat.mul(Nat.mul(4n, 81n), Nat.mul(6n, 6n)))
+def test_main() -> IO(Unit):
+  IO.print(U32.show(gd(4n, 0)) ++ " " ++ Nat.show(Nat.mul(Nat.mul(4n, 81n), Nat.mul(6n, 6n))))
+
+# This program takes no arguments. Since Bend 2.0.38 a runtime option goes between +RTS and -RTS, and one written
+# without them arrives here as an argument while the program runs on the default thread count, so a check of 1 and 16
+# threads would pass without testing them: any argument is an error.
+def alone(args: List<String>, go: IO(Unit)) -> IO(Unit):
+  match args:
+    case Nil{}:
+      go
+    case Con{p, Nil{}}:
+      go
+    case Con{p, Con{a, t}}:
+      do IO<Unit>:
+        IO.print_err("unexpected argument " ++ a ++ ": this program takes none (runtime options go between +RTS and -RTS)")
+        IO.exit(2)
+
+def main() -> IO(Unit):
+  do IO<Unit>:
+    args : List<String> <- IO.args()
+    alone(args, test_main())

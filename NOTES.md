@@ -1344,3 +1344,22 @@ through pull request #14 (CI green).
   (135.5-137.1) on 2.0.37 against 136.2 (134.6-137.4) on 2.0.38; 16 threads 105.0 (104.4-106.4) against 106.1
   (104.7-106.8). No difference beyond the spread, the same tokens, the same peak memory; the binary is 4 KB smaller
   (402,656 bytes against 406,656).
+
+## Guards for the runtime options (2026-10-23)
+
+- Since Bend 2.0.38 a runtime option written outside `+RTS ... -RTS` is not an error: the program gets it as an argument
+  and runs on the default thread count, so a 1-and-16-thread check passes while testing nothing. After fixing about 60
+  such calls by hand across the projects, I added three guards:
+  1. `scripts/check_rts.py`, run by the checks (and CI): it fails on any tracked line with `--threads` or `--gpu` left
+     once the `+RTS ... -RTS` spans are taken out, except the lines in `rts-allow.txt`, each with its reason (the log,
+     other programs' own `--threads`). `--self-test` shows it finds a bare option and passes a bracketed one; a bare
+     `--threads` planted in a Makefile fails the checks.
+  2. Test programs that take no arguments refuse any, with exit 2 and a message that names `+RTS` (`IO.args()` holds the
+     program's name only, on C and on JavaScript; the runtime takes `+RTS ... -RTS` out first). The checks run one with a
+     bare `--threads 16` and require the refusal.
+  3. `scripts/rts_probe.py`: a parallel program run with `+RTS --threads 1 -RTS` must use at most 1.5 cores, and with
+     `--threads 16` several. Local only: CI sets `SKIP_RTS_PROBE=1`, and it skips itself under 8 cores. With a wrapper
+     that drops the bracket (a runtime that ignores it), one thread used 10.1 cores and the probe failed, as it should.
+  On this repository: the tests of tensor-fork, tensor-gpu and tensor-array refuse arguments (five of them returned a
+  String and now print it, so `check_all.py` compares the text without quotes); the probe runs tensor-fork's bits test,
+  1.00 and 6.5-6.7 cores.

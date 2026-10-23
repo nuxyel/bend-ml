@@ -114,5 +114,24 @@ def gs(ss: List<&2, S>, +p: Nat, acc: U32) -> U32:
 def shapes() -> List<&2, S>:
   [S{1n, 5n, 3001n}, S{1n, 3n, 1025n}, S{3n, 4n, 1023n}, S{3n, 4n, 1024n}, S{3n, 4n, 1025n}, S{5n, 7n, 2048n}, S{5n, 7n, 2049n}, S{9n, 2n, 8200n}, S{2n, 3n, 49152n}]
 
-def main() -> String:
-  U32.show((((gs(shapes(), 0n, 0) + gs(shapes(), 4n, 0) : U32) + ((short(0n, 3n, 4n, 1023n, 9) + short(4n, 5n, 7n, 1024n, 9) : U32) + (short(0n, 1n, 9n, 700n, 9) + short(4n, 64n, 32n, 1000n, 9) : U32) : U32)) : U32)) ++ " " ++ U32.show(((9 * 2 : U32) + 4 : U32))
+def test_main() -> IO(Unit):
+  IO.print(U32.show((((gs(shapes(), 0n, 0) + gs(shapes(), 4n, 0) : U32) + ((short(0n, 3n, 4n, 1023n, 9) + short(4n, 5n, 7n, 1024n, 9) : U32) + (short(0n, 1n, 9n, 700n, 9) + short(4n, 64n, 32n, 1000n, 9) : U32) : U32)) : U32)) ++ " " ++ U32.show(((9 * 2 : U32) + 4 : U32)))
+
+# This program takes no arguments. Since Bend 2.0.38 a runtime option goes between +RTS and -RTS, and one written
+# without them arrives here as an argument while the program runs on the default thread count, so a check of 1 and 16
+# threads would pass without testing them: any argument is an error.
+def alone(args: List<String>, go: IO(Unit)) -> IO(Unit):
+  match args:
+    case Nil{}:
+      go
+    case Con{p, Nil{}}:
+      go
+    case Con{p, Con{a, t}}:
+      do IO<Unit>:
+        IO.print_err("unexpected argument " ++ a ++ ": this program takes none (runtime options go between +RTS and -RTS)")
+        IO.exit(2)
+
+def main() -> IO(Unit):
+  do IO<Unit>:
+    args : List<String> <- IO.args()
+    alone(args, test_main())

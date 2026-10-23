@@ -157,10 +157,29 @@ def line(+n: Nat) -> String:
   show2(runs(4n, n, P2{0, 0}))
 
 @unsafe
-def main() -> IO(Unit):
+def test_main() -> IO(Unit):
   do IO<Unit>:
     a : Unit <- IO.print(line(1n))
     b : Unit <- IO.print(line(7n))
     c : Unit <- IO.print(line(1000n))
     d : Unit <- IO.print(line(16389n))
     IO.print(line(70000n))
+
+# This program takes no arguments. Since Bend 2.0.38 a runtime option goes between +RTS and -RTS, and one written
+# without them arrives here as an argument while the program runs on the default thread count, so a check of 1 and 16
+# threads would pass without testing them: any argument is an error.
+def alone(args: List<String>, go: IO(Unit)) -> IO(Unit):
+  match args:
+    case Nil{}:
+      go
+    case Con{p, Nil{}}:
+      go
+    case Con{p, Con{a, t}}:
+      do IO<Unit>:
+        IO.print_err("unexpected argument " ++ a ++ ": this program takes none (runtime options go between +RTS and -RTS)")
+        IO.exit(2)
+
+def main() -> IO(Unit):
+  do IO<Unit>:
+    args : List<String> <- IO.args()
+    alone(args, test_main())

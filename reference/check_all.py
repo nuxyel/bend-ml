@@ -44,6 +44,10 @@ def check_toolchain():
 
 def main():
     check_toolchain()
+    # 0. every runtime option given to a Bend program sits between +RTS and -RTS (Bend 2.0.38 passes one written without
+    # them to the program and runs on the default thread count, silently); the self-test shows the check tells them apart
+    run("scripts/check_rts.py --self-test", [PY, "scripts/check_rts.py", "--self-test"])
+    run("runtime options inside +RTS ... -RTS (scripts/check_rts.py)", [PY, "scripts/check_rts.py"])
     # 1. proofs: checker and audited kernel, in each package
     for pkg in ["nat-lemmas", "bpe", "tensor", "tensor-array", "autograd"]:
         f = f"{pkg}/main.bend"
@@ -82,11 +86,15 @@ def main():
         for t in ["1", "16"]:
             run(f"tensor-fork gives tensor-array's bits, A and B intact: 14,832 products, the six public ones, three big ones, par1..par4 ({t} threads)",
                 [tf, "+RTS", "--threads", t, "-RTS"], lambda o, c: o.split() == ["0", "0", "14832"] + ["0"] * 13)
+        run("tensor-fork/tests/bits.bend refuses a bare --threads 16 (a runtime option outside +RTS ... -RTS)", [tf, "--threads", "16"],
+            lambda o, c: c == 2 and "+RTS" in o)
+        run("the runtime takes the thread count: one core on +RTS --threads 1 -RTS, several on 16 (scripts/rts_probe.py)",
+            [PY, "scripts/rts_probe.py", tf])
         tfp = os.path.join(d, "tfp")
         run("compile tensor-fork/tests/precise.bend", [BEND, "tensor-fork/tests/precise.bend", "-o", tfp])
         for t in ["1", "16"]:
             run(f"tensor-fork's matmul_precise gives tensor-array's bits: 21 products ({t} threads)", [tfp, "+RTS", "--threads", t, "-RTS"],
-                lambda o, c: o.strip() == '"0 21"')
+                lambda o, c: o.strip() == "0 21")
     if FULL:
         run("tensor-fork/tests/bits.bend on the JS lane", [BEND, "tensor-fork/tests/bits.bend"],
             lambda o, c: re.findall(r"^[0-9 ]+$", o, re.M) == ["0 0 14832", "0 0 0 0 0 0", "0 0 0 0 0 0 0"])
@@ -125,9 +133,9 @@ def main():
             tgp = os.path.join(d, "tgp")
             run("compile tensor-gpu/tests/precise.bend for CUDA", [BEND, "tensor-gpu/tests/precise.bend", "-o", tgp], extra_env=env)
             run("tensor-gpu's matmul_precise gives tensor-array's bits on the GPU: 21 products", [tgp],
-                lambda o, c: o.strip() == '"0 21"', extra_env=env)
+                lambda o, c: o.strip() == "0 21", extra_env=env)
             run("tensor-gpu's matmul_precise gives tensor-array's bits on the CPU threads: 21 products", [tgp, "+RTS", "--gpu", "off", "--threads", "16", "-RTS"],
-                lambda o, c: o.strip() == '"0 21"', extra_env=env)
+                lambda o, c: o.strip() == "0 21", extra_env=env)
         else:
             print("skip  tensor-gpu on the GPU: no CUDA toolkit (CUDA_HOME)")
     if FULL:
@@ -161,19 +169,19 @@ def main():
         split = os.path.join(d, "split")
         run("compile tensor-array/tests/split.bend", [BEND, "tensor-array/tests/split.bend", "-o", split])
         run("split_depth picks 0 or par, and par 4 gives par 0's bits (tensor-array/tests/split.bend)", [split, "+RTS", "--threads", "16", "-RTS"],
-            lambda o, c: o.strip() == '"0 3 0 0 3 0 4\\n0 0 0 0 0 0"')
+            lambda o, c: o.strip() == "0 3 0 0 3 0 4\n0 0 0 0 0 0")
         parseq = os.path.join(d, "parseq")
         run("compile tensor-array/tests/parseq.bend", [BEND, "tensor-array/tests/parseq.bend", "-o", parseq])
         run("parallel = sequential: 11,664 products at depths 1-4 give depth 0's bits (tensor-array/tests/parseq.bend)", [parseq, "+RTS", "--threads", "16", "-RTS"],
-            lambda o, c: o.strip() == '"0 11664"')
+            lambda o, c: o.strip() == "0 11664")
         onerow = os.path.join(d, "onerow")
         run("compile tensor-array/tests/onerow.bend", [BEND, "tensor-array/tests/onerow.bend", "-o", onerow])
         run("one row at par 4 runs the scalar loop: 50,257 x 768 gives par 0's bits (tensor-array/tests/onerow.bend)", [onerow, "+RTS", "--threads", "16", "-RTS"],
-            lambda o, c: o.strip() == '"0 0 0"')
+            lambda o, c: o.strip() == "0 0 0")
         blocks = os.path.join(d, "blocks")
         run("compile tensor-array/tests/blocks.bend", [BEND, "tensor-array/tests/blocks.bend", "-o", blocks])
         run("matmul_precise sums k in blocks of 1024 from dotr; up to 1024 it is matmul (tensor-array/tests/blocks.bend)", [blocks, "+RTS", "--threads", "16", "-RTS"],
-            lambda o, c: o.strip() == '"0 22"')
+            lambda o, c: o.strip() == "0 22")
     run("tensor-array/tests/checked.bend rejects wrong label counts", [BEND, "tensor-array/tests/checked.bend"], lambda o, c: o.strip() == "[1n, 0n, 0n, 1n, 0n, 0n]")
 
     # 3. tests against the Python references

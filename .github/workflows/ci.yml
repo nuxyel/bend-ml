@@ -13,6 +13,8 @@ jobs:
     name: proofs, kernel, tests, MNIST and GPT-2
     runs-on: ubuntu-24.04      # pinned (ubuntu-latest moves to 26 on 2026-10-19); 4 vCPU, 16 GB RAM, 14 GB disk
     timeout-minutes: 90
+    env:
+      SKIP_RTS_PROBE: 1        # 4 vCPU and noisy CPU time: the runtime's thread-count probe runs on the local machine
     steps:
       - uses: actions/checkout@v7
 

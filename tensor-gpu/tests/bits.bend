@@ -158,8 +158,27 @@ def line1(+g: U32) -> IO(Unit):
   IO.print(U32.show(U32.shrn(g, 16n)) ++ " " ++ U32.show(U32.and(g, 65535)) ++ " " ++ U32.show(gcount()))
 
 @unsafe
-def main() -> IO(Unit):
+def test_main() -> IO(Unit):
   do IO<Unit>:
     line1(grid())
     IO.print(U32.show(pub(128n, 100n, 784n, 0n)) ++ " " ++ U32.show(pub(128n, 100n, 784n, 1n)) ++ " " ++ U32.show(pub(128n, 100n, 784n, 2n)) ++ " " ++ U32.show(pub(128n, 100n, 784n, 3n)) ++ " " ++ U32.show(pub(128n, 100n, 784n, 4n)) ++ " " ++ U32.show(pub(128n, 100n, 784n, 5n)))
     IO.print(U32.show(pub(512n, 576n, 1536n, 0n)) ++ " " ++ U32.show(pub(512n, 576n, 1536n, 2n)) ++ " " ++ U32.show(pub(512n, 576n, 1536n, 5n)))
+
+# This program takes no arguments. Since Bend 2.0.38 a runtime option goes between +RTS and -RTS, and one written
+# without them arrives here as an argument while the program runs on the default thread count, so a check of 1 and 16
+# threads would pass without testing them: any argument is an error.
+def alone(args: List<String>, go: IO(Unit)) -> IO(Unit):
+  match args:
+    case Nil{}:
+      go
+    case Con{p, Nil{}}:
+      go
+    case Con{p, Con{a, t}}:
+      do IO<Unit>:
+        IO.print_err("unexpected argument " ++ a ++ ": this program takes none (runtime options go between +RTS and -RTS)")
+        IO.exit(2)
+
+def main() -> IO(Unit):
+  do IO<Unit>:
+    args : List<String> <- IO.args()
+    alone(args, test_main())

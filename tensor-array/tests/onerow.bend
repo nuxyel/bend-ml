@@ -57,5 +57,24 @@ def one_nn(+k: Nat, +m: Nat, +par: Nat, +seed: U32) -> String:
   +s1 = (seed + 1 : U32)
   U32.show(diff(m, mm_c(1n, k, m, TA.Mat.matmul(1n, k, m, par, TA.Mat{arr(k, seed)}, TA.Mat{arr(km, s1)})), mm_c(1n, k, m, TA.Mat.matmul(1n, k, m, 0n, TA.Mat{arr(k, seed)}, TA.Mat{arr(km, s1)}))))
 
-def main() -> String:
-  one(768n, 50257n, 4n, 5) ++ " " ++ one_nn(768n, 3072n, 4n, 9)
+def test_main() -> IO(Unit):
+  IO.print(one(768n, 50257n, 4n, 5) ++ " " ++ one_nn(768n, 3072n, 4n, 9))
+
+# This program takes no arguments. Since Bend 2.0.38 a runtime option goes between +RTS and -RTS, and one written
+# without them arrives here as an argument while the program runs on the default thread count, so a check of 1 and 16
+# threads would pass without testing them: any argument is an error.
+def alone(args: List<String>, go: IO(Unit)) -> IO(Unit):
+  match args:
+    case Nil{}:
+      go
+    case Con{p, Nil{}}:
+      go
+    case Con{p, Con{a, t}}:
+      do IO<Unit>:
+        IO.print_err("unexpected argument " ++ a ++ ": this program takes none (runtime options go between +RTS and -RTS)")
+        IO.exit(2)
+
+def main() -> IO(Unit):
+  do IO<Unit>:
+    args : List<String> <- IO.args()
+    alone(args, test_main())
