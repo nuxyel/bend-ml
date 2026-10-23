@@ -6,7 +6,7 @@ when there is one; and, since 0.1.1.0, bangs over any leaf code written in plain
 a training step (element-wise layers, norms, attention, the optimizer). It is **not proved**, and says so: like [`bend-ml-tensor-fork`](../tensor-fork), it shares arrays
 between the leaves of a fork tree through Base's `@unsafe` `Array.fork`.
 
-- Bend: **2.0.37** · License: MIT · Depends on `bend-ml-tensor-array@0.1.14.0`. Versions on BendHub: 0.1.0.0, the
+- Bend: **2.0.38** · License: MIT · Depends on `bend-ml-tensor-array@0.1.14.0`. Versions on BendHub: 0.1.0.0, the
   products alone (hash `0xb00297062e21c56b88008f0c5387c0a0`); 0.1.1.0, with `run1`..`run4`
   (`0x92c8fe8f8abfa0e0018d7f1c3ddd061c`), both on tensor-array 0.1.12.0; 0.1.1.1, the same code on tensor-array
   0.1.13.0; 0.1.2.0, `matmul_precise` (tensor-array 0.1.14.0's opt-in precise product, a bang a block, its slices copied on the
@@ -30,7 +30,7 @@ def prod(x: TA.Mat<256n, 576n>, w: TA.Mat<1536n, 576n>) -> TA.MMulNT<256n, 576n,
 ```
 
 Build with CUDA to get the GPU: `CUDA_HOME=... bend x.bend -o x` writes `x` and `x.gpu`. Without CUDA, or with
-`./x --gpu off`, the same bangs run on the CPU threads, with the same bits.
+`./x +RTS --gpu off -RTS`, the same bangs run on the CPU threads, with the same bits.
 
 ## How it works
 

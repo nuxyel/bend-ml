@@ -5,7 +5,7 @@ forms), with the same arguments, result types and bits, but with the parallel bl
 of copying them, and `par1`..`par4`, which run any kernel of yours over blocks of a range on up to four shared arrays.
 It is faster wherever the work splits into blocks; it is **not proved**, and says so.
 
-- Bend: **2.0.37** · License: MIT · Depends on `bend-ml-tensor-array@0.1.14.0`.
+- Bend: **2.0.38** · License: MIT · Depends on `bend-ml-tensor-array@0.1.14.0`.
 - `bend tensor-fork/main.bend` → `SOME PROOFS FAIL`, naming the 32 defs that rely on `@unsafe` code (below). All of it is
   Bend: no foreign code.
 - Tests: `tests/bits.bend`, against tensor-array, bit for bit (below).

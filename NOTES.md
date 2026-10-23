@@ -4,7 +4,7 @@ Date: 2026-10-03. Everything below was verified on the machine or in a primary s
 
 ## Pinned version
 
-- **Bend 2.0.37** (`bend version`), since 2026-10-13 (2.0.36 from 2026-10-10, 2.0.35 before). Pin this version until further notice.
+- **Bend 2.0.38** (`bend version`), since 2026-10-23 (2.0.37 from 2026-10-13, 2.0.36 from 2026-10-10, 2.0.35 before). Pin this version until further notice.
 - Official repository: `github.com/bendlang/bend` (not `HigherOrderCO/Bend`, which is Bend 1).
 - Installed with `curl -fsSL https://bend-lang.com/install.sh | sh` (script read before running: it downloads the GitHub release, checks the SHA256, installs only into `~/.bend`, no sudo).
 - Update: `bend update` (runs the installer again). Do not update without recording it here, since Bend 2 changes fast.
@@ -1322,3 +1322,25 @@ through pull request #14 (CI green).
   `bend-ml-autograd@0.1.1.0`). Their hub descriptions stay as they are until a version would change them.
 - llama.bend moved its last five list helpers off `bend-ml-tensor` into its own code, with the same bits (llama.bend
   NOTES, 2026-10-19).
+
+## Bend 2.0.38 (2026-10-23)
+
+- **Pin.** The same checklist as 2.0.37's: `scripts/setup.sh` (version and both SHA256 sums, computed from the release's
+  tarballs, which publish no checksums file), `check_all.py`, the CI step, the README badge and setup line, CONTRIBUTING,
+  the `Bend:` line of each package README, CLAUDE.md and "Pinned version".
+- **Runtime options between `+RTS` and `-RTS`** (bendlang/bend#1530, breaking): `./x --threads 16` now passes
+  `--threads 16` to the program and runs on the default thread count with no error, so the 1-and-16-thread checks would
+  have passed while testing nothing. `check_all.py`, `test_published.py` and `bench/` pass `+RTS --threads N -RTS`; on
+  `tensor-fork/tests/bits.bend` one thread takes 99% of a CPU and 16 take 591%.
+- **Two changes in the checker's output**, no change in what it says: the defs outside the proofs are listed on one line
+  per kind ("defs that depend on @unsafe: a, b") instead of one `- name` per line (bendlang/bend#1531), and the emitted C
+  names functions in lower case (`FID____main_bmv_j41`). The counts and names of binary-read's (1), tensor-fork's (32)
+  and tensor-gpu's (54) defs are the same, and `Bands.matvec` keeps its parallel join.
+- **`make check-full`: 92/92**; `reference/test_published.py`: the published packages pass on 2.0.38.
+- **Packages.** No source changed, so none is republished. tensor-gpu's header comment still says `--gpu off`; it goes
+  with the next real change to tensor-gpu, as `bmv`'s comment did for 2.0.37.
+- **GPT-2 timings, the same commit (`34f2be8`) built with 2.0.37 and 2.0.38**, 7 alternated rounds in one session on
+  mains power (the evidence harness, `gpt2` block; medians and interquartile ranges, ms per token): one thread 136.6
+  (135.5-137.1) on 2.0.37 against 136.2 (134.6-137.4) on 2.0.38; 16 threads 105.0 (104.4-106.4) against 106.1
+  (104.7-106.8). No difference beyond the spread, the same tokens, the same peak memory; the binary is 4 KB smaller
+  (402,656 bytes against 406,656).

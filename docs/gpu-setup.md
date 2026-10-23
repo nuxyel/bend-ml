@@ -18,7 +18,7 @@ Then, in each shell that builds or runs a GPU program:
 ```bash
 export CUDA_HOME=$HOME/.local/cuda12 LD_LIBRARY_PATH=$HOME/.local/cuda12/lib
 bend prog.bend -o prog     # also writes prog.gpu, which must stay next to the binary
-./prog                     # `f!(x)` calls run on the GPU; `./prog --gpu off` forces the CPU
+./prog                     # `f!(x)` calls run on the GPU; `./prog +RTS --gpu off -RTS` forces the CPU
 ```
 
 Checked on 2026-10-04 with driver 610.57.04 and an RTX 4050 Laptop (6 GB): the guide's `pow2!(26n)` builds, runs on the GPU and returns the right value.

@@ -160,7 +160,7 @@ def check_fork():
         f = os.path.join(d, "fork.bend")
         open(f, "w").write(FORK.format(ta=ta_of("bend-ml-tensor-fork"), tf=tf))
         cc = subprocess.run([BEND, f, "-o", os.path.join(d, "fork")], capture_output=True, text=True, env=ENV, cwd=d)
-        c = subprocess.run([os.path.join(d, "fork"), "--threads", "4"], capture_output=True, text=True, cwd=d) if cc.returncode == 0 else cc
+        c = subprocess.run([os.path.join(d, "fork"), "+RTS", "--threads", "4", "-RTS"], capture_output=True, text=True, cwd=d) if cc.returncode == 0 else cc
     lines = [l.split() for l in c.stdout.strip().splitlines()]
     ok = len(lines) == 2 and all(len(l) == 2 and l[0] == l[1] for l in lines)
     print(("ok   " if ok else "ERROR ") + f"published {tf.replace('bend-ml-', '')}: a split product and par1 give the one-block bits")
@@ -201,7 +201,7 @@ def check_gpu():
         f = os.path.join(d, "gpu.bend")
         open(f, "w").write(GPU.format(ta=ta_of("bend-ml-tensor-gpu"), tg=tg))
         cc = subprocess.run([BEND, f, "-o", os.path.join(d, "gpu")], capture_output=True, text=True, env=ENV, cwd=d)
-        c = subprocess.run([os.path.join(d, "gpu"), "--threads", "4"], capture_output=True, text=True, cwd=d) if cc.returncode == 0 else cc
+        c = subprocess.run([os.path.join(d, "gpu"), "+RTS", "--threads", "4", "-RTS"], capture_output=True, text=True, cwd=d) if cc.returncode == 0 else cc
     words = c.stdout.split()
     ok = len(words) == 2 and words[0] == words[1]
     print(("ok   " if ok else "ERROR ") + f"published {tg.replace('bend-ml-', '')}: its product gives tensor-array's bits")

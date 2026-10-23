@@ -5,5 +5,5 @@ extra = sys.argv[3:]
 for t in threads:
     ts = []
     for _ in range(3):
-        t0 = time.time(); r = subprocess.run([exe, "--threads", str(t), *extra], capture_output=True, text=True); ts.append(time.time() - t0)
+        t0 = time.time(); r = subprocess.run([exe, "+RTS", "--threads", str(t), "-RTS", *extra], capture_output=True, text=True); ts.append(time.time() - t0)
     print(f"threads={t:2d}  {statistics.median(ts):7.3f}s   output: {r.stdout.strip()[:40]}")

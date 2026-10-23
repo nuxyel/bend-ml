@@ -35,7 +35,7 @@ def run(exe, threads):
     ts, out = [], ""
     for _ in range(3):
         t0 = time.perf_counter()
-        r = subprocess.run([exe, "--threads", str(threads)], capture_output=True, text=True)
+        r = subprocess.run([exe, "+RTS", "--threads", str(threads), "-RTS"], capture_output=True, text=True)
         ts.append(time.perf_counter() - t0)
         out = r.stdout.strip()
     return statistics.median(ts), out

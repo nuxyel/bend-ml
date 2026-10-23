@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/nuxyel/bend-ml/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/nuxyel/bend-ml/ci.yml?branch=main&style=flat-square&label=ci&labelColor=4d4a44&color=7e9a5e" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8b83b5?style=flat-square&labelColor=4d4a44" alt="MIT license"></a>
-  <a href="https://bend-lang.com"><img src="https://img.shields.io/badge/Bend-2.0.37-8b83b5?style=flat-square&labelColor=4d4a44" alt="Bend 2.0.37"></a>
+  <a href="https://bend-lang.com"><img src="https://img.shields.io/badge/Bend-2.0.38-8b83b5?style=flat-square&labelColor=4d4a44" alt="Bend 2.0.38"></a>
   <img src="https://img.shields.io/badge/laws%20proved-27-7e9a5e?style=flat-square&labelColor=4d4a44" alt="27 laws proved">
 </p>
 
@@ -105,6 +105,8 @@ sums changed on purpose):
 | v1.3.2 | the MNIST demo moves from `tensor-array` 0.1.3.0 to 0.1.11.0; the README and its figures measured again | an MNIST epoch 17.9 → 11.9 s on one thread, 7.3 → 4.4 s on 16, the same test hits |
 | v1.4.0 | the new `bend-ml-tensor-fork`: tensor-array's products with the parallel blocks sharing their operands (`@unsafe`, outside the proofs); `tensor-array` 0.1.12.0: a product with one row runs sequentially | an MNIST epoch with tensor-fork 12.0 → 6.2 s on one thread, 4.4 → 3.0 s on 16, the same bits; one row against GPT-2's 50,257 x 768 weights at par 4: 9.5 GB → 565 MB |
 | v1.5.0 | `bend-ml-tensor-fork` 0.1.1.0: `par1`..`par4` (any kernel over blocks of shared arrays), A and B packed in blocks when big, output arrays sized without `cap_depth` | a training step of one SmolLM2-135M-sized block on 16 threads 6% faster; the products' bits unchanged |
+| v1.6.0 | the new `bend-ml-tensor-gpu`: tensor-array's six products as one GPU call each; `tensor-array` 0.1.14.0: `matmul_precise`, long dot products summed in blocks of 1024 | the same bits as tensor-array on the GPU and on the CPU threads |
+| v1.6.1 | Bend 2.0.38: a compiled program's runtime options now go between `+RTS` and `-RTS` | GPT-2 per token unchanged (136.2 against 136.6 ms on one thread, 106.1 against 105.0 on 16); the binary 4 KB smaller |
 
 Versions are numbered as in [`docs/VERSIONING.md`](docs/VERSIONING.md); each release has its notes on GitHub.
 
@@ -114,7 +116,7 @@ Linux x86_64 (or WSL), clang ≥ 14, Python ≥ 3.12, `curl`, ~3 GB of disk, 8 G
 
 ```bash
 git clone https://github.com/nuxyel/bend-ml.git && cd bend-ml
-make setup          # Bend 2.0.37 (SHA256-checked), Lean 4.34.0, Python venv, data; no sudo
+make setup          # Bend 2.0.38 (SHA256-checked), Lean 4.34.0, Python venv, data; no sudo
 make check          # 82 checks
 make check-full     # the same plus GPT-2 and MNIST
 make media          # regenerate the figures on this page (needs node, ffmpeg, Brave)
