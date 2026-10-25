@@ -23,6 +23,9 @@ import {ag}/main.bend as AG
 def law_nat(a: Nat, +b: Nat) -> {{Nat.add(a, b) == Nat.add(b, a) : Nat}}:
   NL.add_comm(a, b)
 
+def law_nat4(+a: Nat, +b: Nat, +c: Nat, +d: Nat) -> {{Nat.add(Nat.add(a, b), Nat.add(c, d)) == Nat.add(Nat.add(a, c), Nat.add(b, d)) : Nat}}:
+  NL.add4(a, b, c, d)
+
 def law_bpe(+n: Nat, +corpus: List<&2, Nat>, +bs: List<&2, Nat>) -> {{BPE.decode(BPE.train(n, 0n, BPE.lift(corpus)), BPE.encode(BPE.train(n, 0n, BPE.lift(corpus)), BPE.lift(bs))) == bs : List<&2, Nat>}}:
   BPE.roundtrip_trained(n, corpus, bs)
 
@@ -63,7 +66,8 @@ def main() -> Nat:
 """
 
 
-# bend-ml-binary-read is foreign code (no laws): read 1.0 and -2.5 back from a file, on the JS and the C lane
+# bend-ml-binary-read is foreign code (no laws): read 1.0 and -2.5 back from a file, as F32 and then as BF16 at byte 8
+# (0.2.0.0's read_bf16_at), on the JS and the C lane
 READ = """import Base
 import {br}/main.bend as R
 
@@ -90,20 +94,23 @@ def main() -> IO(Unit):
     f : File <- IO.try(File, File.open("w.bin", "r"))
     p : File & (Array<F32> & Result<&1, &1, U32 & String, U32>) <- R.read_f32(f, 0, 2, Array.new(F32, 1n, 0.0))
     show(p)
+    g : File <- IO.try(File, File.open("w.bin", "r"))
+    q : File & (Array<F32> & Result<&1, &1, U32 & String, U32>) <- R.read_bf16_at(g, 0, 8, 2, Array.new(F32, 1n, 0.0))
+    show(q)
 """
 
 
 def check_read():
     br = f"bend-ml-binary-read@{VERS['bend-ml-binary-read']}"
     with tempfile.TemporaryDirectory() as d:
-        open(os.path.join(d, "w.bin"), "wb").write(bytes([0, 0, 128, 63, 0, 0, 32, 192]))
+        open(os.path.join(d, "w.bin"), "wb").write(bytes([0, 0, 128, 63, 0, 0, 32, 192, 128, 63, 32, 192]))
         f = os.path.join(d, "read.bend")
         open(f, "w").write(READ.format(br=br))
         js = subprocess.run([BEND, f], capture_output=True, text=True, env=ENV, cwd=d)
         cc = subprocess.run([BEND, f, "-o", os.path.join(d, "read")], capture_output=True, text=True, env=ENV, cwd=d)
         c = subprocess.run([os.path.join(d, "read")], capture_output=True, text=True, cwd=d) if cc.returncode == 0 else cc
     outs = [js.stdout.strip(), c.stdout.strip()]
-    ok = outs == ["8 1 -2.5", "8 1 -2.5"]
+    ok = outs == ["8 1 -2.5\n2 1 -2.5"] * 2  # read_f32 answers bytes, read_bf16_at whole numbers
     print(("ok   " if ok else "ERROR ") + f"published {br.replace('bend-ml-', '')} on the JS and C lanes")
     if not ok:
         print(outs, (js.stderr + c.stderr)[:800])

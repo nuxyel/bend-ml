@@ -2,7 +2,7 @@
 
 Proved lemmas about `Nat` and `List` that Bend 2's Base does not have yet. They are the foundation for the rest of bend-ml (tensor shapes, the tokenizer).
 
-- Bend: **2.0.38**
+- Bend: **2.0.39**
 - License: MIT
 - No `@unsafe`, no `?TODO`: `bend nat-lemmas/main.bend` prints `ALL PROOFS CHECK`, and `bend nat-lemmas/main.bend --verdict` re-checks it with the Lean-proved kernel.
 
@@ -10,7 +10,7 @@ Proved lemmas about `Nat` and `List` that Bend 2's Base does not have yet. They 
 
 ```python
 import Base
-import bend-ml-nat-lemmas@0.1.1.0/main.bend as NL
+import bend-ml-nat-lemmas@0.1.2.0/main.bend as NL
 
 def comm(a: Nat, +b: Nat) -> {Nat.add(a, b) == Nat.add(b, a) : Nat}:
   NL.add_comm(a, b)
@@ -31,6 +31,8 @@ A parameter carries `+` when it may be used more than once (Bend's affine-variab
 | `mul_comm` | `a * b = b * a` (multiplication is commutative) |
 | `mul_dist` | `a*c + b*c = (a + b)*c` (distributivity) |
 | `mul_assoc` | `a * (b * c) = (a * b) * c` (multiplication is associative) |
+| `add4` | `(a + b) + (c + d) = (a + c) + (b + d)` (the middle terms of a four-term sum swap) |
+| `mul_dist_l` | `k * (a + b) = k*a + k*b` (distributivity from the left) |
 | `mul_one_l`, `mul_one_r` | `1 * a = a` and `a * 1 = a` |
 | `append_nil` | `xs ++ [] = xs` |
 | `append_assoc` | `(xs ++ ys) ++ zs = xs ++ (ys ++ zs)` |

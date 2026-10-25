@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/nuxyel/bend-ml/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/nuxyel/bend-ml/ci.yml?branch=main&style=flat-square&label=ci&labelColor=4d4a44&color=7e9a5e" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8b83b5?style=flat-square&labelColor=4d4a44" alt="MIT license"></a>
-  <a href="https://bend-lang.com"><img src="https://img.shields.io/badge/Bend-2.0.38-8b83b5?style=flat-square&labelColor=4d4a44" alt="Bend 2.0.38"></a>
+  <a href="https://bend-lang.com"><img src="https://img.shields.io/badge/Bend-2.0.39-8b83b5?style=flat-square&labelColor=4d4a44" alt="Bend 2.0.39"></a>
   <img src="https://img.shields.io/badge/laws%20proved-27-7e9a5e?style=flat-square&labelColor=4d4a44" alt="27 laws proved">
 </p>
 
@@ -34,17 +34,17 @@ only compiles with a proof that the number of elements does not change, even whe
 
 | Package | Version | What it is | Proved laws |
 |---|---|---|---|
-| [`bend-ml-nat-lemmas`](nat-lemmas) | 0.1.1.0 | `Nat` and `List` lemmas that Base does not have | `add_comm`, `add_assoc`, `mul_comm`, `mul_assoc`, `mul_dist`, `append_assoc`, `length_append`, `product_append`... (15) |
+| [`bend-ml-nat-lemmas`](nat-lemmas) | 0.1.2.0 | `Nat` and `List` lemmas that Base does not have | `add_comm`, `add_assoc`, `mul_comm`, `mul_assoc`, `mul_dist`, `append_assoc`, `length_append`, `product_append`, `add4`, `mul_dist_l`... (17) |
 | [`bend-ml-bpe-tokenizer`](bpe) | 0.1.3.0 | Byte-level BPE tokenizer (GPT-2 style) | **roundtrip** `decode(encode(s)) = s`, `vocab_bound`, `dec_append`, `train_wf`, `roundtrip_trained` |
 | [`bend-ml-tensor`](tensor) | 0.1.2.0 | `Vec<n>` and `Mat<r,c>` with the shape in the type, over lists. **Frozen** (2026-10-19): no new versions; superseded by tensor-array | `reshape_swap`, `reshape_flat` |
-| [`bend-ml-tensor-array`](tensor-array) | 0.1.14.0 | the same guarantees over a flat `Array<F32>`; `Bands<r,c>` for a parallel matrix · vector | `cap_ok`, `half_cover`, `leaf_len`, `band_len`; typed `matmul`, `matmul_nt`, `matmul_tn` (and their accumulating forms), `Bands.matvec` |
+| [`bend-ml-tensor-array`](tensor-array) | 0.1.16.0 | the same guarantees over a flat `Array<F32>`; `Bands<r,c>` for a parallel matrix · vector | `cap_ok`, `half_cover`, `leaf_len`, `band_len`; typed `matmul`, `matmul_nt`, `matmul_tn` (and their accumulating forms), `Bands.matvec` |
 | [`bend-ml-autograd`](autograd) | 0.1.1.0 | Automatic differentiation and layers with typed backward. **Frozen** (2026-10-19): no new versions; training moves to [BendTorch](https://github.com/nuxyel/bendtorch) | **`reverse_eq_forward`** |
-| [`bend-ml-binary-read`](binary-read) | 0.1.0.0 | F32 weights read from a file straight into an `Array<F32>`; foreign code (C and JavaScript), kept out of the packages with laws | none: an effect, tested on both lanes |
-| [`bend-ml-tensor-fork`](tensor-fork) | 0.1.2.0 | tensor-array's six products with the parallel blocks sharing A, B and C (`Array.fork`, `@unsafe` in Base) instead of copying them: an MNIST epoch 12.0 → 6.2 s on one thread, 4.4 → 3.0 s on 16; `par1`..`par4`, any kernel over blocks of shared arrays | none: the same bits as tensor-array, tested on 14,835 products; kept out of the packages with laws |
-| [`bend-ml-tensor-gpu`](tensor-gpu) | 0.1.2.1 | tensor-array's six products as one `!` call each, so they run on the GPU (`Array.fork`, `@unsafe` in Base); at SmolLM2-135M's sizes 1.6-2.8x faster than tensor-fork on 16 threads, 512 x 4096 x 512 4.5x; `run1`..`run4`, bangs over any leaf code written in plain Bend | none: the same bits as tensor-array on the GPU and the CPU, tested on 2,967 products; kept out of the packages with laws |
+| [`bend-ml-binary-read`](binary-read) | 0.2.0.0 | F32 and BF16 weights read from a file straight into an `Array<F32>`, at offsets past 4 GiB; foreign code (C and JavaScript), kept out of the packages with laws | none: an effect, tested on both lanes |
+| [`bend-ml-tensor-fork`](tensor-fork) | 0.1.4.0 | tensor-array's six products with the parallel blocks sharing A, B and C (`Array.fork`, `@unsafe` in Base) instead of copying them: an MNIST epoch 12.0 → 6.2 s on one thread, 4.4 → 3.0 s on 16; `par1`..`par4`, any kernel over blocks of shared arrays | none: the same bits as tensor-array, tested on 14,835 products; kept out of the packages with laws |
+| [`bend-ml-tensor-gpu`](tensor-gpu) | 0.1.4.0 | tensor-array's six products as one `!` call each, so they run on the GPU (`Array.fork`, `@unsafe` in Base); at SmolLM2-135M's sizes 1.6-2.8x faster than tensor-fork on 16 threads, 512 x 4096 x 512 4.5x; `run1`..`run4`, bangs over any leaf code written in plain Bend | none: the same bits as tensor-array on the GPU and the CPU, tested on 2,967 products; kept out of the packages with laws |
 
 ```python
-import bend-ml-tensor-array@0.1.14.0/main.bend as TA
+import bend-ml-tensor-array@0.1.16.0/main.bend as TA
 import bend-ml-bpe-tokenizer@0.1.3.0/main.bend as BPE
 ```
 
@@ -53,8 +53,8 @@ import bend-ml-bpe-tokenizer@0.1.3.0/main.bend as BPE
 <p align="center"><img src="docs/media/diagram.svg" alt="The six packages: nat-lemmas is imported by bpe-tokenizer, tensor and autograd; tensor-array stands alone; binary-read is foreign code; the GPT-2 demo uses bpe-tokenizer, tensor, tensor-array and binary-read; the MNIST demo uses tensor and tensor-array" width="90%"></p>
 
 Every package with laws passes `bend X/main.bend --verdict`, the re-check by Bend's Lean-proved kernel, with no `@unsafe`
-and no `?TODO`. `bend-ml-binary-read` is the exception by design: it is a file read written in C and JavaScript, one
-definition, and no package with laws imports it (`make check` checks both).
+and no `?TODO`. `bend-ml-binary-read` is the exception by design: its reads are written in C and JavaScript, six
+definitions, and no package with laws imports it (`make check` checks both).
 
 Numbers are a different matter: `F32` is not a real number, so the numerics are tested against PyTorch, NumPy and
 `tiktoken` instead of proved. [`docs/AUDIT.md`](docs/AUDIT.md) lists the trust base.
@@ -82,6 +82,8 @@ next to v1.2.2, PyTorch and NumPy again, which came out within 2% of their numbe
 dfdx and candle keep theirs. GPT-2's cost per token is unchanged since v1.2.2 (139 ms on one thread, 107 on 16); what
 changed is the start (1.0 s instead of 5.4, at 831 MB instead of 1,464 MB) and training: an MNIST batch takes 20.0 ms
 instead of 29.9 on one thread, 7.7 instead of 12.8 on 16.
+Bend 2.0.39 alone then took a token to 128 ms on one thread and 86 on 16, against 138 and 106 for the same commit
+built with 2.0.38 (idle machine, 7 alternated rounds, 2026-10-24); the charts below still show the earlier numbers.
 
 <p align="center"><img src="docs/media/deck/frames/04-vs-references.webp" alt="GPT-2 small, ms per token: PyTorch 18.5 and 9.4, NumPy 18.5 and 11.2, llama.cpp 22.2 and 9.8, bend-ml v1.3.2 139 and 107, llm.c without a key/value cache 529 and 142, on 1 and 16 threads" width="90%"></p>
 
@@ -108,6 +110,7 @@ sums changed on purpose):
 | v1.6.0 | the new `bend-ml-tensor-gpu`: tensor-array's six products as one GPU call each; `tensor-array` 0.1.14.0: `matmul_precise`, long dot products summed in blocks of 1024 | the same bits as tensor-array on the GPU and on the CPU threads |
 | v1.6.1 | Bend 2.0.38: a compiled program's runtime options now go between `+RTS` and `-RTS` | GPT-2 per token unchanged (136.2 against 136.6 ms on one thread, 106.1 against 105.0 on 16); the binary 4 KB smaller |
 | v1.6.2 | the checks guard the runtime options: one outside `+RTS ... -RTS` fails them, test programs refuse arguments, and a probe checks that 1 and 16 threads use 1 and several cores | the packages and their bits unchanged |
+| v1.7.0 | Bend 2.0.39; `binary-read` 0.2.0.0: reads at 64-bit offsets, BF16 files and reads into a cell offset; `nat-lemmas` 0.1.2.0: `add4`, `mul_dist_l`; `tensor-array` 0.1.16.0 with `tensor-fork` and `tensor-gpu` 0.1.4.0 (0.1.14.0's code again, after 0.1.15.0's faster loop proved slower inside a whole program) | GPT-2 128 ms a token on one thread, 86 on 16 (138 and 106 with Bend 2.0.38); the products' bits those of 0.1.14.0 |
 
 Versions are numbered as in [`docs/VERSIONING.md`](docs/VERSIONING.md); each release has its notes on GitHub.
 
@@ -117,7 +120,7 @@ Linux x86_64 (or WSL), clang ≥ 14, Python ≥ 3.12, `curl`, ~3 GB of disk, 8 G
 
 ```bash
 git clone https://github.com/nuxyel/bend-ml.git && cd bend-ml
-make setup          # Bend 2.0.38 (SHA256-checked), Lean 4.34.0, Python venv, data; no sudo
+make setup          # Bend 2.0.39 (SHA256-checked), Lean 4.34.0, Python venv, data; no sudo
 make check          # 82 checks
 make check-full     # the same plus GPT-2 and MNIST
 make media          # regenerate the figures on this page (needs node, ffmpeg, Brave)

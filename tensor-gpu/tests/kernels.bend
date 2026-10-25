@@ -4,7 +4,7 @@
 # trees from depth(n). Prints, per n: the differing words in the outputs of the eight runs, then in the inputs (the
 # shared arrays must come back as they went in): "0 0" five times.
 import Base
-import bend-ml-tensor-array@0.1.14.0/main.bend as TA
+import bend-ml-tensor-array@0.1.16.0/main.bend as TA
 import ../main.bend as TG
 
 def val(+i: U32, +seed: U32) -> F32:

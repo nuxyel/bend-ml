@@ -4,7 +4,7 @@
 
 Automatic differentiation in Bend 2, with a **proved law**: the reverse mode (what neural-network training uses) computes the same derivative as the forward mode.
 
-- Bend: **2.0.38** · License: MIT · Depends on `bend-ml-nat-lemmas@0.1.0.0` and `bend-ml-tensor@0.1.0.0`.
+- Bend: **2.0.39** · License: MIT · Depends on `bend-ml-nat-lemmas@0.1.0.0` and `bend-ml-tensor@0.1.0.0`.
 - `bend autograd/main.bend` and `--verdict` → `ALL PROOFS CHECK` (no `@unsafe`, no `?TODO`).
 
 ## What it has

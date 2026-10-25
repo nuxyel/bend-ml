@@ -1,7 +1,7 @@
 # bend-ml-tensor-gpu: tensor-array's products on the GPU, with tensor-array's bits.
 #
 #   import ../tensor-array/main.bend as TA
-#   import bend-ml-tensor-gpu@0.1.2.1/main.bend as TG
+#   import bend-ml-tensor-gpu@0.1.4.0/main.bend as TG
 #   TG.matmul(n, k, m, par, a, b)      # the same arguments, result type and bits as TA.Mat.matmul
 #
 # The six products (matmul, matmul_nt, matmul_tn and their accumulating forms) take tensor-array's Mat values and return
@@ -22,7 +22,7 @@
 # writes only its own tile of C, or never writes A or B; the tiles are disjoint by construction (leaf t writes tile t).
 # All of it is Bend: no foreign code. Written by bend-ml's scripts/gen_tensor_gpu.py (4 x 4 tiles).
 import Base
-import bend-ml-tensor-array@0.1.14.0/main.bend as TA
+import bend-ml-tensor-array@0.1.16.0/main.bend as TA
 
 # the sizes and strides of one product: C[i][j] = sum_p A[oa + i*arow + p*sa] * B[ob + p*sb + j*bcol], n x m, k steps
 # (oa, ob: 0 except for matmul_precise's blocks)

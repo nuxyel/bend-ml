@@ -4,7 +4,7 @@
 
 Tensors in Bend 2 with the **shape in the type**: a shape error is a type error, not a run-time failure.
 
-- Bend: **2.0.38** · License: MIT · Depends on `bend-ml-nat-lemmas@0.1.0.0`.
+- Bend: **2.0.39** · License: MIT · Depends on `bend-ml-nat-lemmas@0.1.0.0`.
 - `bend tensor/main.bend` and `bend tensor/main.bend --verdict` → `ALL PROOFS CHECK` (no `@unsafe`, no `?TODO`).
 
 ```python

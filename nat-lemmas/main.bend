@@ -1,6 +1,6 @@
 # bend-ml-nat-lemmas: Nat and List lemmas, proved, that Bend's Base does not have.
 #
-#   import bend-ml-nat-lemmas@0.1.1.0/main.bend as NL
+#   import bend-ml-nat-lemmas@0.1.2.0/main.bend as NL
 #   NL.add_comm(a, b)   NL.mul_assoc(a, b, c)   NL.product_append(xs, ys) ...
 #
 # Each `law` states a fact; the `def` right below it is the proof, checked by the kernel.
@@ -169,6 +169,39 @@ def mul_assoc(a, b, c):
     case 1n++p:
       %Equal.sym(Nat, Nat.mul(p, Nat.mul(b, c)), Nat.mul(Nat.mul(p, b), c), mul_assoc(p, b, c)) : {Nat.add(Nat.mul(b, c), _) == Nat.mul(Nat.add(b, Nat.mul(p, b)), c) : Nat}
       mul_dist(b, Nat.mul(p, b), c)
+
+law add4:
+  for +a: Nat
+  for +b: Nat
+  for +c: Nat
+  for +d: Nat
+  {Nat.add(Nat.add(a, b), Nat.add(c, d)) == Nat.add(Nat.add(a, c), Nat.add(b, d)) : Nat}
+
+# (a + b) + (c + d) == (a + c) + (b + d)
+# Regroup to a + (b + (c + d)), swap b and c in the middle (add_swap), and regroup back.
+def add4(a, b, c, d):
+  Equal.trans(Nat, Nat.add(Nat.add(a, b), Nat.add(c, d)), Nat.add(a, Nat.add(b, Nat.add(c, d))), Nat.add(Nat.add(a, c), Nat.add(b, d)),
+    Equal.sym(Nat, Nat.add(a, Nat.add(b, Nat.add(c, d))), Nat.add(Nat.add(a, b), Nat.add(c, d)), add_assoc(a, b, Nat.add(c, d))),
+    Equal.trans(Nat, Nat.add(a, Nat.add(b, Nat.add(c, d))), Nat.add(a, Nat.add(c, Nat.add(b, d))), Nat.add(Nat.add(a, c), Nat.add(b, d)),
+      Equal.cong(Nat, Nat, s => Nat.add(a, s), Nat.add(b, Nat.add(c, d)), Nat.add(c, Nat.add(b, d)), add_swap(b, c, d)),
+      add_assoc(a, c, Nat.add(b, d))))
+
+law mul_dist_l:
+  for +k: Nat
+  for +a: Nat
+  for +b: Nat
+  {Nat.mul(k, Nat.add(a, b)) == Nat.add(Nat.mul(k, a), Nat.mul(k, b)) : Nat}
+
+# k * (a + b) == k * a + k * b
+# Turn k * (a + b) into (a + b) * k (mul_comm), split it with mul_dist, and turn each product back around.
+def mul_dist_l(k, a, b):
+  Equal.trans(Nat, Nat.mul(k, Nat.add(a, b)), Nat.mul(Nat.add(a, b), k), Nat.add(Nat.mul(k, a), Nat.mul(k, b)),
+    mul_comm(k, Nat.add(a, b)),
+    Equal.trans(Nat, Nat.mul(Nat.add(a, b), k), Nat.add(Nat.mul(a, k), Nat.mul(b, k)), Nat.add(Nat.mul(k, a), Nat.mul(k, b)),
+      Equal.sym(Nat, Nat.add(Nat.mul(a, k), Nat.mul(b, k)), Nat.mul(Nat.add(a, b), k), mul_dist(a, b, k)),
+      Equal.trans(Nat, Nat.add(Nat.mul(a, k), Nat.mul(b, k)), Nat.add(Nat.mul(k, a), Nat.mul(b, k)), Nat.add(Nat.mul(k, a), Nat.mul(k, b)),
+        Equal.cong(Nat, Nat, s => Nat.add(s, Nat.mul(b, k)), Nat.mul(a, k), Nat.mul(k, a), mul_comm(a, k)),
+        Equal.cong(Nat, Nat, s => Nat.add(Nat.mul(k, a), s), Nat.mul(b, k), Nat.mul(k, b), mul_comm(b, k)))))
 
 law mul_one_l:
   for +a: Nat

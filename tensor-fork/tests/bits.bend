@@ -12,7 +12,7 @@
 # 1000 against the same kernel in one loop, differing words in every array (the ones only read included):
 # "0 0 0 0 0 0 0".
 import Base
-import bend-ml-tensor-array@0.1.14.0/main.bend as TA
+import bend-ml-tensor-array@0.1.16.0/main.bend as TA
 import ../main.bend as TF
 
 # deterministic values with specials mixed in by index (as tensor-array's tests/parseq.bend)

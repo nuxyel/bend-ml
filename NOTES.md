@@ -4,7 +4,7 @@ Date: 2026-10-03. Everything below was verified on the machine or in a primary s
 
 ## Pinned version
 
-- **Bend 2.0.38** (`bend version`), since 2026-10-23 (2.0.37 from 2026-10-13, 2.0.36 from 2026-10-10, 2.0.35 before). Pin this version until further notice.
+- **Bend 2.0.39** (`bend version`), since 2026-10-24 (2.0.38 from 2026-10-23, 2.0.37 from 2026-10-13, 2.0.36 from 2026-10-10, 2.0.35 before). Pin this version until further notice.
 - Official repository: `github.com/bendlang/bend` (not `HigherOrderCO/Bend`, which is Bend 1).
 - Installed with `curl -fsSL https://bend-lang.com/install.sh | sh` (script read before running: it downloads the GitHub release, checks the SHA256, installs only into `~/.bend`, no sudo).
 - Update: `bend update` (runs the installer again). Do not update without recording it here, since Bend 2 changes fast.
@@ -1363,3 +1363,102 @@ through pull request #14 (CI green).
   On this repository: the tests of tensor-fork, tensor-gpu and tensor-array refuse arguments (five of them returned a
   String and now print it, so `check_all.py` compares the text without quotes); the probe runs tensor-fork's bits test,
   1.00 and 6.5-6.7 cores.
+
+## Bend 2.0.39 (2026-10-24)
+
+- **Pin.** The same checklist as 2.0.38's: `scripts/setup.sh` (version and both SHA256 sums, computed from the release's
+  tarballs), `check_all.py`, the CI step, the README badge and setup line, CONTRIBUTING, the `Bend:` line of each
+  package README, CLAUDE.md and "Pinned version". Nothing in the code changed.
+- **What could touch us:** `bend --publish` now sends only files inside the entry's directory (a `../` import, a symlink
+  out of it or a linked `LICENSE` is refused before mining, #1836). No package folder here has a symlink or a `../`
+  import, so publishing works as before. A read-only walk of a list now borrows it when a sum type mixes a word and a box
+  (#1805), and a memory fault ends the program by its signal instead of exit 1.
+- **`make check-full`: 96/96** (the 92 of 2.0.38 and the runtime-option guards), `Bands.matvec` keeps its parallel join,
+  and `reference/test_published.py`: the published packages pass on 2.0.39.
+- **Packages.** No source changed, so none is republished.
+
+## binary-read 0.2.0.0: 64-bit offsets, BF16, reads into an array (2026-10-24)
+
+- **Why.** BendTorch's loader for SmolLM2-1.7B needs offsets past 4 GiB (a 3.4 GB BF16 safetensors file, a 6.8 GB F32
+  one) and BF16 reads. Its night branch `reader64` (2026-10-21) had them in a vendored copy of this package, imported
+  by a `../` path. Since Bend 2.0.39 `bend --publish` refuses files outside the entry's directory (#1836), so they move
+  here, where BendTorch can import them from the hub.
+- **What.** Five new effects next to `read_f32`, which is unchanged: `size64`, `read_f32_at`, `read_bf16_at`,
+  `read_f32_into`, `read_bf16_into` (C in `read_at.c`, JavaScript in `read_at.js`, the code of the vendored copy). Base
+  in 2.0.39 still has no 64-bit integer and `File.read_at` takes a U32 offset, so offsets and sizes cross as two U32s
+  (hi, lo).
+- **Tests** (`binary-read/tests/test_read_at.py` over `read_at.bend`, in `make check` on both lanes): 28 reads around
+  2, 4 and 8 GiB of a sparse 8 GiB file give the file's bits, including short reads, a hole, reads past the end, reads
+  into a cell offset with the neighbouring cells untouched, and the U32 `read_f32` up to 4 GiB. Reads larger than the
+  array stop at its capacity. 10,019 BF16 numbers written by PyTorch, at offsets 0 and 6, equal `bf16.to(torch.float32)`
+  bit for bit. The JS lane canonicalizes NaN payloads, as for `read_f32`. `make check`: 89/89.
+- **Published** as `bend-ml-binary-read@0.2.0.0`, hash `0x5240900a1da5d0b346237e15fbea87a9` (6 files). The README's
+  table, the GPT-2 demo and `reference/test_published.py` (which now also reads BF16 at a byte offset on both lanes) use
+  it. I posted the #1843 comment the same day.
+
+## GPT-2 on Bend 2.0.39 against 2.0.38 (2026-10-24)
+
+- The same commit (727165d) built with both, the cross-system harness, idle machine, 7 alternated rounds: 128.2 ms a
+  token on one thread with 2.0.39 against 138.1 with 2.0.38 (ranges 127.3-129.9 and 135.9-140.2), 85.9 against 106.1 on
+  16 threads (83.2-87.3 and 103.6-109.0). The same output with both; peak memory 831 MB on one thread with both.
+- Hardware counters (`perf stat`, 33 tokens, 3 alternated rounds, one thread): 1.4% fewer instructions and 7% fewer
+  cycles with 2.0.39, about as many cache misses: more instructions per cycle, not less work.
+- The README says it in a line; its charts still show the earlier numbers.
+
+## B6: BendTorch's general lemmas in nat-lemmas (2026-10-24)
+
+- `add4` (`(a + b) + (c + d) = (a + c) + (b + d)`) and `mul_dist_l` (`k * (a + b) = k*a + k*b`) move from BendTorch's
+  `PROOF.bend` into `nat-lemmas/main.bend` as laws, with the same proofs over the package's own `add_assoc`,
+  `add_swap`, `mul_comm` and `mul_dist`. `bend nat-lemmas/main.bend --verdict`: ALL PROOFS CHECK. `list_laws.py
+  --check-readme`: 29 laws, README ok. `make check-full`: 96/96.
+- The other lemmas B6 named in the plan of 2026-10-15 (`drop_app`, `len_take`, `len_softmax`'s list part) are no longer
+  in BendTorch. Its `sub0` and `app2` are one-liners tied to their proofs and stay where they are.
+- **Published** as `bend-ml-nat-lemmas@0.1.2.0`, hash `0x09966385f3a8541fb22fd49450cdf477` (2 files). The README's
+  table, `examples/symbolic_reshape.bend` and `reference/test_published.py` (which now type-checks `add4` against its
+  statement) use it. tensor, bpe-tokenizer and autograd keep importing 0.1.0.0, as published. BendTorch imports the two
+  lemmas from it instead of keeping copies.
+
+## tensor-array 0.1.15.0: eight partial sums a dot, two cells of C a pass (2026-10-25)
+
+- **Why.** In BendTorch's SmolLM2-135M step the products are 76-86% of one thread's time. `perf annotate` of `t8_dot`:
+  clang vectorizes it with SSE, about 20 instructions and 3.9 cycles a cell of 8, and the loop waits on its four sums'
+  chain (two dependent additions a cell). Six variants were tried on SmolLM2's three linear-layer products (bend2-lab).
+  Eight sums alone gave 7.6% fewer cycles; cells of 16 cut instructions but not cycles on the short dots; two columns of
+  C a pass with today's order made clang's vectorizer shuffle the two dots' sums across lanes (2x slower).
+- **What.** Each sum is now lane q of every cell (product p into sum p mod 8), combined at the end as `dotr` combines
+  its eight rotating sums (`t8_comb` with rot = k mod 8), and `t8_cols`/`t8_lcols` compute two cells of C in one pass
+  over k, so each cell of A is read once for both. The scalar loop (`dotr`, one-row products, `Bands.matvec`) keeps
+  the same order: `tests/t8.bend` still gives 0 differing words between the cells of 8 and the scalar loop, every k
+  from 0 to 19, the three layouts, sequential and parallel.
+- **Result** (idle machine, 3 alternated rounds): over the three products, one thread, 315.6 -> 243.4 Mcycles (-23%;
+  `nt` -29%, `tn` -7%, `nn` -31%); 16 threads 8-24% faster. Against a float64 dot the error is about 25% lower at k =
+  256 to 1536 (a simulation of both orders on 20,000 random dots each). Every product's last bits move.
+- **The cost**: one-row products, where the scalar loop now rotates eight sums. GPT-2's generation (all matrix ·
+  vector) took 5.0 s instead of 4.65 s for 32 tokens on one thread (busy machine, 2 rounds), the same on 16 threads; two
+  products a step was worse (5.9 s). So the GPT-2 demo and the `Bands` benchmarks stay on 0.1.14.0, and the MNIST
+  demo (batches of 100) moves to 0.1.15.0.
+- **tensor-fork 0.1.3.0** (k mod 8 to the cells) and **tensor-gpu 0.1.3.0** (eight sums a cell, generated in 4 x 2
+  tiles: 4 x 4 would carry 128 sums a lane; on 2026-10-25 the four products of the README took 15.5 ms in all against
+  0.1.2.1's 16.0, 2 rounds, CPU not idle) on the new tensor-array, both checked with its bits on the CPU and the GPU.
+- Published: `bend-ml-tensor-array@0.1.15.0` `0x054428f37dcef26dfcdf73a81af76b07`, `bend-ml-tensor-fork@0.1.3.0`
+  `0x75a8d2c438b6e6aeea7459234622dfd6`, `bend-ml-tensor-gpu@0.1.3.0` `0x44d4ef8d5e110dfdde14372a07d96ade`. `make
+  check-full` 99/99 (GPU included); `reference/test_published.py` passes on all three.
+
+## tensor-array 0.1.16.0: 0.1.14.0's code again (2026-10-25)
+
+- Moving BendTorch to 0.1.15.0 made its SmolLM2-135M step slower, not faster: `train 1` on one thread 14.2 -> 24.6 s,
+  `train 3` on 16 threads 10.8 -> 13.0 s (busy machine, 2 rounds each, the same programs otherwise). `perf annotate`:
+  inside the whole program clang vectorized `t8_dot2` (the two-cell pass) with shuffles across lanes, as it did with
+  the probe's c0, where in the probe alone it had vectorized it cleanly. The probe's 23% does not carry over.
+- With one cell a pass and 0.1.15.0's eight sums (the same bits as 0.1.15.0), the step took 14.1 s on one thread and
+  2% less on 16: nothing gained, every product's bits moved, and `test_tiny_rt`'s 3 x 24 run failed its per-tensor
+  rule (b0.wu at 5.1x PyTorch float32's distance from float64, 2.4x with the old order; the whole model at 1.13x against
+  0.99x). So the eight-sum order is dropped.
+- Published 0.1.14.0's code as `bend-ml-tensor-array@0.1.16.0` `0x0159e1f0f11cc1d285ac6a993d19ba8a`, with
+  `bend-ml-tensor-fork@0.1.4.0` `0xd13098b0f80022977b3ddb83a57e3c50` and `bend-ml-tensor-gpu@0.1.4.0`
+  `0x6a4b8944ce74c49ba240bff44915995a` (0.1.2.0's and 0.1.2.1's code) on it, so that the newest versions on BendHub are
+  the good ones; their bits are 0.1.14.0's. The READMEs mark 0.1.15.0 and 0.1.3.0 as not recommended. `make check-full`
+  99/99 with the published packages; `reference/test_published.py` passes.
+- Lesson: a loop's speed measured in a probe is not its speed inside the program that uses it (clang's choices depend
+  on the code around it; `memory/compiler-schedule-noise.md`). Time a change to a shared kernel in its biggest user
+  before publishing it.

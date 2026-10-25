@@ -9,7 +9,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PY = os.path.join(ROOT, "reference/.venv/bin/python")
 BEND = os.environ.get("BEND_BIN") or os.path.expanduser("~/.bend/bin/bend")
 # BEND_BIN and BEND_PIN run the checks on another Bend (for example a newer release before a bump)
-BEND_PIN = os.environ.get("BEND_PIN") or "2.0.38"
+BEND_PIN = os.environ.get("BEND_PIN") or "2.0.39"
 ENV = dict(os.environ, BEND_NO_TELEMETRY="1", PATH=os.path.expanduser("~/.elan/bin") + ":" + os.environ["PATH"])
 FULL = "--full" in sys.argv
 results = []
@@ -58,9 +58,10 @@ def main():
         results.append(clean)
         print(f"{'ok  ' if clean else 'ERROR'} {f}: no @unsafe or ?TODO")
 
-    # 1b. binary-read: the one package with foreign code, kept to one def and out of the packages with laws
-    run("binary-read/main.bend: read_f32 is its only foreign def", [BEND, "binary-read/main.bend"],
-        lambda o, c: "1 def relies on unsafe or foreign code" in o and outside_proofs(o) == ["read_f32"])
+    # 1b. binary-read: the one package with foreign code, kept to its six reads and out of the packages with laws
+    read_defs = ["read_f32", "size64", "read_f32_at", "read_bf16_at", "read_f32_into", "read_bf16_into"]
+    run("binary-read/main.bend: its foreign defs are the six reads", [BEND, "binary-read/main.bend"],
+        lambda o, c: f"{len(read_defs)} defs rely on unsafe or foreign code" in o and outside_proofs(o) == read_defs)
     laws = [f"{p}/main.bend" for p in ["nat-lemmas", "bpe", "tensor", "tensor-array", "autograd"]]
     clean = not any("binary-read" in open(os.path.join(ROOT, f)).read() for f in laws)
     results.append(clean)
@@ -71,6 +72,12 @@ def main():
         rf = os.path.join(d, "rf")
         run("compile binary-read/tests/read_f32.bend", [BEND, "binary-read/tests/read_f32.bend", "-o", rf])
         run("binary-read/tests/read_f32.bend on the C lane", [rf], lambda o, c: o.strip() == want.strip())
+        ra = os.path.join(d, "ra")
+        run("compile binary-read/tests/read_at.bend", [BEND, "binary-read/tests/read_at.bend", "-o", ra])
+        run("binary-read: 64-bit offsets, BF16 and _into reads on the C lane", [PY, "binary-read/tests/test_read_at.py", ra],
+            lambda o, c: c == 0 and o.strip().endswith("PASS (C)"))
+    run("binary-read: 64-bit offsets, BF16 and _into reads on the JS lane", [PY, "binary-read/tests/test_read_at.py", "--js"],
+        lambda o, c: c == 0 and o.strip().endswith("PASS (JavaScript)"))
 
     # 1c. tensor-fork: the one package whose parallel blocks share arrays through Base's @unsafe Array.fork; its unsafe
     # defs are exactly the blocks, the fork tree and what reaches them, no package with laws imports it, and it gives tensor-array's bits

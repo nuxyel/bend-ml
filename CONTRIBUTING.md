@@ -23,7 +23,7 @@ request myself. Bug reports, numbers from other machines, fixes, new laws and ne
 ## Setup and checks
 
 ```bash
-make setup        # the pinned Bend 2.0.38, Lean 4.34.0, the Python venv and the data (make setup-lite skips GPT-2)
+make setup        # the pinned Bend 2.0.39, Lean 4.34.0, the Python venv and the data (make setup-lite skips GPT-2)
 make check        # the proofs, the kernel (--verdict), the rejected programs, the comparisons with PyTorch and tiktoken
 make check-full   # the same plus GPT-2 and MNIST
 make laws         # every law statement of every package

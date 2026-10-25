@@ -14,7 +14,7 @@
 # not compile.
 
 import Base
-import bend-ml-nat-lemmas@0.1.1.0/main.bend as NL
+import bend-ml-nat-lemmas@0.1.2.0/main.bend as NL
 import bend-ml-tensor@0.1.2.0/main.bend as T
 
 # n x 6 -> (n*2) x 3, for every n

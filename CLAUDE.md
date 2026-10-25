@@ -34,13 +34,13 @@ NOTES exp. 10).
 
 ## Rules
 
-1. Bend is pinned to **2.0.38** (and Lean 4.34.0 for `--verdict`). Bend 2 changes fast and differs from
+1. Bend is pinned to **2.0.39** (and Lean 4.34.0 for `--verdict`). Bend 2 changes fast and differs from
    Bend 1: before writing code, read `bend guide`, `bend base <name>` and the Base source
    (`~/.bend/bend2/base.bend`). A version bump goes in `NOTES.md`.
 2. Run the checker on every change; it takes a fraction of a second.
 3. Every proof is real: no `@unsafe`, no `?TODO`, no axioms. A law that cannot be proved yet is
    recorded in `NOTES.md` as debt and left out of the README. Two packages stand outside the proofs, by Renan's
-   decision, and no package with laws imports them: `binary-read` (foreign code, one def) and `tensor-fork` (Base's
+   decision, and no package with laws imports them: `binary-read` (foreign code, six reads) and `tensor-fork` (Base's
    `@unsafe` `Array.fork`, all Bend; decided 2026-10-16). `make check` pins the list of defs each one has outside the
    proofs, so it cannot grow unnoticed. A third, approved by Renan on 2026-10-18: `tensor-gpu`
    (tensor-array's products under `!`, Base's `@unsafe` `Array.fork`/`Array.join`, all Bend), on the same terms: no
@@ -60,7 +60,7 @@ NOTES exp. 10).
    stays in the third person: it tells agents whose decisions are whose. Drafts already posted upstream and
    dated entries are left as written.
 
-## Bend 2.0.38 pitfalls we paid for
+## Bend 2.0.39 pitfalls we paid for
 
 - A compiled program's runtime options go between `+RTS` and `-RTS` (since 2.0.38): `./x +RTS --threads 16 -RTS`.
   A bare `./x --threads 16` passes `--threads 16` to the program and runs on the default thread count with no error,
