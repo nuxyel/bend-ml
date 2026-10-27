@@ -372,8 +372,8 @@ parallel work. Plans after v3 (llama.bend, a training framework) are in my priva
 - **Two traps that kept it sequential** (found by reading the emitted C, `bend X.bend -o x.c`):
   1. **An erased parameter at the end of the parameter list turns the parallel let into two sequential
      calls.** `bmv(+c, -r, b, xp, +rr, -e)` had no join task in the C; `bmv(+c, -r, b, +rr, -e, xp)` has one.
-     Minimal repro: `docs/upstream/erased_last_{ok,bad}.bend` (16 leaves of a flat loop: ok 0.054 s → 0.011 s
-     with 16 threads; bad 0.053 s → 0.055 s). Draft report: `docs/upstream/erased-last-parameter.md`, posted as
+     Minimal repro: `erased_last_{ok,bad}.bend`, linked from the issue (16 leaves of a flat loop: ok 0.054 s → 0.011 s
+     with 16 threads; bad 0.053 s → 0.055 s). Reported as
      [bendlang/bend#1374](https://github.com/bendlang/bend/issues/1374); cause and fix in
      [bendlang/bend#1377](https://github.com/bendlang/bend/pull/1377) (merged 2026-10-07; see "Upstream PR for #1374").
   2. **A non-tail recursive helper in the fork tree halves the gain.** `half(n) = 1 + half(n - 2)` called at
@@ -441,9 +441,9 @@ checking takes 0.22 s for 8 distinct typed layers and 0.27 s for 128; the build 
 
 ### Upstream drafts (Renan posts them)
 
-- `docs/upstream/erased-last-parameter.md`: the compiler bug above, with the repro. Posted as
+- The compiler bug above, with the repro. Posted as
   [bendlang/bend#1374](https://github.com/bendlang/bend/issues/1374); fix in [#1377](https://github.com/bendlang/bend/pull/1377).
-- `docs/upstream/shared-readonly-array.md` ([bendlang/bend#1376](https://github.com/bendlang/bend/issues/1376)): a read-only `Array` borrow that does not need `@unsafe`
+- [bendlang/bend#1376](https://github.com/bendlang/bend/issues/1376): a read-only `Array` borrow that does not need `@unsafe`
   (`Array.fork`, the answer to #885, is `@unsafe`, and `--check-only` then reports
   `SOME PROOFS FAIL: 1 def relies on unsafe or foreign code`).
 
@@ -461,11 +461,11 @@ v3.0 profile: `wte` (38.6 M numbers) 1.9 s, the 12 layers (85 M) 4.8 s, ~50 ns p
   no intermediate `F32` list): load 5.1-5.6 s → 3.8-4.3 s, alternated runs, the same machine state (-25%).
 - **`IO.fork` does not parallelize pure work (negative result).** Loading the 12 layers with one `IO.fork`
   each, joined in order, took 6.6-7.1 s instead of 5.1-5.6 s, the same with 1 and 16 threads. A minimal test
-  (`docs/upstream/io_fork_parallel.bend`: 4 forks of a flat loop of 4 G steps seeded at run time): 1.86 s with 1 thread,
+  (`io_fork_parallel.bend`, linked from the issue below: 4 forks of a flat loop of 4 G steps seeded at run time): 1.86 s with 1 thread,
   1.73 s with 16, user time equal to real time. In Bend 2.0.35 `IO.fork` interleaves computations on one core;
   the guide's "each runs its pure code (in parallel, on every core)" does not hold across forks. Parallelism
   across cores comes from parallel lets in pure code. Reverted; reported as
-  [bendlang/bend#1375](https://github.com/bendlang/bend/issues/1375) (`docs/upstream/io-fork-parallel.md`).
+  [bendlang/bend#1375](https://github.com/bendlang/bend/issues/1375).
 - **Size check at the boundary:** every weight file must hold exactly `r*c*4` bytes (`check_size` with
   `File.size`), otherwise the program stops: `h3.fw.bin: expected 9437184 bytes, found 1000000; run
   reference/gpt2_prep.py --split again` (tested with a truncated copy in a temporary tree of links).
@@ -516,12 +516,12 @@ logits as v3.0 and v2.1, digit for digit.
 
 ### For Renan to post upstream (all three posted on 2026-10-06; see "Upstream issues opened" below)
 
-- `docs/upstream/erased-last-parameter.md` (the parallel let made sequential by an erased last parameter):
+- The parallel let made sequential by an erased last parameter:
   [bendlang/bend#1374](https://github.com/bendlang/bend/issues/1374), fix in [#1377](https://github.com/bendlang/bend/pull/1377).
-- `docs/upstream/shared-readonly-array.md` (a read-only `Array` borrow without `@unsafe`):
+- A read-only `Array` borrow without `@unsafe`:
   [bendlang/bend#1376](https://github.com/bendlang/bend/issues/1376).
-- `IO.fork` does not run pure work on several cores (exp. 12), although the guide says it does. Draft and
-  repro: `docs/upstream/io-fork-parallel.md`, `io_fork_parallel.bend`: [bendlang/bend#1375](https://github.com/bendlang/bend/issues/1375).
+- `IO.fork` does not run pure work on several cores (exp. 12), although the guide says it does. Reported, with
+  the repro, as [bendlang/bend#1375](https://github.com/bendlang/bend/issues/1375).
 
 ### v3.1 measurements added at the end (2026-10-06)
 
@@ -533,13 +533,13 @@ logits as v3.0 and v2.1, digit for digit.
 - Peak resident memory (`scripts/peak_rss.sh`, "Hi" + 1 token, 16 threads): v2.1 1462 MB, v3.0 895 MB,
   v3.1 903 MB. The peak *virtual* size of v3.1 is 41 GB (v2.1 and v3.0: 10.6 GB): address space reserved, not
   memory used; cause not investigated.
-- `IO.fork` control: the same loops as parallel lets scale (1.69 s → 0.85 s); `docs/upstream/io_fork_parallel_control.bend`.
+- `IO.fork` control: the same loops as parallel lets scale (1.69 s → 0.85 s); `io_fork_parallel_control.bend`, linked from #1375.
 
 ### Upstream issues opened (2026-10-06, by Renan)
 
-- [bendlang/bend#1374](https://github.com/bendlang/bend/issues/1374): an erased last parameter makes a parallel let sequential (`docs/upstream/erased-last-parameter.md`).
-- [bendlang/bend#1375](https://github.com/bendlang/bend/issues/1375): `IO.fork` computations run their pure work on one core (`docs/upstream/io-fork-parallel.md`; not a duplicate of #831, which was about parallel lets after closure calls and is fixed in 2.0.13).
-- [bendlang/bend#1376](https://github.com/bendlang/bend/issues/1376): a read-only `Array` borrow without `@unsafe` (`docs/upstream/shared-readonly-array.md`).
+- [bendlang/bend#1374](https://github.com/bendlang/bend/issues/1374): an erased last parameter makes a parallel let sequential.
+- [bendlang/bend#1375](https://github.com/bendlang/bend/issues/1375): `IO.fork` computations run their pure work on one core (not a duplicate of #831, which was about parallel lets after closure calls and is fixed in 2.0.13).
+- [bendlang/bend#1376](https://github.com/bendlang/bend/issues/1376): a read-only `Array` borrow without `@unsafe`.
 
 ### Upstream PR for #1374 (2026-10-07, by Renan)
 
@@ -903,8 +903,8 @@ indicative timings). Not integrated or measured in a demo yet.
 ## Upstream: a dense file read (2026-10-14)
 
 Exp. 13's lever, taken upstream: [bendlang/bend#1573](https://github.com/bendlang/bend/issues/1573) asks for a file read
-into an `Array<U32>` (four little-endian bytes per word) instead of a `List<U32>` with one cell per byte. Draft and repro
-in `docs/upstream/` (`dense-file-read.md`, `read_at_bytes.bend`, `read_at_bytes.c`). The standalone repro, Bend 2.0.37,
+into an `Array<U32>` (four little-endian bytes per word) instead of a `List<U32>` with one cell per byte. The repro
+(`read_at_bytes.bend`, `read_at_bytes.c`) is in `docs/upstream/`. The standalone repro, Bend 2.0.37,
 one thread pinned to CPU 3, five alternated runs: reading and summing 384 MiB in 1 MiB blocks takes 1.52-1.57 s with
 `File.read_at` and 56-58 ms with `pread` in C, the same sum. The work per byte is one addition in both, so the gap is
 the list. The gain would be in loading only (llama.bend's 1.7B: 66 s); the cost per token does not change.
@@ -1170,7 +1170,7 @@ stays as it is.
 
 ## The CLI's table check without `BPE.wf` (2026-10-17)
 
-From bend-lint's `eager_branch` on `has`/`wf.go`, measured at GPT-2's 50,000 merges (bend2-lab
+From bend-lint's `eager_branch` on `has`/`wf.go`, measured at GPT-2's 50,000 merges (my private notes,
 `experiments/2026-10-17-lint-scale`): `bpe/cli.bend` checked every merges table it read with `ids_ok` and `BPE.wf`,
 and `wf` walks the rules before each rule, O(n²): 4,395 ms per `encode` of one line, against 55 ms without it (10,000
 merges: 212 → 14 ms), the same output. `wf` holds by construction there, since `rules.go` numbers the rules 0, 1,
@@ -1422,7 +1422,7 @@ through pull request #14 (CI green).
 
 - **Why.** In BendTorch's SmolLM2-135M step the products are 76-86% of one thread's time. `perf annotate` of `t8_dot`:
   clang vectorizes it with SSE, about 20 instructions and 3.9 cycles a cell of 8, and the loop waits on its four sums'
-  chain (two dependent additions a cell). Six variants were tried on SmolLM2's three linear-layer products (bend2-lab).
+  chain (two dependent additions a cell). Six variants were tried on SmolLM2's three linear-layer products (my private notes).
   Eight sums alone gave 7.6% fewer cycles; cells of 16 cut instructions but not cycles on the short dots; two columns of
   C a pass with today's order made clang's vectorizer shuffle the two dots' sums across lanes (2x slower).
 - **What.** Each sum is now lane q of every cell (product p into sum p mod 8), combined at the end as `dotr` combines
@@ -1462,3 +1462,27 @@ through pull request #14 (CI green).
 - Lesson: a loop's speed measured in a probe is not its speed inside the program that uses it (clang's choices depend
   on the code around it; `memory/compiler-schedule-noise.md`). Time a change to a shared kernel in its biggest user
   before publishing it.
+
+## tensor-array: Mat.softmax_ce over the array (2026-10-26, published as 0.1.17.0 on 2026-10-27)
+
+- MetalBend measured `Mat.softmax_ce` walking each row as a list five times, and the same operations over the array
+  3.4x faster. `cea_rows` now does them in place with tail loops, in the list version's order (the max from the first
+  cell, exp(x - max) summed from +0.0, p = e / s, the loss term read before the row is overwritten, (p - onehot) / n),
+  and `Mat.softmax_ce` uses it. `ce_rows` stays as the reference.
+- Bits: `tensor-array/tests/ce_array.bend` compares both versions word for word on 2x3, 100x10, 7 rows of 49,152, 1x1,
+  and 5x10 with 3 and with 7 labels (one row per label, as before), logits with -0, inf, NaN and a subnormal, labels
+  past the row: all 0. A mutant that shifts the one-hot by a column is caught. In `make check`.
+- Cost, user-mode counts on CPU 3 (the same output): 64 rows of 49,152 take 417 M instructions and 150 M cycles against
+  1,260 M and 455 M (3.0x, the fill included in both); the MNIST demo's 50 batches (rows of 10) take 8,598 M
+  instructions against 8,613 M, the same `train_loss` and accuracy. So it matters for wide rows, not for MNIST.
+- Not done: the rows in parallel. tensor-array shares no array (no `Array.fork`), so each node of a fork tree would
+  clone the whole matrix, and on a loop bound by memory the copies cost what the threads give back. BendTorch, the
+  user with wide rows, has its own cross-entropy over arrays.
+- Timed on an idle machine (2026-10-27, 64 rows of 49,152 on 16 threads, alternated rounds): 0.137 s against
+  0.505 s for the published list version, 3.7x.
+- The rows in parallel were tried after all (`Mat.softmax_ce_par`, rows on up to 2^par tasks, the same bits on 1 and 16
+  threads): 0.139 s on 16 threads against the sequential 0.138, and 1.43x slower on one thread, because each half of the
+  fork tree copies its rows. Dropped.
+- Published: `bend-ml-tensor-array@0.1.17.0` `0x7a3ad9c30a648ef09dd908b6468f25ea`. The MNIST and GPT-2 demos and the
+  benchmarks moved to it; `tensor-fork` and `tensor-gpu` 0.1.4.0 stay on 0.1.16.0 until their next versions. `make
+  check-full` 101/101 with it; `reference/test_published.py` passes.

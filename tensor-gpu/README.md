@@ -88,7 +88,7 @@ def twice(+n: Nat, +c: Nat, x: Array<F32>) -> TG.R1:
   and never an input, and that leaves past the work return their outputs unchanged. The leaves run in a run-time order
   inside each group of 128, so a leaf's result must not depend on another's.
 - The bits are the leaf's own code, the same on the GPU as on the CPU threads, except where CUDA's math functions
-  differ from the host's (an `exp` on the device takes the float overload; `docs/upstream/gpu-math-overloads.md`).
+  differ from the host's (an `exp` on the device takes the float overload; the known limit of [bendlang/bend#1305](https://github.com/bendlang/bend/issues/1305)).
 - BendTorch's GPU layers are written over these.
 
 ## Speed (first measurement)

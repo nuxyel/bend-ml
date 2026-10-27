@@ -1,6 +1,8 @@
 # bend-ml-tensor
 
 > **Frozen (2026-10-19).** No new versions of this package will be published. It is superseded by [`bend-ml-tensor-array`](../tensor-array), which keeps the same shape guarantees over a flat `Array<F32>`. The published versions stay on BendHub, and bend-ml's own demos keep using them.
+>
+> **To train a model, use [BendTorch](https://github.com/nuxyel/bendtorch)**: its layers' parameters are `bend-ml-tensor-array`'s `Mat`, so data prepared with tensor-array goes straight into training. A list becomes a tensor-array `Mat` with `Mat.of_list` (it checks the length) and back with `Mat.to_list`.
 
 Tensors in Bend 2 with the **shape in the type**: a shape error is a type error, not a run-time failure.
 

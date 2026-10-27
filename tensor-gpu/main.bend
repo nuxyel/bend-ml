@@ -340,7 +340,7 @@ def matmul_tn_acc(+n: Nat, +k: Nat, +m: Nat, par: Nat, a: TA.Mat<k, n>, b: TA.Ma
 # cover them. The leaves run in a run-time order inside each group of 128 (bendlang/bend's CUDA lowering), so a leaf's
 # result must not depend on another's. Every number a leaf computes is the caller's own code, so the bits are the
 # caller's: the same on the GPU as on the CPU threads, except where CUDA's math functions differ from the host's (an exp
-# on the device takes the float overload; bend-ml's docs/upstream/gpu-math-overloads.md).
+# on the device takes the float overload; the known limit of bendlang/bend#1305).
 # =====================================================================================================================
 
 def depth2(big: Bool, +n: Nat) -> Nat:

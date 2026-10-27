@@ -35,7 +35,7 @@ its band and only the input vector is copied.
 
 1. A README section on what this adds over const-generic shape checking (dfdx), with sources.
 2. A measurement of check and build times as the number of distinct typed layers grows.
-3. A draft report for `bendlang/bend` on sharing read-only arrays between tasks (`docs/upstream/`).
+3. A draft report for `bendlang/bend` on sharing read-only arrays between tasks.
 
 ## Stop criterion
 
@@ -61,7 +61,7 @@ Part B:
 |---|---|
 | dfdx comparison | README section 01, with links to dfdx's source; examples `symbolic_reshape`, `symbolic_reshape_bad`, `square_transpose_bad` in `check_all.py` |
 | compile times | checking: 0.22 s for 8 distinct layers, 0.27 s for 128; build (clang) 1.1 to 4.7 s |
-| upstream | two drafts in `docs/upstream/` (the erased-parameter bug with a minimal repro; a read-only `Array` borrow without `@unsafe`) |
+| upstream | two reports, posted as bendlang/bend#1374 and #1376 (the erased-parameter bug with a minimal repro; a read-only `Array` borrow without `@unsafe`) |
 
 Not done: an idle-machine re-measure of GPT-2 for the README chart (the machine had background load all
 evening); a list-returning variant of `Bands.matvec` to remove the one-thread overhead.

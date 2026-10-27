@@ -13,7 +13,8 @@ use on BendHub, and a portfolio piece for HOC.
 - `docs/v3.1-plan.md`: the current plan and its stop criterion. Earlier plans: `docs/v3-plan.md`,
   `docs/v2-plan.md`.
 - `docs/AUDIT.md`: the trust base and what is proved, tested or trusted.
-- `docs/upstream/`: drafts of reports for `bendlang/bend`. Renan posts them.
+- `docs/upstream/`: the repros of open `bendlang/bend` issues (its README names each one). The issue texts are drafted
+  outside this repository; Renan posts them.
 - Plans after v3 (llama.bend, a training framework) live in Renan's private notes, outside this repository.
 - `make check` / `make check-full` (`reference/check_all.py`) is the gate before a commit; CI runs the full
   one on every push to `devel` and `main` and on pull requests.
@@ -82,12 +83,12 @@ NOTES exp. 10).
   when the def's last parameter was erased, NOTES exp. 11; fixed in 2.0.37 by bendlang/bend#1377.)
 - On the GPU a lane has a 2,048-word stack: a non-tail recursion inside a `!` faults past it ("memory fault (machine
   stack overflow?)", e.g. `List.append` over 1,023 elements) while `+RTS --gpu off` runs; use tail loops in bangs (bendlang/bend
-  #1393). Every device loop also polls for errors, which costs 4-20x on loops with little work a step (a draft issue
-  in bend-ml's `docs/upstream/gpu-error-poll.md`); loops that read memory pay 1.2-1.9x.
+  #1393). Every device loop also polls for errors, which costs 4-20x on loops with little work a step
+  ([bendlang/bend#1776](https://github.com/bendlang/bend/issues/1776)); loops that read memory pay 1.2-1.9x.
 - On CUDA a bang deals a balanced tree's leaves to threads in a run-time order: each block of 128 threads gets one
   aligned range of 128 leaves, but inside it the order changes from run to run, so "leaf k on lane k" layouts read
   uncoalesced (16 sectors a warp instead of 4). Check layouts with `ncu` (sectors per request); a
-  renumbering of the low 7 bits helps a 2^14 tree (issue draft `docs/upstream/gpu-leaf-order.md`).
+  renumbering of the low 7 bits helps a 2^14 tree ([bendlang/bend#1780](https://github.com/bendlang/bend/issues/1780)).
 - `IO.fork` gives concurrency, not parallelism: forked computations take turns on one event loop
   (NOTES exp. 12). This is intended; the guide says so since bendlang/bend#1415. Use parallel lets in pure
   code for several cores.

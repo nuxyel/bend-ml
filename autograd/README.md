@@ -1,6 +1,8 @@
 # bend-ml-autograd
 
 > **Frozen (2026-10-19).** No new versions of this package will be published. Layers with typed backward passes and training move to [BendTorch](https://github.com/nuxyel/bendtorch). The published versions stay on BendHub, and bend-ml's own demos keep using them.
+>
+> This package trains only `bend-ml-tensor`'s list-based `Mat`; there will be no autodiff over `bend-ml-tensor-array`'s `Mat` in bend-ml. BendTorch is that: its `Linear`, `CrossEntropy`, `SGD` and `AdamW` work on tensor-array's `Mat` directly.
 
 Automatic differentiation in Bend 2, with a **proved law**: the reverse mode (what neural-network training uses) computes the same derivative as the forward mode.
 

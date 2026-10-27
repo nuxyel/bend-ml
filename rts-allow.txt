@@ -1,6 +1,6 @@
 # Lines scripts/check_rts.py accepts with --threads or --gpu outside +RTS ... -RTS: `<path glob>` or `<path glob>:<text>`.
 NOTES.md                                   # the log: how each run was made at the time
-docs/upstream/*                            # drafts and posted reports, as they ran on Bend 2.0.35-2.0.37
+docs/upstream/*                            # repros of open issues, as they ran when reported
 CLAUDE.md:A bare `./x --threads 16`        # the pitfall itself, explaining the bare form
 CLAUDE.md:`--gpu off` goes in the same bracket  # the same pitfall
 reference/mnist_torch.py                   # the PyTorch twin's own --threads, not a Bend program's

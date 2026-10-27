@@ -37,14 +37,14 @@ only compiles with a proof that the number of elements does not change, even whe
 | [`bend-ml-nat-lemmas`](nat-lemmas) | 0.1.2.0 | `Nat` and `List` lemmas that Base does not have | `add_comm`, `add_assoc`, `mul_comm`, `mul_assoc`, `mul_dist`, `append_assoc`, `length_append`, `product_append`, `add4`, `mul_dist_l`... (17) |
 | [`bend-ml-bpe-tokenizer`](bpe) | 0.1.3.0 | Byte-level BPE tokenizer (GPT-2 style) | **roundtrip** `decode(encode(s)) = s`, `vocab_bound`, `dec_append`, `train_wf`, `roundtrip_trained` |
 | [`bend-ml-tensor`](tensor) | 0.1.2.0 | `Vec<n>` and `Mat<r,c>` with the shape in the type, over lists. **Frozen** (2026-10-19): no new versions; superseded by tensor-array | `reshape_swap`, `reshape_flat` |
-| [`bend-ml-tensor-array`](tensor-array) | 0.1.16.0 | the same guarantees over a flat `Array<F32>`; `Bands<r,c>` for a parallel matrix · vector | `cap_ok`, `half_cover`, `leaf_len`, `band_len`; typed `matmul`, `matmul_nt`, `matmul_tn` (and their accumulating forms), `Bands.matvec` |
+| [`bend-ml-tensor-array`](tensor-array) | 0.1.17.0 | the same guarantees over a flat `Array<F32>`; `Bands<r,c>` for a parallel matrix · vector | `cap_ok`, `half_cover`, `leaf_len`, `band_len`; typed `matmul`, `matmul_nt`, `matmul_tn` (and their accumulating forms), `Bands.matvec` |
 | [`bend-ml-autograd`](autograd) | 0.1.1.0 | Automatic differentiation and layers with typed backward. **Frozen** (2026-10-19): no new versions; training moves to [BendTorch](https://github.com/nuxyel/bendtorch) | **`reverse_eq_forward`** |
 | [`bend-ml-binary-read`](binary-read) | 0.2.0.0 | F32 and BF16 weights read from a file straight into an `Array<F32>`, at offsets past 4 GiB; foreign code (C and JavaScript), kept out of the packages with laws | none: an effect, tested on both lanes |
 | [`bend-ml-tensor-fork`](tensor-fork) | 0.1.4.0 | tensor-array's six products with the parallel blocks sharing A, B and C (`Array.fork`, `@unsafe` in Base) instead of copying them: an MNIST epoch 12.0 → 6.2 s on one thread, 4.4 → 3.0 s on 16; `par1`..`par4`, any kernel over blocks of shared arrays | none: the same bits as tensor-array, tested on 14,835 products; kept out of the packages with laws |
 | [`bend-ml-tensor-gpu`](tensor-gpu) | 0.1.4.0 | tensor-array's six products as one `!` call each, so they run on the GPU (`Array.fork`, `@unsafe` in Base); at SmolLM2-135M's sizes 1.6-2.8x faster than tensor-fork on 16 threads, 512 x 4096 x 512 4.5x; `run1`..`run4`, bangs over any leaf code written in plain Bend | none: the same bits as tensor-array on the GPU and the CPU, tested on 2,967 products; kept out of the packages with laws |
 
 ```python
-import bend-ml-tensor-array@0.1.16.0/main.bend as TA
+import bend-ml-tensor-array@0.1.17.0/main.bend as TA
 import bend-ml-bpe-tokenizer@0.1.3.0/main.bend as BPE
 ```
 
@@ -111,6 +111,7 @@ sums changed on purpose):
 | v1.6.1 | Bend 2.0.38: a compiled program's runtime options now go between `+RTS` and `-RTS` | GPT-2 per token unchanged (136.2 against 136.6 ms on one thread, 106.1 against 105.0 on 16); the binary 4 KB smaller |
 | v1.6.2 | the checks guard the runtime options: one outside `+RTS ... -RTS` fails them, test programs refuse arguments, and a probe checks that 1 and 16 threads use 1 and several cores | the packages and their bits unchanged |
 | v1.7.0 | Bend 2.0.39; `binary-read` 0.2.0.0: reads at 64-bit offsets, BF16 files and reads into a cell offset; `nat-lemmas` 0.1.2.0: `add4`, `mul_dist_l`; `tensor-array` 0.1.16.0 with `tensor-fork` and `tensor-gpu` 0.1.4.0 (0.1.14.0's code again, after 0.1.15.0's faster loop proved slower inside a whole program) | GPT-2 128 ms a token on one thread, 86 on 16 (138 and 106 with Bend 2.0.38); the products' bits those of 0.1.14.0 |
+| v1.7.1 | `tensor-array` 0.1.17.0: `Mat.softmax_ce` walks its rows over the array, with the same bits | the cross-entropy of 64 rows of 49,152 3.7x faster on 16 threads; MNIST unchanged |
 
 Versions are numbered as in [`docs/VERSIONING.md`](docs/VERSIONING.md); each release has its notes on GitHub.
 
