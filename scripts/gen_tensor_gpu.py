@@ -34,14 +34,14 @@ p = o.append
 p(f"""# bend-ml-tensor-gpu: tensor-array's products on the GPU, with tensor-array's bits.
 #
 #   import ../tensor-array/main.bend as TA
-#   import bend-ml-tensor-gpu@0.1.4.0/main.bend as TG
+#   import bend-ml-tensor-gpu@0.1.5.0/main.bend as TG
 #   TG.matmul(n, k, m, par, a, b)      # the same arguments, result type and bits as TA.Mat.matmul
 #
 # The six products (matmul, matmul_nt, matmul_tn and their accumulating forms) take tensor-array's Mat values and return
 # its result types; par is ignored (the GPU decides the split). Each product is one `!` call (a bang): a balanced fork
 # tree whose leaves each compute a {TM} x {TN} tile of C, every node sharing A, B and C through Base's Array.fork (two
 # handles to one block, no copy), as upstream's one-block pattern does (bendlang/bend tests/run/stencil3d.bend). On a
-# machine without a GPU, or with `--gpu off`, the same bang runs on the CPU threads.
+# machine without a GPU, or with `+RTS --gpu off -RTS`, the same bang runs on the CPU threads.
 #
 # The bits: a cell of C is computed in tensor-array's order. Product p of a dot goes to partial sum p mod 4, in
 # increasing p, each sum starting at +0.0, and the four sums are combined by TA.t8_comb with rot = k mod 4, as
@@ -50,12 +50,16 @@ p(f"""# bend-ml-tensor-gpu: tensor-array's products on the GPU, with tensor-arra
 # is never -0.0). Bend builds the device code with --fmad=false, so no multiply-add is fused. tests/bits.bend checks the
 # bits against tensor-array on many shapes, on the GPU and the CPU.
 #
+# Counter-based random numbers (fill_uniform, fill_gauss, uniform_mat, gauss_mat and their _at forms; the last section):
+# n uniforms or Gaussians of a counter made in one bang, each a pure function of (counter, index), with the same bits on
+# every lane.
+#
 # Not proved, and marked so: Array.fork and Array.join are @unsafe in Base, so the defs below that call them, or take
 # a shared array, are @unsafe, and `bend main.bend` names every def that relies on them. Nothing checks that a leaf
 # writes only its own tile of C, or never writes A or B; the tiles are disjoint by construction (leaf t writes tile t).
 # All of it is Bend: no foreign code. Written by bend-ml's scripts/gen_tensor_gpu.py ({TM} x {TN} tiles).
 import Base
-import bend-ml-tensor-array@0.1.16.0/main.bend as TA
+import bend-ml-tensor-array@0.1.18.0/main.bend as TA
 
 # the sizes and strides of one product: C[i][j] = sum_p A[oa + i*arow + p*sa] * B[ob + p*sb + j*bcol], n x m, k steps
 # (oa, ob: 0 except for matmul_precise's blocks)
@@ -451,6 +455,217 @@ def mm_precise2(long: Bool, +n: Nat, +k: Nat, +m: Nat, +par: Nat, a: TA.Mat<n, k
 @unsafe
 def matmul_precise(+n: Nat, +k: Nat, +m: Nat, +par: Nat, a: TA.Mat<n, k>, b: TA.Mat<k, m>) -> TA.MMul<n, k, m>:
   mm_precise2(Nat.is_lt(1024n, k), n, k, m, par, a, b)
+""")
+p("""
+# =====================================================================================================================
+# Counter-based random fills (prototype). fill_uniform and fill_gauss make n numbers of a counter s in one bang, each
+# number a pure function of (s, its index), so a lane computes its cells without reading anything; uniform_mat and
+# gauss_mat give them as a tensor-array Mat. The _at forms (fill_uniform_at, fill_gauss_at, uniform_mat_at, gauss_mat_at)
+# make the cells i0 .. i0 + n - 1 of the same counter, so a batch can be made in slices: their cell k is the cell
+# function at i0 + k, and the Gaussians' pairs stay global (2p, 2p + 1), so an odd i0 starts with the sine half of the
+# pair (i0 - 1, i0). The plain forms are the case i0 = 0. Indexes are U32 and wrap: i0 + k is taken mod 2^32. The
+# functions behind them (rng_uniform, rng_gauss2, rng_gauss) are plain
+# Bend that a caller's own leaf (runK) can call too, to make noise where it is used (x_t = a * x_0 + b * noise in one
+# bang) instead of in an array of its own.
+#
+# The counter hash and the uniform are mlbend-generative 0.1.0.0's (its mix32 over s * 0x9E3779B9 + i + 0x1234567A,
+# the low 24 bits plus one over 2^24, a uniform in (0, 1]), so rng_uniform gives that package's words. A Gaussian is
+# Box-Muller over the pair (2p, 2p + 1): cell 2p is r cos(2 pi u_b), cell 2p + 1 is r sin(2 pi u_b), with
+# r = sqrt(-2 ln u_a), u_a the uniform of index 2p and u_b of 2p + 1, so each pair costs one ln, one sqrt and one sine
+# and cosine. ln, sin and cos are written here with + - * / and the exponent's bits, not F32.log/sin/cos: CUDA's float
+# functions give other bits than the host's (bendlang/bend#1305), while + - * / and sqrt are
+# IEEE's on every lane and Bend fuses no multiply-add, so these numbers have the same bits on the GPU, on the CPU
+# threads and on the JS lane. They are within a few ulp of the libm values (tests/fill.bend measures it), not equal.
+# =====================================================================================================================
+
+def rng_word(x: F32) -> U32:
+  match x:
+    case F32{w}: U32{w}
+
+def rng_f32(x: U32) -> F32:
+  match x:
+    case U32{w}: F32{w}
+
+# mlbend-generative's mix32: xor-shift 16, multiply, xor-shift 13, multiply, xor-shift 16, over U32 that wraps
+def rng_mix(+z: U32) -> U32:
+  +a = U32.xor(z, U32.shrn(z, 16n))
+  +b = (a * 2246822519 : U32)
+  +c = U32.xor(b, U32.shrn(b, 13n))
+  +e = (c * 3266489917 : U32)
+  U32.xor(e, U32.shrn(e, 16n))
+
+# the hash of index i of counter s
+def rng_hash(+s: U32, +i: U32) -> U32:
+  rng_mix(((s * 2654435769 : U32) + (i + 305419898 : U32) : U32))
+
+# the uniform of index i of counter s, in (0, 1]: the hash's low 24 bits plus one, over 2^24 (exact)
+def rng_uniform(+s: U32, +i: U32) -> F32:
+  (U32.to_f32((U32.and(rng_hash(s, i), 16777215) + 1 : U32)) / 16777216.0 : F32)
+
+# ln m for m in [sqrt(1/2), sqrt(2)], from s = (m - 1) / (m + 1): ln m = 2 (s + s^3/3 + s^5/5 + s^7/7 + s^9/9)
+def rng_ln_m(+ex: F32, +m: F32) -> F32:
+  +s = ((m - 1.0 : F32) / (m + 1.0 : F32) : F32)
+  +z = (s * s : F32)
+  +c3 = (0.14285715 + (z * 0.11111111 : F32) : F32)
+  +c2 = (0.2 + (z * c3 : F32) : F32)
+  +p = (z * (0.33333334 + (z * c2 : F32) : F32) : F32)
+  +t = (s + s : F32)
+  ((ex * 0.693145751953125 : F32) + ((t + (t * p : F32) : F32) + (ex * 0.0000014286067653 : F32) : F32) : F32)
+
+# ln x for a positive normal x: x = m * 2^ex with m in [sqrt(1/2), sqrt(2)) read from the bits (a mantissa above
+# sqrt(2)'s, 0x3504F3, is halved and the exponent raised by one); ex * ln 2 in two parts, the first exact
+def rng_ln_w(+w: U32) -> F32:
+  +big = U32.is_lt(3474675, U32.and(w, 8388607))
+  +mb = U32.or(U32.and(w, 8388607), Bool.pick(U32, big, 1056964608, 1065353216))
+  rng_ln_m((U32.to_f32(U32.shrn(w, 23n)) - Bool.pick(F32, big, 126.0, 127.0) : F32), rng_f32(mb))
+
+def rng_ln(x: F32) -> F32:
+  rng_ln_w(rng_word(x))
+
+# sin x and cos x for x in [0, pi/4], Taylor to x^9 and x^10 (the next terms are below 2^-28)
+def rng_sin(+x: F32) -> F32:
+  +z = (x * x : F32)
+  +c4 = (0.0001984127 - (z * 0.0000027557319 : F32) : F32)
+  +c3 = (0.008333334 - (z * c4 : F32) : F32)
+  +c2 = (0.16666667 - (z * c3 : F32) : F32)
+  (x - ((x * z : F32) * c2 : F32) : F32)
+
+def rng_cos(+x: F32) -> F32:
+  +z = (x * x : F32)
+  +c5 = (0.0000248015873 - (z * 0.00000027557319 : F32) : F32)
+  +c4 = (0.0013888889 - (z * c5 : F32) : F32)
+  +c3 = (0.041666668 - (z * c4 : F32) : F32)
+  +c2 = (0.5 - (z * c3 : F32) : F32)
+  (1.0 - (z * c2 : F32) : F32)
+
+# the result of rng_sc: sin and cos of one angle
+type SC is Data:
+  SC{s: F32, c: F32}
+
+# sin and cos of a quarter turn's first eighth (x) or second (pi/2 - x, the two swapped), then turned by q quarters
+def rng_sc_q(+q: U32, +sx: F32, +cx: F32) -> SC:
+  SC{Bool.pick(F32, U32.is_eq(q, 0), sx, Bool.pick(F32, U32.is_eq(q, 1), cx, Bool.pick(F32, U32.is_eq(q, 2), F32.neg(sx), F32.neg(cx)))), Bool.pick(F32, U32.is_eq(q, 0), cx, Bool.pick(F32, U32.is_eq(q, 1), F32.neg(sx), Bool.pick(F32, U32.is_eq(q, 2), F32.neg(cx), sx)))}
+
+def rng_sc_x(+q: U32, +hi: Bool, +x: F32) -> SC:
+  +a = rng_sin(x)
+  +b = rng_cos(x)
+  rng_sc_q(q, Bool.pick(F32, hi, b, a), Bool.pick(F32, hi, a, b))
+
+# sin and cos of 2 pi v / 2^24 (v < 2^24): the quarter q is v's top 2 bits, w the rest; past the eighth (2^21) the angle
+# is taken from the quarter's end (2^22 - w, exact), so the polynomial only sees [0, pi/4]
+def rng_sc_w(+q: U32, +w: U32) -> SC:
+  +hi = U32.is_lt(2097152, w)
+  rng_sc_x(q, hi, (U32.to_f32(Bool.pick(U32, hi, (4194304 - w : U32), w)) * 0.00000037450702 : F32))
+
+def rng_sc(+v: U32) -> SC:
+  rng_sc_w(U32.shrn(v, 22n), U32.and(v, 4194303))
+
+def rng_pair(+r: F32, a: SC) -> F32 & F32:
+  match a:
+    case SC{+s, +c}: Tuple{(r * c : F32), (r * s : F32)}
+
+# the Gaussians of cells 2p and 2p + 1 of counter s (Box-Muller). The angle's 24 bits are u_b's (its hash plus one,
+# mod 2^24), so the angle is 2 pi u_b exactly before rounding
+def rng_gauss2(+s: U32, +p: U32) -> F32 & F32:
+  +i = (p + p : U32)
+  rng_pair(F32.sqrt((0.0 - (2.0 * rng_ln(rng_uniform(s, i)) : F32) : F32)), rng_sc(U32.and((rng_hash(s, (i + 1 : U32)) + 1 : U32), 16777215)))
+
+def rng_pick(+odd: Bool, g: F32 & F32) -> F32:
+  match g:
+    case Tuple{+a, +b}: Bool.pick(F32, odd, b, a)
+
+# the Gaussian of cell i alone (fill_gauss's cell i)
+def rng_gauss(+s: U32, +i: U32) -> F32:
+  rng_pick(U32.is_eq(U32.and(i, 1), 1), rng_gauss2(s, U32.shrn(i, 1n)))
+
+# the counter, the first index and the number of cells, the same for every leaf
+type FE is Data:
+  FE{s: U32, i0: U32, n: U32}
+
+def fu_go(k: Nat, +i: U32, +l: U32, +s: U32, +i0: U32, o: Array<F32>) -> Array<F32>:
+  match k:
+    case 0n: o
+    case 1n+q: fu_go(q, (i + l : U32), l, s, i0, Array.set(F32, o, i, rng_uniform(s, (i0 + i : U32))))
+
+# leaf t writes the cells t, t + l, .. below n, cell k the uniform of index i0 + k
+def fu_leaf(+t: U32, +l: U32, +e: FE, x1: Array<F32>, x2: Array<F32>, x3: Array<F32>, x4: Array<F32>, o: Array<F32>) -> Array<F32>:
+  match e:
+    case FE{+s, +i0, +n}: fu_go(share(t, n, l), t, l, s, i0, o)
+
+# writes cell i when it is below n (the cell before the first of an odd i0, which wraps to 2^32 - 1, and the cell after
+# the last are not written)
+def fg_if(ok: Bool, +i: U32, +x: F32, o: Array<F32>) -> Array<F32>:
+  match ok:
+    case True{}: Array.set(F32, o, i, x)
+    case False{}: o
+
+def fg_put(+i: U32, +n: U32, g: F32 & F32, o: Array<F32>) -> Array<F32>:
+  match g:
+    case Tuple{+a, +b}: fg_if(U32.is_lt((i + 1 : U32), n), (i + 1 : U32), b, fg_if(U32.is_lt(i, n), i, a, o))
+
+# pair j of the slice is the global pair q + j (q = i0 / 2), cells 2j - h and 2j - h + 1 of the output (h = i0 mod 2)
+def fg_go(k: Nat, +j: U32, +l: U32, +s: U32, +q: U32, +h: U32, +n: U32, o: Array<F32>) -> Array<F32>:
+  match k:
+    case 0n: o
+    case 1n+r: fg_go(r, (j + l : U32), l, s, q, h, n, fg_put(((j + j : U32) - h : U32), n, rng_gauss2(s, (q + j : U32)), o))
+
+# the number of global pairs that cells i0 .. i0 + n - 1 touch: (i0 mod 2 + n + 1) / 2
+def fg_pairs(+i0: U32, +n: U32) -> U32:
+  U32.shrn(((U32.and(i0, 1) + n : U32) + 1 : U32), 1n)
+
+# leaf t writes the pairs t, t + l, .. of the slice's pairs, each into the cells of it that lie in the slice
+def fg_leaf(+t: U32, +l: U32, +e: FE, x1: Array<F32>, x2: Array<F32>, x3: Array<F32>, x4: Array<F32>, o: Array<F32>) -> Array<F32>:
+  match e:
+    case FE{+s, +i0, +n}: fg_go(share(t, fg_pairs(i0, n), l), t, l, s, U32.shrn(i0, 1n), U32.and(i0, 1), n, o)
+
+def r1_out(r: R1) -> Array<F32>:
+  match r:
+    case R1{x1, x2, x3, x4, a}: a
+
+# n uniforms of counter s from index i0, cell k = rng_uniform(s, i0 + k) (mod 2^32), in a new array of 2^c cells made
+# on the device (one bang)
+@unsafe
+def fill_uniform_at(+s: U32, +i0: U32, +n: Nat, +c: Nat) -> Array<F32>:
+  r1_out(run1_new(~FE, ~fu_leaf, depth(n), FE{s, i0, U32.from_nat(n)}, none(Unit{}), none(Unit{}), none(Unit{}), none(Unit{}), c))
+
+# n Gaussians of counter s from index i0, cell k = rng_gauss(s, i0 + k) (mod 2^32), in a new array of 2^c cells made
+# on the device (one bang, a lane a global pair of cells; an odd i0 starts with the sine half of the pair (i0 - 1, i0))
+@unsafe
+def fill_gauss_at(+s: U32, +i0: U32, +n: Nat, +c: Nat) -> Array<F32>:
+  r1_out(run1_new(~FE, ~fg_leaf, depth(U32.to_nat(fg_pairs(i0, U32.from_nat(n)))), FE{s, i0, U32.from_nat(n)}, none(Unit{}), none(Unit{}), none(Unit{}), none(Unit{}), c))
+
+# n uniforms of counter s, cell i = rng_uniform(s, i), in a new array of 2^c cells made on the device (one bang)
+@unsafe
+def fill_uniform(+s: U32, +n: Nat, +c: Nat) -> Array<F32>:
+  fill_uniform_at(s, 0, n, c)
+
+# n Gaussians of counter s, cell i = rng_gauss(s, i), in a new array of 2^c cells made on the device (one bang, a lane a
+# pair of cells)
+@unsafe
+def fill_gauss(+s: U32, +n: Nat, +c: Nat) -> Array<F32>:
+  fill_gauss_at(s, 0, n, c)
+
+# an r x m Mat of uniforms of counter s, row-major (cell i * m + j = rng_uniform(s, i * m + j))
+@unsafe
+def uniform_mat(+s: U32, +r: Nat, +m: Nat) -> TA.Mat<r, m>:
+  TA.Mat{fill_uniform(s, Nat.mul(r, m), TA.cap_depth(Nat.mul(r, m)))}
+
+# an r x m Mat of Gaussians of counter s, row-major (cell i * m + j = rng_gauss(s, i * m + j))
+@unsafe
+def gauss_mat(+s: U32, +r: Nat, +m: Nat) -> TA.Mat<r, m>:
+  TA.Mat{fill_gauss(s, Nat.mul(r, m), TA.cap_depth(Nat.mul(r, m)))}
+
+# an r x m Mat of uniforms of counter s from index i0 (cell i * m + j = rng_uniform(s, i0 + i * m + j)); rows b .. b + r - 1
+# of an R x m uniform_mat are uniform_mat_at(s, b * m, r, m)
+@unsafe
+def uniform_mat_at(+s: U32, +i0: U32, +r: Nat, +m: Nat) -> TA.Mat<r, m>:
+  TA.Mat{fill_uniform_at(s, i0, Nat.mul(r, m), TA.cap_depth(Nat.mul(r, m)))}
+
+# an r x m Mat of Gaussians of counter s from index i0 (cell i * m + j = rng_gauss(s, i0 + i * m + j)); rows
+# b .. b + r - 1 of an R x m gauss_mat are gauss_mat_at(s, b * m, r, m)
+@unsafe
+def gauss_mat_at(+s: U32, +i0: U32, +r: Nat, +m: Nat) -> TA.Mat<r, m>:
+  TA.Mat{fill_gauss_at(s, i0, Nat.mul(r, m), TA.cap_depth(Nat.mul(r, m)))}
 """)
 open(OUT, "w").write("\n".join(o) if False else "".join(x if x.endswith("\n") else x + "\n" for x in o))
 print(f"{OUT}: {TM}x{TN} tiles, {len(S)} sums, {len(V)} values a turn")

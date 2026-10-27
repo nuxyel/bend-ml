@@ -1,6 +1,6 @@
 # bend-ml-tensor-array: tensors over a flat Array<F32>, with the shape in the type.
 #
-#   import bend-ml-tensor-array@0.1.17.0/main.bend as TA
+#   import bend-ml-tensor-array@0.1.18.0/main.bend as TA
 #
 # Mat<r, c> stores r*c numbers in an Array<F32>, row by row (index i*c + j). The
 # dimensions are erased type parameters: the same guarantee as bend-ml-tensor
@@ -768,12 +768,25 @@ def Mat.to_list2(-r: Nat, -c: Nat, al: AL) -> ML<r, c>:
     case AL{d, l}:
       ML{Mat{d}, l}
 
+def ML.len(-r: Nat, -c: Nat, ml: ML<r, c>) -> Nat:
+  match ml:
+    case ML{m, l}:
+      List.length(&2, F32, l)
+
+# n numbers from index 0, in row order; n = 0 gives the empty list (a Mat with no numbers)
+def Mat.to_list_count(-r: Nat, -c: Nat, d: Array<F32>, n: Nat) -> ML<r, c>:
+  match n:
+    case 0n:
+      ML{Mat{d}, Nil{}}
+    case 1n+p:
+      Mat.to_list2(r, c, read_l(p, 0, Nil{}, Array.get(F32, d, 0)))
+
 # two independent copies
 
 def Mat.to_list(+r: Nat, +c: Nat, m: Mat<r, c>) -> ML<r, c>:
   match m:
     case Mat{d}:
-      Mat.to_list2(r, c, read_l(Nat.sub(Nat.mul(r, c), 1n), 0, Nil{}, Array.get(F32, d, 0)))
+      Mat.to_list_count(r, c, d, Nat.mul(r, c))
 
 type MM2<-r: Nat, -c: Nat> is Type:
   MM2{a: Mat<r, c>, b: Mat<r, c>}
@@ -1770,6 +1783,14 @@ def app_len(+xs: List<&2, F32>, +ys: List<&2, F32>) -> {List.length(&2, F32, Lis
       %app_len(t, ys) : {1n+List.length(&2, F32, List.append(&2, F32, t, ys)) == 1n+_ : Nat}
       {==}
 
+# the same count for the list of a whole Mat: to_list2 wraps read_l's answer, and ML.len counts it
+def read_ml_len(-r: Nat, -c: Nat, +mleft: Nat, +idx: U32, +acc: List<&2, F32>, rc: Array<F32> & F32) -> {ML.len(r, c, Mat.to_list2(r, c, read_l(mleft, idx, acc, rc))) == Nat.add(1n+mleft, List.length(&2, F32, acc)) : Nat}:
+  match mleft rc:
+    case 0n Tuple{d, +v}:
+      zero_out(ML.len(r, c, Mat.to_list2(r, c, read_l(0n, idx, acc, Tuple{d, v}))), 1n+List.length(&2, F32, acc), rev_len(v <> acc, Nil{}))
+    case 1n+p Tuple{d, +v}:
+      len_step(ML.len(r, c, Mat.to_list2(r, c, read_l(p, (idx + 1 : U32), v <> acc, Array.get(F32, d, (idx + 1 : U32))))), p, List.length(&2, F32, acc), read_ml_len(r, c, p, (idx + 1 : U32), v <> acc, Array.get(F32, d, (idx + 1 : U32))))
+
 # a leaf's list: read_l reads mleft + 1 numbers onto acc and reverses them. By induction on
 # mleft: with 0 left it reads one number (rev_len counts the reversed list); with 1 + p left it
 # reads one and recurses, and len_step moves the 1 out of the sum.
@@ -1825,3 +1846,22 @@ def join_len(-r: Nat, -c: Nat, -h1: Nat, -h2: Nat, p: BL<half(r), c>, q: BL<Nat.
       %hq : {List.length(&2, F32, List.append(&2, F32, yx, yy)) == Nat.add(List.length(&2, F32, yx), _) : Nat}
       app_len(yx, yy)
 
+# Mat.to_list_count reads exactly n numbers, and n = 0 reads none.
+def to_list_count_len(-r: Nat, -c: Nat, d: Array<F32>, +n: Nat) -> {ML.len(r, c, Mat.to_list_count(r, c, d, n)) == n : Nat}:
+  match n:
+    case 0n:
+      {==}
+    case 1n+p:
+      zero_out(ML.len(r, c, Mat.to_list_count(r, c, d, 1n+p)), 1n+p, read_ml_len(r, c, p, 0, Nil{}, Array.get(F32, d, 0)))
+
+# LAW (to_list_len): Mat.to_list reads exactly r*c numbers, no more and no fewer.
+law to_list_len:
+  for +r: Nat
+  for +c: Nat
+  for m: Mat<r, c>
+  {ML.len(r, c, Mat.to_list(r, c, m)) == Nat.mul(r, c) : Nat}
+
+def to_list_len(r, c, m):
+  match m:
+    case Mat{d}:
+      to_list_count_len(r, c, d, Nat.mul(r, c))

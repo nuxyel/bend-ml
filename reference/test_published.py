@@ -38,6 +38,9 @@ def law_bands(+n: Nat) -> {{n == Nat.add(TA.half(n), Nat.sub(n, TA.half(n))) : N
 def law_band(-r: Nat, +c: Nat, +rows: Nat, x: Array<F32>, w: Array<F32>) -> {{TA.bl_len(r, c, TA.bv_gemm(r, c, rows, rows, x, w)) == rows : Nat}}:
   TA.band_len(r, c, rows, x, w)
 
+def law_tolist(+r: Nat, +c: Nat, m: TA.Mat<r, c>) -> {{TA.ML.len(r, c, TA.Mat.to_list(r, c, m)) == Nat.mul(r, c) : Nat}}:
+  TA.to_list_len(r, c, m)
+
 def law_ad(+e: AG.NE, +x: Nat) -> {{AG.nbwd(e, x, 1n) == AG.nfwd(e, x) : Nat}}:
   AG.reverse_eq_forward(e, x)
 
@@ -61,8 +64,9 @@ def bands_len(x: TA.BV<6n, 3n>) -> Nat:
     case TA.BV{{b, y}}:
       len_of(1n, 6n, TA.Mat.to_list(1n, 6n, y))
 
+# 0 x 5: no numbers, the empty list (0.1.18.0; 0.1.17.0 gave one number and the total 15n)
 def main() -> Nat:
-  Nat.add(after(prod()), bands_len(TA.Bands.matvec(6n, 3n, TA.Bands.zeros(2n, 6n, 3n), TA.Mat.fill(1n, 3n, 1.0))))
+  Nat.add(Nat.add(after(prod()), bands_len(TA.Bands.matvec(6n, 3n, TA.Bands.zeros(2n, 6n, 3n), TA.Mat.fill(1n, 3n, 1.0)))), len_of(0n, 5n, TA.Mat.to_list(0n, 5n, TA.Mat.fill(0n, 5n, 1.0))))
 """
 
 
@@ -117,9 +121,23 @@ def check_read():
     return ok
 
 
-# the tensor-array version a published package imports (its Mat types are that version's), read from its source
+# the tensor-array version a published package imports (its Mat types are that version's), read from the published
+# source in Bend's package store (~/.bend/lib, names/<pkg>@<ver> holds the hash of its folder) after an import fetches
+# it, so a newer local version on another tensor-array does not change what is checked; the local source if the store
+# has no copy
+LIB = os.path.expanduser("~/.bend/lib")
+
 def ta_of(pkg):
-    src = open(os.path.join(ROOT, pkg.replace("bend-ml-", ""), "main.bend"), encoding="utf-8").read()
+    ver = f"{pkg}@{VERS[pkg]}"
+    with tempfile.TemporaryDirectory() as d:
+        f = os.path.join(d, "fetch.bend")
+        open(f, "w").write(f'import Base\nimport {ver}/main.bend as P\n\ndef main() -> IO(Unit):\n  IO.print("")\n')
+        subprocess.run([BEND, f], capture_output=True, text=True, env=ENV, cwd=d)
+    try:
+        h = open(os.path.join(LIB, "names", ver), encoding="utf-8").read().strip()
+        src = open(os.path.join(LIB, h, "main.bend"), encoding="utf-8").read()
+    except OSError:
+        src = open(os.path.join(ROOT, pkg.replace("bend-ml-", ""), "main.bend"), encoding="utf-8").read()
     return re.search(r"import (bend-ml-tensor-array@[0-9.]+)/main.bend", src).group(1)
 
 
@@ -176,8 +194,9 @@ def check_fork():
     return ok
 
 
-# bend-ml-tensor-gpu is outside the proofs (no laws): its product (one bang) against tensor-array's, on the C lane's CPU
-# threads (the test builds without CUDA); the GPU's bits are checked by tensor-gpu/tests/bits.bend in make check
+# bend-ml-tensor-gpu is outside the proofs (no laws): an offset fill against its cell function, and its product (one
+# bang) against tensor-array's, on the C lane's CPU threads (the test builds without CUDA); the GPU's bits are checked
+# by tensor-gpu/tests/bits.bend and fill.bend in make check
 GPU = """import Base
 import {ta}/main.bend as TA
 import {tg}/main.bend as TG
@@ -197,8 +216,18 @@ def sum(k: Nat, +i: U32, acc: F32, r: Array<F32> & F32) -> F32:
 def tot(+n: Nat, a: Array<F32>) -> F32:
   sum(n, 0, 0.0, Array.get(F32, a, 0))
 
+# 1,000 Gaussians of counter 7 from cell 37 (an odd offset: the first is a sine half), as one fill and cell by cell
+def gsum(k: Nat, +s: U32, +i: U32, acc: F32) -> F32:
+  match k:
+    case 0n:
+      acc
+    case 1n+q:
+      gsum(q, s, (i + 1 : U32), (acc + TG.rng_gauss(s, i) : F32))
+
 def main() -> IO(Unit):
-  IO.print(F32.show(tot(16384n, c_of(TG.matmul(128n, 512n, 128n, 0n, TA.Mat.fill(128n, 512n, 0.5), TA.Mat.fill(512n, 128n, 3.0))))) ++ " " ++ F32.show(tot(16384n, c_of(TA.Mat.matmul(128n, 512n, 128n, 0n, TA.Mat.fill(128n, 512n, 0.5), TA.Mat.fill(512n, 128n, 3.0))))))
+  do IO<Unit>:
+    IO.print(F32.show(tot(1000n, TG.fill_gauss_at(7, 37, 1000n, 10n))) ++ " " ++ F32.show(gsum(1000n, 7, 37, 0.0)))
+    IO.print(F32.show(tot(16384n, c_of(TG.matmul(128n, 512n, 128n, 0n, TA.Mat.fill(128n, 512n, 0.5), TA.Mat.fill(512n, 128n, 3.0))))) ++ " " ++ F32.show(tot(16384n, c_of(TA.Mat.matmul(128n, 512n, 128n, 0n, TA.Mat.fill(128n, 512n, 0.5), TA.Mat.fill(512n, 128n, 3.0))))))
 """
 
 
@@ -209,9 +238,9 @@ def check_gpu():
         open(f, "w").write(GPU.format(ta=ta_of("bend-ml-tensor-gpu"), tg=tg))
         cc = subprocess.run([BEND, f, "-o", os.path.join(d, "gpu")], capture_output=True, text=True, env=ENV, cwd=d)
         c = subprocess.run([os.path.join(d, "gpu"), "+RTS", "--threads", "4", "-RTS"], capture_output=True, text=True, cwd=d) if cc.returncode == 0 else cc
-    words = c.stdout.split()
-    ok = len(words) == 2 and words[0] == words[1]
-    print(("ok   " if ok else "ERROR ") + f"published {tg.replace('bend-ml-', '')}: its product gives tensor-array's bits")
+    lines = [l.split() for l in c.stdout.strip().splitlines()]
+    ok = len(lines) == 2 and all(len(l) == 2 and l[0] == l[1] for l in lines)
+    print(("ok   " if ok else "ERROR ") + f"published {tg.replace('bend-ml-', '')}: an offset fill gives its cells' words, its product tensor-array's bits")
     if not ok:
         print(c.stdout[:400], (cc.stderr + c.stderr)[:800])
     return ok

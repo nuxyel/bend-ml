@@ -109,13 +109,19 @@ def main():
     # 1d. tensor-gpu: tensor-array's products as one bang each (Base's @unsafe Array.fork/join, upstream's one-block
     # pattern; Renan's decision, 2026-10-18); its unsafe defs are the tree, its leaves and what reaches them, no package
     # with laws imports it, and it gives tensor-array's bits on the CPU threads and, when CUDA is there, on the GPU
-    gpu_defs = ["mm", "put", "tile", "leaf_if", "leaf", "tree", "tree_new", "bang_new", "bang", "run_e", "gemm_new", "gemm", "matmul", "matmul_acc", "matmul_nt", "matmul_nt_acc", "matmul_tn", "matmul_tn_acc", "join2", "join3", "join4", "tree1", "root1", "root1_new", "go1", "go1_new", "run1", "run1_new", "tree2", "root2", "root2_new", "go2", "go2_new", "run2", "run2_new", "tree3", "root3", "root3_new", "go3", "go3_new", "run3", "run3_new", "tree4", "root4", "root4_new", "go4", "go4_new", "run4", "run4_new", "blocks_acc", "precise_c", "mm_precise3", "mm_precise2", "matmul_precise"]
+    gpu_defs = ["mm", "put", "tile", "leaf_if", "leaf", "tree", "tree_new", "bang_new", "bang", "run_e", "gemm_new", "gemm", "matmul", "matmul_acc", "matmul_nt", "matmul_nt_acc", "matmul_tn", "matmul_tn_acc", "join2", "join3", "join4", "tree1", "root1", "root1_new", "go1", "go1_new", "run1", "run1_new", "tree2", "root2", "root2_new", "go2", "go2_new", "run2", "run2_new", "tree3", "root3", "root3_new", "go3", "go3_new", "run3", "run3_new", "tree4", "root4", "root4_new", "go4", "go4_new", "run4", "run4_new", "blocks_acc", "precise_c", "mm_precise3", "mm_precise2", "matmul_precise", "fill_uniform_at", "fill_gauss_at", "fill_uniform", "fill_gauss", "uniform_mat", "gauss_mat", "uniform_mat_at", "gauss_mat_at"]
     run("tensor-gpu/main.bend: its @unsafe defs are the bang's tree and what reaches it", [BEND, "tensor-gpu/main.bend"],
         lambda o, c: f"{len(gpu_defs)} defs rely on unsafe or foreign code" in o and outside_proofs(o) == gpu_defs)
     clean = not any("tensor-gpu" in open(os.path.join(ROOT, f)).read() for f in laws)
     results.append(clean)
     print(f"{'ok  ' if clean else 'ERROR'} no package with laws imports tensor-gpu")
     gpu_want = ["0", "0", "2958"] + ["0"] * 9
+    # tests/fill.bend: the fills against their cell functions (0 differing words), the offset fills against theirs and
+    # against slices of a full fill (0 0 twelve times), mlbend-generative's uniform (0), the
+    # ulp of ln, sin and cos against libm (2, 1 1), Box-Muller against libm's, and the moments; the same lines on every
+    # lane, since the numbers are + - * / and sqrt only
+    fill_want = ["0 0"] * 6 + ["0"] + ["0 0"] * 12 + ["0", "2", "1 1", "0.0000013113022",
+                                "0.0009277552 0.9998181 0.6830969 0.95434856 0.99730206 ok", "0.4998817 0.08327992 1 1 1 ok"]
     with tempfile.TemporaryDirectory() as d:
         tg = os.path.join(d, "tg")
         run("compile tensor-gpu/tests/bits.bend", [BEND, "tensor-gpu/tests/bits.bend", "-o", tg])
@@ -127,6 +133,11 @@ def main():
         for t in ["1", "16"]:
             run(f"tensor-gpu's run1..run4 and run1_new..run4_new give their leaf's bits, inputs intact: 5 sizes ({t} CPU threads)",
                 [tk, "+RTS", "--threads", t, "-RTS"], lambda o, c: o.split() == ["0"] * 10)
+        tf = os.path.join(d, "tf")
+        run("compile tensor-gpu/tests/fill.bend", [BEND, "tensor-gpu/tests/fill.bend", "-o", tf])
+        for t in ["1", "16"]:
+            run(f"tensor-gpu's fills and offset fills give their cell functions' bits, near libm, sane moments ({t} CPU threads)",
+                [tf, "+RTS", "--threads", t, "-RTS"], lambda o, c: o.splitlines() == fill_want)
         cuda = os.environ.get("CUDA_HOME") or os.path.expanduser("~/.local/cuda12")
         if os.path.isdir(cuda):
             tgg = os.path.join(d, "tgg")
@@ -137,6 +148,9 @@ def main():
             run("compile tensor-gpu/tests/kernels.bend for CUDA", [BEND, "tensor-gpu/tests/kernels.bend", "-o", tkg], extra_env=env)
             run("tensor-gpu's run1..run4 and run1_new..run4_new give their leaf's bits on the GPU, inputs intact", [tkg],
                 lambda o, c: o.split() == ["0"] * 10, extra_env=env)
+            tfg = os.path.join(d, "tfg")
+            run("compile tensor-gpu/tests/fill.bend for CUDA", [BEND, "tensor-gpu/tests/fill.bend", "-o", tfg], extra_env=env)
+            run("tensor-gpu's fills give the CPU threads' bits on the GPU", [tfg], lambda o, c: o.splitlines() == fill_want, extra_env=env)
             tgp = os.path.join(d, "tgp")
             run("compile tensor-gpu/tests/precise.bend for CUDA", [BEND, "tensor-gpu/tests/precise.bend", "-o", tgp], extra_env=env)
             run("tensor-gpu's matmul_precise gives tensor-array's bits on the GPU: 21 products", [tgp],
@@ -148,12 +162,18 @@ def main():
     if FULL:
         run("tensor-gpu/tests/bits.bend on the JS lane", [BEND, "tensor-gpu/tests/bits.bend"],
             lambda o, c: re.findall(r"^[0-9 ]+$", o, re.M) == ["0 0 2958", "0 0 0 0 0 0", "0 0 0"])
+        run("tensor-gpu/tests/fill.bend on the JS lane", [BEND, "tensor-gpu/tests/fill.bend"],
+            lambda o, c: o.splitlines()[-len(fill_want):] == fill_want)
 
     # 2. shape errors that MUST fail to check
     for f, msg in [("tensor/tests/bad_matmul.bend", "expected"), ("tensor/tests/bad_reshape.bend", "expected"), ("tensor-array/tests/bad_matmul.bend", "expected"), ("tensor-array/tests/bad_grad.bend", "expected"), ("examples/runtime_batch_bad.bend", "expected"), ("examples/symbolic_reshape_bad.bend", "expected"), ("examples/square_transpose_bad.bend", "expected"), ("tensor-array/tests/bad_bands.bend", "expected")]:
         run(f"{f} must be a type error", [BEND, f], lambda o, c, m=msg: "SOME PROOFS FAIL" in o and m in o)
     run("tensor/tests/ok.bend compiles and runs", [BEND, "tensor/tests/ok.bend"], lambda o, c: "18 18 18 18" in o)
     run("tensor-array/tests/ok.bend compiles and runs", [BEND, "tensor-array/tests/ok.bend"], lambda o, c: o.strip() == "8n")
+    with tempfile.TemporaryDirectory() as d:
+        roundtrip = os.path.join(d, "roundtrip")
+        run("compile tensor-array/tests/roundtrip.bend", [BEND, "tensor-array/tests/roundtrip.bend", "-o", roundtrip])
+        run("Mat.of_list -> Mat.to_list returns the same numbers, empty included", [roundtrip], lambda o, c: o.strip() == "0")
     run("examples/symbolic_reshape.bend reshapes Mat<3, 6> into Mat<6, 3>", [BEND, "examples/symbolic_reshape.bend", "--", "3"], lambda o, c: "regroup(x) : Mat<6, 3>" in o and "15 16 17" in o)
     # the list-based baselines of the demos: nothing else builds them (train.bend went unchecked from v0.3 to v1.2.2)
     with tempfile.TemporaryDirectory() as d:
@@ -198,6 +218,7 @@ def main():
     run("bpe vs Python reference (train/encode/decode)", [PY, "reference/test_bpe.py"])
     run("tensor vs PyTorch", [PY, "reference/test_tensor.py"])
     run("tensor-array vs PyTorch", [PY, "reference/test_tensor_array.py"])
+    run("tensor-gpu's random fills vs a NumPy float32 twin, word for word", [PY, "reference/test_rng.py"])
     run("runtime batch size (examples/runtime_batch.bend) vs NumPy", [PY, "reference/test_runtime_batch.py"])
     run("autograd vs PyTorch (gradient checking)", [PY, "reference/test_autograd.py"])
     cases = "80" if FULL else "30"

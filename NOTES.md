@@ -1486,3 +1486,69 @@ through pull request #14 (CI green).
 - Published: `bend-ml-tensor-array@0.1.17.0` `0x7a3ad9c30a648ef09dd908b6468f25ea`. The MNIST and GPT-2 demos and the
   benchmarks moved to it; `tensor-fork` and `tensor-gpu` 0.1.4.0 stay on 0.1.16.0 until their next versions. `make
   check-full` 101/101 with it; `reference/test_published.py` passes.
+
+## tensor-gpu: counter-based random fills (2026-10-27, published as 0.1.5.0 on 2026-10-27)
+
+- Asked in bend-ml #23 (adeerkhan): a fill bang for uniform and Gaussian noise, so a generative training step does not
+  make its noise on the host. `fill_uniform`, `fill_gauss`, `uniform_mat` and `gauss_mat` make n numbers of a counter s
+  in one bang over `run1_new`, a lane a cell (uniform) or a pair of cells (Gaussian). Four defs outside the proofs,
+  pinned in `check_all.py` (58 in all).
+- The words: the counter hash and the uniform are mlbend-generative 0.1.0.0's (the test checks 2^20 uniforms against its
+  formula: 0 differ), Box-Muller over (2p, 2p + 1). ln, sin and cos are mine, in `+ - * /` and the exponent's bits
+  (ln from atanh's series on [sqrt(1/2), sqrt(2)], sin and cos by Taylor on [0, π/4] from the angle's 24 bits, so the
+  reduction is exact): with `F32.log`/`sin`/`cos` the GPU would give other bits (the known limit of bendlang/bend#1305).
+  Against libm: ln at most 2 ulp (2^20 points of the uniform grid), sin and cos 1 ulp (all 2^21 arguments), a Gaussian
+  1.3e-6 from Box-Muller with libm's functions (2^18 cells; mostly that formula's 2π written as `6.2831855`).
+- `tensor-gpu/tests/fill.bend`, in `make check`: the fills against their cell functions on the host, bit for bit (n =
+  1, 2, 7, 1000, 16389, 70001 and a 256 x 3072 Mat), the libm distances and the moments of 2^20 numbers; the same 13
+  lines on 1 and 16 threads, on the GPU (RTX 4050) and on the JS lane. With libm's sin and cos put back in the leaf the
+  GPU run differs (69,913 words of the Mat) and the CPU threads do not, so the test sees the GPU lane.
+- `reference/test_rng.py`: the same operations in NumPy's float32, in the same order, give the same words on 8,192
+  cells (4,096 from the bangs, 4,096 where the U32 indexes wrap), so a twin in Python can check the noise bit for bit.
+  It catches a changed sine coefficient (287 words) and a changed hash constant (all).
+- The issue's premise, checked on the noise alone: mlbend-generative's host path for the issue's size
+  (`TA.Mat.from_list(256n, 3072n, G.noise_of(s, 786432n))`, compiled, one thread) took 233 M user instructions on
+  2026-10-27, and `gauss_mat` with `+RTS --gpu off --threads 1 -RTS` 93 M (a checksum pass included in both). That is
+  tens of milliseconds, not the ~7 s a step the issue attributes to the generator, so the host time of that step is
+  somewhere else (my reply on #23 asks for the program). Timed on the idle machine (2026-10-27, 100 fills of
+  256 x 3072, whole programs, three runs each): the host list 1.98-1.99 s on one thread, about 20 ms a fill;
+  `bench/fill_gauss.bend` 0.75-0.76 s on one thread, 0.60-0.65 s on 16 and 0.68-0.70 s on the RTX 4050 after a first
+  run of 2.75 s (the kernel's compile), so 6-7.5 ms a fill on every lane, the same checksum on all of them.
+- Offset fills, asked on #23 by adeerkhan so a batch can be sliced: `fill_uniform_at(s, i0, n, c)`,
+  `fill_gauss_at(s, i0, n, c)`, `uniform_mat_at(s, i0, r, m)` and `gauss_mat_at(s, i0, r, m)` make cells
+  i0 .. i0 + n - 1 of counter s, output cell k the cell function at i0 + k (i0 a `U32`, wrapping mod 2^32). His
+  condition was that the Gaussians' pairs stay global, not per slice: a lane makes the global pair i0 / 2 + j and
+  writes its halves at 2j - (i0 mod 2) and the next cell when they lie in the slice, so an odd i0 starts with a sine
+  half. The plain fills are now the case i0 = 0, with the same words (the 13 lines of `fill.bend` and the twin's 8,192
+  words unchanged). Four more defs outside the proofs (62). `fill.bend` adds 12 lines: 8 offset fills against their
+  cell functions (odd and even i0 and n, n = 1 at an odd i0, an i0 near 2^32 that wraps), 3 slices against a full
+  fill, and 16 rows of a `gauss_mat_at` against the 256 x 3072 `gauss_mat`, the same on 1 and 16 threads, the GPU and
+  the JS lane; with the parity dropped from the leaf the 8 Gaussian slices at an odd i0 differ. The twin adds two
+  odd-i0 slices (4,095 cells that wrap, 777 cells): 13,064 words, 0 differ.
+- 0.1.5.0 imports tensor-array 0.1.17.0 instead of 0.1.16.0: Bend treats two versions' `Mat` as different types, so
+  a program on 0.1.17.0 (the version the README now lists) could not pass its matrices to a tensor-gpu on 0.1.16.0.
+  0.1.17.0 only adds the cross-entropy over the array; the products are 0.1.16.0's, and the bit tests pass unchanged on
+  every lane. `reference/test_published.py` now reads the tensor-array a published package imports from its published
+  source, not the local one, so the published 0.1.4.0 is still checked against 0.1.16.0.
+
+## tensor-array: the law to_list_len and the empty to_list (bend-ml #22, 2026-10-27, published as 0.1.18.0 on 2026-10-27)
+
+- Contributed by adeerkhan (pull request #22, related to #20), merged into `devel` on 2026-10-27.
+- The fix: `Mat.to_list` read `Nat.sub(r*c, 1) + 1` numbers, and `Nat.sub(0, 1)` is 0 on `Nat`, so a matrix with 0
+  rows or 0 columns gave a one-element list read from an empty array. `Mat.to_list_count` matches on the count instead,
+  and 0 gives `Nil`.
+- The law `to_list_len`: `Mat.to_list` reads exactly `r*c` numbers, the empty case included (by `read_ml_len`, the
+  count of `read_l` through `to_list2`, and `to_list_count_len`).
+- The numbers themselves are tested, not proved: `tensor-array/tests/roundtrip.bend`, in `make check`, runs
+  `Mat.of_list` then `Mat.to_list` on 11 shapes (0 x 0, 0 x 5, 5 x 0, a row, a column, rectangles) with -0, infinities,
+  NaN and a subnormal, word for word, and prints 0. A content law needs the checker to follow `Array.set`/`Array.get` on
+  a neutral array, which Base has no lemma for (the same reason `leaf_len` and `band_len` count lists).
+- Every other def is 0.1.17.0's, so the products and the cross-entropy keep their bits.
+- Published: `bend-ml-tensor-array@0.1.18.0` `0xf4dfe0b415f12cd7b6b3e20aa7cc5aa0`, then
+  `bend-ml-tensor-gpu@0.1.5.0` `0x6538b6a56d11b5a4d65ef7d8b18c1f9f` with the fills and the offset fills, moved from
+  tensor-array 0.1.17.0 to 0.1.18.0 (through `scripts/gen_tensor_gpu.py`; the generated file changes only in that
+  import) so that every package in v1.8.0 uses one `Mat`. The products' bit tests and `fill.bend` pass unchanged on 1
+  and 16 threads, the GPU and the JS lane. `tensor-fork` 0.1.4.0 stays on 0.1.16.0. The demos and the benchmarks moved
+  to 0.1.18.0. `reference/test_published.py` now applies `to_list_len`, checks that a published 0 x 5 `Mat.to_list` is
+  empty (0.1.17.0 gives one number) and that a published `fill_gauss_at` at an odd offset sums like its cells. `make
+  check-full` 110/110; `scripts/check_rts.py` passes.

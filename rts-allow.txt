@@ -4,6 +4,4 @@ docs/upstream/*                            # repros of open issues, as they ran 
 CLAUDE.md:A bare `./x --threads 16`        # the pitfall itself, explaining the bare form
 CLAUDE.md:`--gpu off` goes in the same bracket  # the same pitfall
 reference/mnist_torch.py                   # the PyTorch twin's own --threads, not a Bend program's
-tensor-gpu/main.bend:or with `--gpu off`   # a comment in published source; it changes with tensor-gpu's next version
-scripts/gen_tensor_gpu.py:or with `--gpu off`  # the generator of that comment
 reference/check_all.py:refuses a bare --threads 16  # the check that a test program refuses a bare option

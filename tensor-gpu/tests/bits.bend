@@ -10,7 +10,7 @@
 # Third line: matmul, matmul_nt and matmul_tn_acc on 512 x 576 by 576 x 1536 against tensor-array's: "0 0 0".
 # The values mix in -0, +inf, NaN and a subnormal (as tensor-array's tests); NaN equals NaN whatever its payload.
 import Base
-import bend-ml-tensor-array@0.1.16.0/main.bend as TA
+import bend-ml-tensor-array@0.1.18.0/main.bend as TA
 import ../main.bend as TG
 
 # deterministic values with specials mixed in by index (as tensor-array's tests/parseq.bend)

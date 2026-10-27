@@ -2,7 +2,7 @@
 # k from inside one block to many (up to 49,152), three times each. Prints the differing words over every
 # product, then the number of products: "0 21".
 import Base
-import bend-ml-tensor-array@0.1.16.0/main.bend as TA
+import bend-ml-tensor-array@0.1.18.0/main.bend as TA
 import ../main.bend as TG
 
 def val(+i: U32, +seed: U32) -> F32:
