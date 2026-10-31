@@ -2,7 +2,7 @@
 # any kernel over blocks of a range sharing up to four arrays.
 #
 #   import bend-ml-tensor-array@0.1.18.0/main.bend as TA
-#   import bend-ml-tensor-fork@0.1.4.0/main.bend as TF
+#   import bend-ml-tensor-fork@0.1.5.0/main.bend as TF
 #   TF.matmul(n, k, m, par, a, b)      # the same arguments, result type and bits as TA.Mat.matmul
 #
 # The six products (matmul, matmul_nt, matmul_tn and their accumulating forms) take tensor-array's Mat values and
