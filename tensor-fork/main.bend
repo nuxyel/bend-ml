@@ -1,7 +1,7 @@
 # bend-ml-tensor-fork: bend-ml-tensor-array's products, with the parallel blocks sharing their operands; and par1..par4,
 # any kernel over blocks of a range sharing up to four arrays.
 #
-#   import bend-ml-tensor-array@0.1.16.0/main.bend as TA
+#   import bend-ml-tensor-array@0.1.18.0/main.bend as TA
 #   import bend-ml-tensor-fork@0.1.4.0/main.bend as TF
 #   TF.matmul(n, k, m, par, a, b)      # the same arguments, result type and bits as TA.Mat.matmul
 #
@@ -21,7 +21,7 @@
 # the blocks are the halves of the fork tree, as in tensor-array's own split. tests/bits.bend checks both by sampling.
 # All of it is Bend: no foreign code.
 import Base
-import bend-ml-tensor-array@0.1.16.0/main.bend as TA
+import bend-ml-tensor-array@0.1.18.0/main.bend as TA
 
 # ---- blocks: any kernel over ranges of shared arrays ----
 # parN runs a kernel f over 2^d blocks of the range 0 .. cnt-1 in a tree of parallel lets; every block gets a handle to
