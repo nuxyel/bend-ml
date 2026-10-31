@@ -1586,3 +1586,12 @@ through pull request #14 (CI green).
 - `make lint` passes the tracked files without `tensor/` and `autograd/`, frozen since 2026-10-19, so their sources stay
   as published (their 11 findings are proofs and small scalar trees). Result: 0 findings, 39 suppressed. Comments only:
   every edited file checks as before.
+
+## tensor-fork 0.1.5.0 on tensor-array 0.1.18.0 (2026-10-30)
+
+- tensor-fork 0.1.4.0 imported tensor-array 0.1.16.0, so a program that used it with tensor-gpu 0.1.5.0 or tensor-array
+  0.1.18.0 held two `Mat` types: BendTorch's bump to 0.1.18.0 failed in the three files that import tensor-fork
+  (`expected ...main.Mat`, `observed TA.Mat`, in `lin_fwd`; reported on #23). Pull request #29 by adeerkhan moved the
+  three imports to 0.1.18.0; merged into `devel` after `make check` 101/101.
+- Published `bend-ml-tensor-fork@0.1.5.0` `0x236efa65086abc5955a9e74563e24668`: the same code and bits as 0.1.4.0.
+  `make check` 101/101 with it; `reference/test_published.py` takes it from the README table.
