@@ -1617,3 +1617,37 @@ through pull request #14 (CI green).
   leaves), so both lanes print `(1.5, 2.5, 3.0, 9.0)`: get after set, a write at 13 (wrapped to 5) leaving cell 2
   alone, and on the 4-leaf tree a write at 2 leaving cell 3 alone and seen by a read at 2. `make check` runs it on both
   lanes and with `--verdict` (4 checks; 108 in all on this machine with CUDA).
+
+## Peak virtual memory: 10.6 GB against 41 GB, explained (2026-11-01, Bend 2.0.39)
+
+The open question of 2026-10-06 and 2026-10-09 (GPT-2's peak virtual size 41 GB in some runs, 10.6 GB in others).
+It is address space the runtime reserves, and its size follows the thread count, not the model:
+
+- Measured with `scripts/peak_rss.sh`'s method plus a copy of `/proc/<pid>/maps` at the peak, GPT-2 `fast.bend`
+  compiled with 2.0.39, "Hi" + 1 token (busy machine; sizes only, no timings):
+
+  | `+RTS --threads` | peak virtual | peak resident | mappings of 256 MiB or more |
+  |---|---|---|---|
+  | 1 | 10,634 MB | 825 MB | one of 8 GiB, one of 2 GiB |
+  | 2 | 10,634 MB | 825 MB | (same as 1) |
+  | 4 | 16,421 MB | 829-837 MB | one of 8 GiB, four of 2 GiB |
+  | 16 | 41,094 MB | 833-840 MB | one of 8 GiB, sixteen of 2 GiB |
+
+- Where they come from, in the C the compiler emits (`bend X.bend -o x.c`): the heap ("corpus") is one
+  `mmap(MAP_PRIVATE | MAP_ANON | MAP_NORESERVE)` of 8 GiB (`1ull << 33`) at a high fixed address, and it doubles in
+  place when it fills (`corpus_grow`, up to 2^43 bytes). Every thread that runs Bend code gets its own 2 GiB stack
+  (`pool_stack`, `1ull << 31` plus a guard page), the main thread too. `pool_open` starts the `threads - 1` workers at
+  the first parallel split, not at start-up.
+- So peak virtual = 8 GiB x 2^k (k heap doublings; 0 for GPT-2) + 2 GiB x (1 + workers started) + ~0.4 GB of program,
+  libraries and the IO thread. 16 threads: 8 + 32 GiB = 41 GB; 1 thread: 8 + 2 GiB = 10.6 GB. With 2 threads the demo
+  keeps its weights as one block (bands only above 2 threads), never splits, starts no worker and stays at 10.6 GB.
+  That is probably why 2026-10-09's shorter prompt showed 10.6 GB (not re-measured; those runs were on Bend 2.0.3x): a
+  run that ends before its first parallel split never starts the workers. On 22 threads the same arithmetic gives
+  ~52 GB (computed, not measured).
+- None of it is memory in use: the pages are `MAP_NORESERVE` and only touched pages become resident (840 MB at 16
+  threads against 825 at 1, the workers' stacks and heap pages). It matters under a virtual memory limit: with
+  `ulimit -v 20000000` (about 19 GiB) the 16-thread run stops with `bend: reservation failed` (exit 1) after printing
+  the prompt ids, while the 4-thread run finishes. Under `vm.overcommit_memory = 2`, which ignores `MAP_NORESERVE`, the
+  same is likely (not tested; this machine runs mode 0).
+- Nothing to change in bend-ml: the sizes are the runtime's. The GPT-2 README's "reserves ~41 GB of address space,
+  which is not memory in use" stays true for 16 threads.
