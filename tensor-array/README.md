@@ -130,7 +130,10 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 ## Versions
 
 - `0.1.19.0`: the laws `size_set`, `get_after_set` and `get_other_set` about Base's `Array` (helpers `ASet.*`), asked for
-  in bend-ml #26. Every other def is 0.1.18.0's, with its bits. The round trip `Mat.to_list(Mat.of_list(xs)) == xs` is
+  in bend-ml #26. Two defs get faster with the same bits: the dot product under `matvec_l` and `matmul_nt` takes four
+  steps a turn (one band of the 50257x768 product 25% faster on one thread, no change on 16), and `Mat.to_list` reads
+  from the last index down instead of reversing a list (35-45% less time per number). Every other def is 0.1.18.0's,
+  with its bits. The round trip `Mat.to_list(Mat.of_list(xs)) == xs` is
   still tested, not proved: it needs a lemma about `Array.new`'s trees that `tests/apart.bend` checks on every pair of
   indices through depth 7 (by @adeerkhan, bend-ml #28). `tensor-fork` 0.1.5.0 and `tensor-gpu` 0.1.5.0 still import
   0.1.18.0, so a program that uses one of them stays on 0.1.18.0.
