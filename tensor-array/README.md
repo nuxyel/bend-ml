@@ -135,8 +135,8 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
   from the last index down instead of reversing a list (35-45% less time per number). Every other def is 0.1.18.0's,
   with its bits. The round trip `Mat.to_list(Mat.of_list(xs)) == xs` is
   still tested, not proved: it needs a lemma about `Array.new`'s trees that `tests/apart.bend` checks on every pair of
-  indices through depth 7 (by @adeerkhan, bend-ml #28). `tensor-fork` 0.1.5.0 and `tensor-gpu` 0.1.5.0 still import
-  0.1.18.0, so a program that uses one of them stays on 0.1.18.0.
+  indices through depth 7 (by @adeerkhan, bend-ml #28). `tensor-fork` 0.1.6.0 and `tensor-gpu` 0.1.5.1 import
+  0.1.19.0 (hash `0x54fd18094240d26f3074e1ee00279d63`).
 - `0.1.18.0`: the law `to_list_len` (`Mat.to_list` reads exactly `r*c` numbers) and a fix: `Mat.to_list` of a matrix
   with no numbers (0 rows or 0 columns) now gives `Nil`, where it gave a one-element list before. `tests/roundtrip.bend`
   checks `Mat.of_list` then `Mat.to_list` on empty, row, column and rectangular matrices, word for word (the numbers are
