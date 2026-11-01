@@ -260,6 +260,10 @@ def main():
             run("GPT-2 tokenizer vs tiktoken", [PY, "reference/test_gpt2_tok.py", exe])
     else:
         print("skipped: GPT-2 tokenizer (run reference/gpt2_prep.py first)")
+    if os.path.isdir(os.path.join(ROOT, "demos/gpt2/data/w")):
+        run("GPT-2 demo's weights load bit for bit (pinned hash, 1 and 16 threads)", [PY, "reference/test_gpt2_load.py"])
+    else:
+        print("skipped: GPT-2 weight hash (run reference/gpt2_prep.py --split first)")
 
     # 5. full demos (--full)
     if FULL:
