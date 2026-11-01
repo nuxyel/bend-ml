@@ -1967,6 +1967,7 @@ def bmv_w(+c: Nat, -r: Nat, b: Bands<r, c>, +rr: Nat, -e: {rr == r : Nat}, xp: A
     case BLeaf{m} Tuple{x, x2}:
       mat_w(r, c, rr, x, m)
     case BNode{bx, by} Tuple{x1, x2}:
+      # bend-lint: disable-next bend-lint-rules/performance/missed_fork -- a proof of matvec_l_len not-expected-because: the package never runs it (NOTES 2026-11-01)
       node_w(r, c, rr, bmv(c, half(r), bx, half(rr), eq_half(rr, r, e), Array.clone(F32, x1)), bmv(c, Nat.sub(r, half(r)), by, Nat.sub(rr, half(rr)), eq_rest(rr, r, e), Array.clone(F32, x2)), bmv_w(c, half(r), bx, half(rr), eq_half(rr, r, e), Array.clone(F32, x1)), bmv_w(c, Nat.sub(r, half(r)), by, Nat.sub(rr, half(rr)), eq_rest(rr, r, e), Array.clone(F32, x2)))
 
 # a witness gives the count
