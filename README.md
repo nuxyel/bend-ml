@@ -80,23 +80,29 @@ same tokens as `transformers`; its typed layers are on BendHub as `bend-ml-llama
 ## 04 · How it compares
 
 Every release up to v1.2.2 was measured on 2026-10-11 next to six reference systems, in one session with one protocol
-(medians of alternated rounds on an Intel Core Ultra 7 155H). v1.3.2 was measured on 2026-10-16 with the same protocol,
-next to v1.2.2, PyTorch and NumPy again, which came out within 2% of their numbers of 2026-10-11; llama.cpp, llm.c,
-dfdx and candle keep theirs. GPT-2's cost per token is unchanged since v1.2.2 (139 ms on one thread, 107 on 16); what
-changed is the start (1.0 s instead of 5.4, at 831 MB instead of 1,464 MB) and training: an MNIST batch takes 20.0 ms
-instead of 29.9 on one thread, 7.7 instead of 12.8 on 16.
-Bend 2.0.39 alone then took a token to 128 ms on one thread and 86 on 16, against 138 and 106 for the same commit
-built with 2.0.38 (idle machine, 7 alternated rounds, 2026-10-24); the charts below still show the earlier numbers.
+(medians of alternated rounds on an Intel Core Ultra 7 155H, 32 GB, AC power, performance profile). v1.3.2 was measured
+on 2026-10-16 the same way, and v1.8.0 on 2026-11-01 with Bend 2.0.39 on an idle machine (load1 0.7 at the start),
+next to v1.3.2, PyTorch and NumPy again. v1.3.2 came out within 1% of its numbers of 2026-10-16 (GPT-2 138 and 106 ms
+a token, MNIST 20.0 and 7.8 ms a batch), and PyTorch and NumPy within 2% on one thread; on 16 threads they came out
+slower than on 2026-10-11 (PyTorch 11.0 ms against 9.4, NumPy 14.8 against 11.2, both with a wide spread), so the
+charts keep every reference system's numbers of 2026-10-11.
 
-<p align="center"><img src="docs/media/deck/frames/04-vs-references.webp" alt="GPT-2 small, ms per token: PyTorch 18.5 and 9.4, NumPy 18.5 and 11.2, llama.cpp 22.2 and 9.8, bend-ml v1.3.2 139 and 107, llm.c without a key/value cache 529 and 142, on 1 and 16 threads" width="90%"></p>
+From v1.3.2 to v1.8.0, a GPT-2 token went from 138 to 129 ms on one thread and from 106 to 85 on 16, most of it from
+Bend 2.0.39 (2026-10-24: 128 and 86 ms for the same commit, against 138 and 106 with 2.0.38); an MNIST batch from 20.0
+to 9.5 ms on one thread and from 7.8 to 5.7 on 16, at 85 MB instead of 107. GPT-2 starts in 0.8 s instead of 1.0. What
+did not move: PyTorch is still 7x ahead on one thread and 9x on 16 for GPT-2; for MNIST NumPy and PyTorch are 20x
+ahead on one thread and 6-14x on 16; and the thread curve still flattens after 4 threads (85 ms at 4, 79 at best, on 8
+and 22), as v1.3.2's did (108 at 4, 97 on 22).
 
-<p align="center"><img src="docs/media/deck/frames/05-threads.webp" alt="ms per token by thread count: Bend keeps improving up to 22 threads" width="90%"></p>
+<p align="center"><img src="docs/media/deck/frames/04-vs-references.webp" alt="GPT-2 small, ms per token: PyTorch 18.5 and 9.4, NumPy 18.5 and 11.2, llama.cpp 22.2 and 9.8, bend-ml v1.8.0 129 and 85, llm.c without a key/value cache 529 and 142, on 1 and 16 threads" width="90%"></p>
 
-<p align="center"><img src="docs/media/deck/frames/06-mnist.webp" alt="MNIST, ms per batch at 16 threads and peak memory: bend-ml v1.3.2 7.7 ms, slower than the others, with the smallest footprint (107 MB)" width="90%"></p>
+<p align="center"><img src="docs/media/deck/frames/05-threads.webp" alt="ms per token by thread count: bend-ml v1.8.0 129 ms on one thread, 85 on 4, 79 at best" width="90%"></p>
+
+<p align="center"><img src="docs/media/deck/frames/06-mnist.webp" alt="MNIST, ms per batch at 16 threads and peak memory: bend-ml v1.8.0 5.7 ms, slower than the others, with the smallest footprint (85 MB)" width="90%"></p>
 
 ## 05 · Every release
 
-<p align="center"><img src="docs/media/deck/frames/03-history.webp" alt="GPT-2 ms per token by release, from v0.2 to v1.3.2, on 1 and 16 threads" width="90%"></p>
+<p align="center"><img src="docs/media/deck/frames/03-history.webp" alt="GPT-2 ms per token by release, from v0.2 to v1.8.0, on 1 and 16 threads" width="90%"></p>
 
 Since v1.2.2, each change keeps the output bits it had (checked word by word, or against PyTorch where the order of
 sums changed on purpose):
