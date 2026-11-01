@@ -1595,3 +1595,16 @@ through pull request #14 (CI green).
   three imports to 0.1.18.0; merged into `devel` after `make check` 101/101.
 - Published `bend-ml-tensor-fork@0.1.5.0` `0x236efa65086abc5955a9e74563e24668`: the same code and bits as 0.1.4.0.
   `make check` 101/101 with it; `reference/test_published.py` takes it from the README table.
+
+## tensor-array 0.1.19.0, ready to publish (2026-11-01, not published)
+
+- The three Array laws of 2026-10-29 (`size_set`, `get_after_set`, `get_other_set`) go out as 0.1.19.0 without the
+  round trip `Mat.to_list(Mat.of_list(xs)) == xs`, my decision: that law needs a lemma about `Array.new`'s trees (two
+  different indices reach different leaves) and four `U32` facts Base does not state; `tests/apart.bend` (#28, by
+  adeerkhan) checks the lemma on every pair of indices through depth 7, and #26 stays open for the law.
+- The header and the README say 0.1.19.0; `git diff` against 0.1.18.0's commit adds lines and changes only the version
+  in the header, so every def 0.1.18.0 had keeps its code and bits. `list_laws.py --check-readme`: 33 laws in 5
+  packages, ok. `bend tensor-array/main.bend --verdict`: ALL PROOFS CHECK.
+- The package table, the badge (33 laws), the diagram, the demos, the benchmarks and `reference/test_published.py` stay
+  on 0.1.18.0 until it is on BendHub: `test_published.py` reads the table, so a version there that the hub does not
+  have fails the checks. tensor-fork and tensor-gpu 0.1.5.0 keep importing 0.1.18.0.
