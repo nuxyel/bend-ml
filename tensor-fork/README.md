@@ -2,13 +2,14 @@
 
 The six products of [`bend-ml-tensor-array`](../tensor-array) (`matmul`, `matmul_nt`, `matmul_tn` and their accumulating
 forms), with the same arguments, result types and bits, but with the parallel blocks **sharing** their operands instead
-of copying them, and `par1`..`par4`, which run any kernel of yours over blocks of a range on up to four shared arrays.
+of copying them, `par1`..`par4`, which run any kernel of yours over blocks of a range on up to four shared arrays, and
+`softmax_ce`, tensor-array's cross-entropy with its rows in blocks (on `devel`, not published yet).
 It is faster wherever the work splits into blocks; it is **not proved**, and says so.
 
 - Bend: **2.0.39** · License: MIT · Depends on `bend-ml-tensor-array@0.1.18.0`.
-- `bend tensor-fork/main.bend` → `SOME PROOFS FAIL`, naming the 32 defs that rely on `@unsafe` code (below). All of it is
+- `bend tensor-fork/main.bend` → `SOME PROOFS FAIL`, naming the 35 defs that rely on `@unsafe` code (below). All of it is
   Bend: no foreign code.
-- Tests: `tests/bits.bend`, against tensor-array, bit for bit (below).
+- Tests: `tests/bits.bend`, `tests/precise.bend` and `tests/ce.bend`, against tensor-array, bit for bit (below).
 
 ```python
 import Base
@@ -28,6 +29,14 @@ writes; then the arrays hold the same bits at every depth and thread count as `f
 def scale_leaf(+s: F32, +i0: U32, +k: Nat, a: Array<F32>) -> Array<F32>:
   my_scale_loop(k, i0, s, a)              # a[i] = a[i] * s for i = i0 .. i0+k-1
 TF.par1(~F32, ~F32, ~scale_leaf, 0.5, 4n, n, a)   # 16 blocks
+```
+
+Cross-entropy with the rows in blocks: `softmax_ce(n, c, par, z, labels)` takes `TA.Mat.softmax_ce`'s arguments plus
+`par` and returns its result type with its bits, the rows on up to 2^par blocks (`par = 0` is tensor-array's own loop).
+
+```python
+def loss(z: TA.Mat<64n, 49152n>, labels: List<&2, Nat>) -> TA.MCE<64n, 49152n>:
+  TF.softmax_ce(64n, 49152n, 4n, z, labels)   # instead of TA.Mat.softmax_ce(64n, 49152n, z, labels)
 ```
 
 ## Why it is a separate package
@@ -80,6 +89,10 @@ A matrix · vector over the same sharing was not adopted: it beat `Bands.matvec`
 inside a whole generation (SmolLM2-135M 10% faster, 360M even, 1.7B 13.5% slower). The GPU (a bang over the same tree)
 runs it with the same bits but 5-10x slower than the CPU on this machine.
 
+`softmax_ce` with its rows in blocks has not been timed yet: it was written on a busy machine, and a speed claim waits
+for an idle one. On one thread, counted rather than timed (user-mode instructions, 256 rows of 49,152, the fill
+included): 1,402.3 M at par 4 against 1,402.2 M through tensor-array, so the shared blocks add no copy.
+
 ## What is checked, and what is not
 
 `tests/bits.bend` (`make check`, on the C lane at 1 and 16 threads; `make check-full` adds the JS lane):
@@ -93,6 +106,11 @@ runs it with the same bits but 5-10x slower than the CPU on this machine.
   0 differing words.
 - `par1`..`par4` with a kernel over blocks of `0 .. cnt-1` at depths 0..6 and cnt = 0, 1, 7, 100, 1000, against the same
   kernel in one loop: 0 differing words in every array, the ones only read included.
+- `softmax_ce` at par 0..6 against `TA.Mat.softmax_ce` (`tests/ce.bend`, 1 and 16 threads): 2 x 3, 100 x 10, 7 x 49,152,
+  1 x 1, 33 x 17, 64 x 4,096, 5 x 10 with 3 labels and with 7 (rows past the matrix), 5 x 0 and 0 x 10 (with no labels
+  and with 3); the loss and every cell of the gradient, 0 differing words. The logits mix in the same specials, and
+  some labels fall past the row. It catches a block that starts a row late (295,110 differing words), a label past the
+  row read as 0 (174) and the loss terms added instead of subtracted (24).
 - Deliberate faults it catches: a right half one row short (5,282 differing words), a right half of columns one
   column late (60,557), a block of rows written at row 0 (22,740); a right block of `blocks2` starting at the left
   block's start (765,956 words in the products, and in `par2`), the packing's blocks written from cell 0 (766,974), a
@@ -104,7 +122,13 @@ defs, so a new one cannot slip in unnoticed:
 
 `blocks1`..`blocks4`, `join2`..`join4`, `par1`..`par4` (the blocks), `pk_par` (packing in blocks), `rpar`, `cpar`,
 `t8_tree`, `t8_go`, `gemm_fork` (the product's fork tree), and `gemm_rows`, `gemm_any2`, `gemm_any`, `matmul`,
-`matmul_acc`, `matmul_nt`, `matmul_nt_acc`, `matmul_tn`, `matmul_tn_acc` (what reaches it).
+`matmul_acc`, `matmul_nt`, `matmul_nt_acc`, `matmul_tn`, `matmul_tn_acc` (what reaches it); `mp_s3`, `mp_s2`, `mp_step`,
+`mp_go`, `mm_precise2`, `matmul_precise` (the precise product); `ce_par3`, `softmax_ce2`, `softmax_ce` (the
+cross-entropy's blocks).
+
+`softmax_ce` relies on the same two conditions: a block writes only its own rows of the logits and its own cells of
+the loss terms, and reads only its own rows. Rows past the matrix (more labels than rows) can wrap around onto its
+first rows, so they run after the blocks, in order, as in tensor-array.
 
 ## Versions
 
@@ -121,3 +145,5 @@ defs, so a new one cannot slip in unnoticed:
 - `0.1.4.0` (2026-10-25): 0.1.2.0's code on tensor-array 0.1.16.0 (0.1.14.0's code), with its bits.
 - `0.1.5.0` (2026-10-30): on tensor-array 0.1.18.0, so a program that also uses tensor-gpu 0.1.5.0 or tensor-array
   0.1.18.0 passes the same `Mat` to all of them (bend-ml #29, by @adeerkhan). The same code and bits.
+- Next (on `devel`, not published; it would be `0.1.6.0`, a new capability): `softmax_ce` with its rows in blocks,
+  `TA.Mat.softmax_ce`'s bits (`tests/ce.bend`). The products unchanged.
