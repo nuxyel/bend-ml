@@ -237,14 +237,16 @@ type P2 is Type:
 type AL is Type:
   AL{c: Array<F32>, l: List<&2, F32>}
 
-# list of m elements starting at idx (reads with Array.get, returning the array)
+# list of mleft + 1 elements ending at idx (reads with Array.get, returning the array). It reads from
+# idx down and conses each number onto acc, so the list comes out in index order with no reverse
+# (NOTES.md, 2026-11-01): callers pass the last index and its read.
 
 def read_l(mleft: Nat, +idx: U32, acc: List<&2, F32>, rc: Array<F32> & F32) -> AL:
   match mleft rc:
     case 0n Tuple{c, +v}:
-      AL{c, List.reverse(&2, F32, v <> acc)}
+      AL{c, v <> acc}
     case 1n+p Tuple{c, +v}:
-      read_l(p, (idx + 1 : U32), v <> acc, Array.get(F32, c, (idx + 1 : U32)))
+      read_l(p, (idx - 1 : U32), v <> acc, Array.get(F32, c, (idx - 1 : U32)))
 
 # writes the list starting at idx
 
@@ -394,7 +396,7 @@ def ce_rows(labels: List<&2, Nat>, +mm1: Nat, +mu: U32, +nf: F32, +i: U32, r: L2
     case Nil{} L2{loss, c}:
       L2{loss, c}
     case Con{+y, t} L2{loss, c}:
-      ce_rows(t, mm1, mu, nf, (i + 1 : U32), ce_row(read_l(mm1, (i * mu : U32), Nil{}, Array.get(F32, c, (i * mu : U32))), y, nf, (i * mu : U32), loss))
+      ce_rows(t, mm1, mu, nf, (i + 1 : U32), ce_row(read_l(mm1, ((i * mu : U32) + U32.from_nat(mm1) : U32), Nil{}, Array.get(F32, c, ((i * mu : U32) + U32.from_nat(mm1) : U32))), y, nf, (i * mu : U32), loss))
 
 # ---- the same rows over the array itself: no lists ----
 # The list version above reads each row into a list and walks it five times. This one walks the row in place with tail
@@ -519,7 +521,7 @@ def count_rows(labels: List<&2, Nat>, +mm1: Nat, +mu: U32, +i: U32, r: CR) -> CR
     case Nil{} CR{c, n}:
       CR{c, n}
     case Con{+y, t} CR{c, n}:
-      count_rows(t, mm1, mu, (i + 1 : U32), count_rows3(y, n, read_l(mm1, (i * mu : U32), Nil{}, Array.get(F32, c, (i * mu : U32)))))
+      count_rows(t, mm1, mu, (i + 1 : U32), count_rows3(y, n, read_l(mm1, ((i * mu : U32) + U32.from_nat(mm1) : U32), Nil{}, Array.get(F32, c, ((i * mu : U32) + U32.from_nat(mm1) : U32)))))
 
 
 # =====================================================================
@@ -804,12 +806,12 @@ def ML.len(-r: Nat, -c: Nat, ml: ML<r, c>) -> Nat:
       List.length(&2, F32, l)
 
 # n numbers from index 0, in row order; n = 0 gives the empty list (a Mat with no numbers)
-def Mat.to_list_count(-r: Nat, -c: Nat, d: Array<F32>, n: Nat) -> ML<r, c>:
+def Mat.to_list_count(-r: Nat, -c: Nat, d: Array<F32>, +n: Nat) -> ML<r, c>:
   match n:
     case 0n:
       ML{Mat{d}, Nil{}}
     case 1n+p:
-      Mat.to_list2(r, c, read_l(p, 0, Nil{}, Array.get(F32, d, 0)))
+      Mat.to_list2(r, c, read_l(p, (U32.from_nat(n) - 1 : U32), Nil{}, Array.get(F32, d, (U32.from_nat(n) - 1 : U32))))
 
 # two independent copies
 
@@ -1323,7 +1325,7 @@ def add_row2(-n: Nat, -m: Nat, +nn: Nat, +mm: Nat, cd: Array<F32>, al: AL) -> MB
 def Mat.add_row(+n: Nat, +m: Nat, c: Mat<n, m>, b: Mat<1n, m>) -> MBias<n, m>:
   match c b:
     case Mat{cd} Mat{bd}:
-      add_row2(n, m, n, m, cd, read_l(Nat.sub(m, 1n), 0, Nil{}, Array.get(F32, bd, 0)))
+      add_row2(n, m, n, m, cd, read_l(Nat.sub(m, 1n), U32.from_nat(Nat.sub(m, 1n)), Nil{}, Array.get(F32, bd, U32.from_nat(Nat.sub(m, 1n)))))
 
 # pair of matrices of the same shape (the result of an operation that reads two operands)
 
@@ -1431,7 +1433,7 @@ def row_fin(-r: Nat, -c: Nat, al: AL) -> MRow<r, c>:
 def Mat.read_row(+r: Nat, +c: Nat, m: Mat<r, c>, +i: U32) -> MRow<r, c>:
   match m:
     case Mat{d}:
-      row_fin(r, c, read_l(Nat.sub(c, 1n), (i * U32.from_nat(c) : U32), Nil{}, Array.get(F32, d, (i * U32.from_nat(c) : U32))))
+      row_fin(r, c, read_l(Nat.sub(c, 1n), ((i * U32.from_nat(c) : U32) + U32.from_nat(Nat.sub(c, 1n)) : U32), Nil{}, Array.get(F32, d, ((i * U32.from_nat(c) : U32) + U32.from_nat(Nat.sub(c, 1n)) : U32))))
 
 def Mat.write_row(-r: Nat, +c: Nat, m: Mat<r, c>, +i: U32, xs: List<&2, F32>) -> Mat<r, c>:
   match m:
@@ -1659,7 +1661,7 @@ def bv_g2(-r: Nat, -c: Nat, w: Array<F32>, al: AL) -> BL<r, c>:
 def bv_g(-r: Nat, -c: Nat, +m: Nat, g: G) -> BL<r, c>:
   match g:
     case G{a, b, y}:
-      bv_g2(r, c, b, read_l(m, 0, Nil{}, Array.get(F32, y, 0)))
+      bv_g2(r, c, b, read_l(m, U32.from_nat(m), Nil{}, Array.get(F32, y, U32.from_nat(m))))
 
 # the rows of one band, one dot product each, with the gemm of Mat.matmul_nt (n = 1), so the
 # results are identical. Writing the results into an Array and reading them back is faster than
@@ -1721,12 +1723,12 @@ def brow_fin(-r: Nat, -c: Nat, al: AL) -> BRow<r, c>:
       BRow{BLeaf{Mat{d}}, l}
 
 # n numbers starting at flat index i of one band (a band may have no rows)
-def brow_leaf2(-r: Nat, -c: Nat, n: Nat, +i: U32, d: Array<F32>) -> BRow<r, c>:
+def brow_leaf2(-r: Nat, -c: Nat, +n: Nat, +i: U32, d: Array<F32>) -> BRow<r, c>:
   match n:
     case 0n:
       BRow{BLeaf{Mat{d}}, Nil{}}
     case 1n+p:
-      brow_fin(r, c, read_l(p, i, Nil{}, Array.get(F32, d, i)))
+      brow_fin(r, c, read_l(p, ((i + U32.from_nat(n) : U32) - 1 : U32), Nil{}, Array.get(F32, d, ((i + U32.from_nat(n) : U32) - 1 : U32))))
 
 def brow_leaf(-r: Nat, -c: Nat, m: Mat<r, c>, +i: U32, n: Nat) -> BRow<r, c>:
   match m:
@@ -1799,14 +1801,6 @@ def zero_out(-s: Nat, +n: Nat, e: {s == Nat.add(n, 0n) : Nat}) -> {s == n : Nat}
   %add_zero_r(n) : {s == _ : Nat}
   e
 
-# reversing onto acc adds the lengths
-def rev_len(+xs: List<&2, F32>, +acc: List<&2, F32>) -> {List.length(&2, F32, List.reverse.go(&2, F32, xs, acc)) == Nat.add(List.length(&2, F32, xs), List.length(&2, F32, acc)) : Nat}:
-  match xs:
-    case Nil{}:
-      {==}
-    case Con{h, t}:
-      succ_out(List.length(&2, F32, List.reverse.go(&2, F32, t, h <> acc)), List.length(&2, F32, t), List.length(&2, F32, acc), rev_len(t, h <> acc))
-
 # appending adds the lengths
 def app_len(+xs: List<&2, F32>, +ys: List<&2, F32>) -> {List.length(&2, F32, List.append(&2, F32, xs, ys)) == Nat.add(List.length(&2, F32, xs), List.length(&2, F32, ys)) : Nat}:
   match xs:
@@ -1820,13 +1814,13 @@ def app_len(+xs: List<&2, F32>, +ys: List<&2, F32>) -> {List.length(&2, F32, Lis
 def read_ml_len(-r: Nat, -c: Nat, +mleft: Nat, +idx: U32, +acc: List<&2, F32>, rc: Array<F32> & F32) -> {ML.len(r, c, Mat.to_list2(r, c, read_l(mleft, idx, acc, rc))) == Nat.add(1n+mleft, List.length(&2, F32, acc)) : Nat}:
   match mleft rc:
     case 0n Tuple{d, +v}:
-      zero_out(ML.len(r, c, Mat.to_list2(r, c, read_l(0n, idx, acc, Tuple{d, v}))), 1n+List.length(&2, F32, acc), rev_len(v <> acc, Nil{}))
+      {==}
     case 1n+p Tuple{d, +v}:
-      len_step(ML.len(r, c, Mat.to_list2(r, c, read_l(p, (idx + 1 : U32), v <> acc, Array.get(F32, d, (idx + 1 : U32))))), p, List.length(&2, F32, acc), read_ml_len(r, c, p, (idx + 1 : U32), v <> acc, Array.get(F32, d, (idx + 1 : U32))))
+      len_step(ML.len(r, c, Mat.to_list2(r, c, read_l(p, (idx - 1 : U32), v <> acc, Array.get(F32, d, (idx - 1 : U32))))), p, List.length(&2, F32, acc), read_ml_len(r, c, p, (idx - 1 : U32), v <> acc, Array.get(F32, d, (idx - 1 : U32))))
 
-# a leaf's list: read_l reads mleft + 1 numbers onto acc and reverses them. By induction on
-# mleft: with 0 left it reads one number (rev_len counts the reversed list); with 1 + p left it
-# reads one and recurses, and len_step moves the 1 out of the sum.
+# a leaf's list: read_l reads mleft + 1 numbers onto acc. By induction on mleft: with 0 left it
+# reads one number onto acc (1 + the length of acc, by the definitions); with 1 + p left it reads
+# one and recurses, and len_step moves the 1 out of the sum.
 law leaf_len:
   for -r: Nat
   for -c: Nat
@@ -1840,16 +1834,16 @@ law leaf_len:
 def leaf_len(r, c, w, mleft, idx, acc, rc):
   match mleft rc:
     case 0n Tuple{d, +v}:
-      zero_out(List.length(&2, F32, List.reverse.go(&2, F32, v <> acc, Nil{})), 1n+List.length(&2, F32, acc), rev_len(v <> acc, Nil{}))
+      {==}
     case 1n+p Tuple{d, +v}:
-      len_step(bl_len(r, c, bv_g2(r, c, w, read_l(p, (idx + 1 : U32), v <> acc, Array.get(F32, d, (idx + 1 : U32))))), p, List.length(&2, F32, acc), leaf_len(r, c, w, p, (idx + 1 : U32), v <> acc, Array.get(F32, d, (idx + 1 : U32))))
+      len_step(bl_len(r, c, bv_g2(r, c, w, read_l(p, (idx - 1 : U32), v <> acc, Array.get(F32, d, (idx - 1 : U32))))), p, List.length(&2, F32, acc), leaf_len(r, c, w, p, (idx - 1 : U32), v <> acc, Array.get(F32, d, (idx - 1 : U32))))
 
 # whatever the gemm wrote, reading 1 + p rows back gives 1 + p numbers (G has one constructor, so
 # matching g opens it, and leaf_len counts the list)
 def g_len(-r: Nat, -c: Nat, +p: Nat, g: G) -> {bl_len(r, c, bv_g(r, c, p, g)) == 1n+p : Nat}:
   match g:
     case G{a, b, y}:
-      zero_out(bl_len(r, c, bv_g2(r, c, b, read_l(p, 0, Nil{}, Array.get(F32, y, 0)))), 1n+p, leaf_len(r, c, b, p, 0, Nil{}, Array.get(F32, y, 0)))
+      zero_out(bl_len(r, c, bv_g2(r, c, b, read_l(p, U32.from_nat(p), Nil{}, Array.get(F32, y, U32.from_nat(p))))), 1n+p, leaf_len(r, c, b, p, U32.from_nat(p), Nil{}, Array.get(F32, y, U32.from_nat(p))))
 
 # LAW (band_len): the product of one band with `rows` rows gives exactly `rows` numbers.
 # 0 rows give the empty list; 1 + p rows go through the gemm, and g_len counts what is read back.
@@ -1885,7 +1879,7 @@ def to_list_count_len(-r: Nat, -c: Nat, d: Array<F32>, +n: Nat) -> {ML.len(r, c,
     case 0n:
       {==}
     case 1n+p:
-      zero_out(ML.len(r, c, Mat.to_list_count(r, c, d, 1n+p)), 1n+p, read_ml_len(r, c, p, 0, Nil{}, Array.get(F32, d, 0)))
+      zero_out(ML.len(r, c, Mat.to_list_count(r, c, d, 1n+p)), 1n+p, read_ml_len(r, c, p, (U32.from_nat(1n+p) - 1 : U32), Nil{}, Array.get(F32, d, (U32.from_nat(1n+p) - 1 : U32))))
 
 # LAW (to_list_len): Mat.to_list reads exactly r*c numbers, no more and no fewer.
 law to_list_len:
