@@ -1,7 +1,7 @@
 # bend-ml
 
 Machine learning in Bend 2 where a shape error is a type error and the structural guarantees are
-laws checked by Bend's kernel. Five packages on BendHub (`bend-ml-*`), an MNIST and a GPT-2 small demo,
+laws checked by Bend's kernel. Eight packages on BendHub (`bend-ml-*`), an MNIST and a GPT-2 small demo,
 both matched against PyTorch. Started from Victor Taelin's wishlist "AI framework / PyTorch /
 llama.bend" (https://x.com/VictorTaelin/status/2104949395770712276). Two goals: packages other people
 use on BendHub, and a portfolio piece for HOC.
