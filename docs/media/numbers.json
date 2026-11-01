@@ -1,5 +1,5 @@
 {
- "_note": "Every number shown in the README charts and the video. Measured on an Intel Core Ultra 7 155H, 32 GB, Bend 2.0.35 (the project moved to 2.0.36 on 2026-10-10; per-token times unchanged), PyTorch 2.14.1 (CPU, 16 threads).",
+ "_note": "Every number shown in the README charts and the video. Measured on an Intel Core Ultra 7 155H, 32 GB, Bend 2.0.35 (the project moved to 2.0.36 on 2026-10-10; per-token times unchanged), PyTorch 2.14.1 (CPU, 16 threads). The evidence block's v1.8.0 numbers: Bend 2.0.39, 2026-11-01.",
  "mnist_epoch_seconds": {
   "bend_v1_lists": 544,
   "bend_v2_array": 7.0,
@@ -35,8 +35,10 @@
  "project": {
   "packages": 8,
   "laws": 30,
-  "checks_quick": 53,
-  "checks_full": 61,
+  "checks_quick": 108,
+  "checks_full": 119,
+  "checks_quick_without_cuda": 99,
+  "checks_full_without_cuda": 110,
   "bend": "2.0.39",
   "lean": "4.34.0"
  },
@@ -47,7 +49,7 @@
   "gpt2_pytorch_ahead_max": 5
  },
  "evidence": {
-  "source": "measured on 2026-10-11 on an Intel Core Ultra 7 155H; medians",
+  "source": "measured on 2026-10-11 on an Intel Core Ultra 7 155H; medians; v1.3.2 on 2026-10-16, v1.8.0 on 2026-11-01 (rerun_2026_10_16, rerun_2026_11_01)",
   "date": "2026-10-11",
   "gpt2_ms_per_token_history": {
    "v0.2.0": {
@@ -85,6 +87,10 @@
    "v1.3.2": {
     "1": 138.8,
     "16": 107.1
+   },
+   "v1.8.0": {
+    "1": 128.9,
+    "16": 84.7
    }
   },
   "gpt2_peak_mb_16t": {
@@ -95,7 +101,8 @@
    "v1.2.0": 931,
    "v1.2.1": 928,
    "v1.2.2": 933,
-   "v1.3.2": 880
+   "v1.3.2": 880,
+   "v1.8.0": 869
   },
   "gpt2_ms_per_token_peers": {
    "PyTorch": {
@@ -121,6 +128,10 @@
    "bend-ml v1.3.2": {
     "1": 138.8,
     "16": 107.1
+   },
+   "bend-ml v1.8.0": {
+    "1": 128.9,
+    "16": 84.7
    }
   },
   "gpt2_thread_curve": {
@@ -177,6 +188,15 @@
     105.4,
     107.1,
     96.7
+   ],
+   "bend-ml v1.8.0": [
+    128.9,
+    129.7,
+    84.5,
+    79.4,
+    83.8,
+    84.7,
+    78.8
    ]
   },
   "mnist_ms_per_batch": {
@@ -207,6 +227,10 @@
    "bend-ml v1.3.2": {
     "1": 19.97,
     "16": 7.67
+   },
+   "bend-ml v1.8.0": {
+    "1": 9.49,
+    "16": 5.69
    }
   },
   "mnist_peak_mb_16t": {
@@ -215,7 +239,8 @@
    "dfdx": 254,
    "candle": 452,
    "bend-ml v1.2.2": 119,
-   "bend-ml v1.3.2": 107
+   "bend-ml v1.3.2": 107,
+   "bend-ml v1.8.0": 85
   },
   "laws_by_release": {
    "v0.2.0": 21,
@@ -225,7 +250,8 @@
    "v1.2.0": 27,
    "v1.2.1": 27,
    "v1.2.2": 27,
-   "v1.3.2": 27
+   "v1.3.2": 27,
+   "v1.8.0": 30
   },
   "gpt2_worst_logit_diff_by_release": {
    "v0.3.0": 0.000582,
@@ -253,6 +279,45 @@
    "gpt2_peak_mb_1t": {
     "v1.2.2": 1464,
     "v1.3.2": 831
+   }
+  },
+  "rerun_2026_11_01": {
+   "source": "my measurements of 2026-11-01 on an idle machine (Bend 2.0.39; gpt2 7 rounds, mnist 5, threads 5; bend-ml v1.8.0 next to v1.3.2, PyTorch and NumPy). The anchors match 2026-10-16 within 1%: GPT-2 v1.3.2 138.2 / 105.9 ms (was 138.8 / 107.1), MNIST v1.3.2 20.03 / 7.75 ms (19.97 / 7.67); PyTorch on one thread 18.8 ms (18.5), NumPy 18.6 (18.5). On 16 threads PyTorch came out at 11.0 ms (9.4 on 2026-10-11) and NumPy at 14.8 (11.2), both with a wide spread; the charts keep the 2026-10-11 numbers for every reference system.",
+   "gpt2_v132_anchor": {
+    "1": 138.2,
+    "16": 105.9
+   },
+   "mnist_v132_anchor": {
+    "1": 20.03,
+    "16": 7.75
+   },
+   "gpt2_pytorch": {
+    "1": 18.8,
+    "16": 11.0
+   },
+   "gpt2_numpy": {
+    "1": 18.6,
+    "16": 14.8
+   },
+   "mnist_pytorch": {
+    "1": 0.49,
+    "16": 0.42
+   },
+   "mnist_numpy": {
+    "1": 0.42,
+    "16": 1.46
+   },
+   "gpt2_small_run_s": {
+    "v1.3.2": 1.02,
+    "v1.8.0": 0.8
+   },
+   "gpt2_peak_mb_1t": {
+    "v1.3.2": 830,
+    "v1.8.0": 831
+   },
+   "mnist_peak_mb_1t": {
+    "v1.3.2": 50,
+    "v1.8.0": 38
    }
   }
  }
