@@ -1701,3 +1701,31 @@ What moved:
 - `numbers.json` holds the run as `rerun_2026_11_01`; `checks_quick`/`checks_full` are 108/119 (99/110 without CUDA).
   `make_media.sh --capture` refreshed the outputs: `make check-full` 119/119; `law_count.txt` reads 33 laws because the
   tree has tensor-array 0.1.19.0's source, not published, so the badge stays at 30.
+
+## tensor-fork: softmax_ce with the rows in blocks (2026-11-01, on devel, not published)
+
+- The rows in parallel, the second time. tensor-array's attempt of 2026-10-27 (`Mat.softmax_ce_par`) gave no gain
+  because tensor-array shares no array: each half of its fork tree copied its rows. tensor-fork has `par3`, so
+  `TF.softmax_ce(n, c, par, z, labels)` runs the rows on up to 2^par blocks that share three arrays through
+  `Array.fork`: the logits (each block overwrites its own rows with their gradient), the labels (read; taken from the
+  list into an `Array<U32>` once, a label past the row kept as c) and one loss term per row (each block writes its own
+  cells). The rows are tensor-array's own loops (`cea_max`, `cea_exp`, `cea_p`, `cea_grad`); only the running loss
+  moves out of the row: the term `log(max(p, 1e-12))` goes into its cell, and after the blocks `ce_sum` subtracts the
+  terms from +0.0 in row order, as `cea_rows` does, so the bits are the same at every depth and thread count.
+- Two cases stay sequential. More labels than rows: those rows reach past the matrix and may wrap around onto its first
+  rows, so they run after the blocks through `TA.cea_rows`, in order (the same order as tensor-array's). A matrix with
+  no columns (every row starts at cell 0) and `par = 0` run `TA.Mat.softmax_ce` itself.
+- Bits: `tensor-fork/tests/ce.bend` compares the loss and every gradient cell with `TA.Mat.softmax_ce` at par 0..6 on
+  eleven cases (2 x 3, 100 x 10, 7 x 49,152, 1 x 1, 5 x 10 with 3 and with 7 labels, 33 x 17, 64 x 4,096, 5 x 0, 0 x 10
+  with no labels and with 3), tensor-array's `ce_array` values and labels: 0 differing words, on 1 and 16 threads. Three
+  mutants are caught: a block that starts a row late (295,110 words), a label past the row read as 0 (174), the terms
+  added instead of subtracted (24). It refuses arguments, as `bits.bend`. Not run on the JS lane: the interpreter grew
+  past 26 GB on the wide cases and was stopped.
+- Three more defs outside the proofs, pinned in `check_all.py` (35): `ce_par3` (calls `par3`), `softmax_ce2` and
+  `softmax_ce` (reach it). No package with laws imports tensor-fork.
+- Cost, counted, not timed (the machine was busy): user-mode instructions on CPU 3, one thread, 256 rows of 49,152, the
+  fill included: 1,402.3 M at par 4 against 1,402.2 M at par 0 (tensor-array's loop), so the blocks add no copy. Whether
+  16 threads give anything on a loop this bound by memory is the idle-machine question (Track B); until then the README
+  makes no speed claim.
+- `make check` 111/111 (108 before, with CUDA); `make lint` 0 findings.
+- Not published: it would be `bend-ml-tensor-fork@0.1.6.0` (a new capability; the products' code and bits unchanged).
