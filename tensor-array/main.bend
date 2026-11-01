@@ -39,8 +39,37 @@ def dotr(k: Nat, +ia: U32, +ib: U32, +sa: U32, +sb: U32, a0: F32, a1: F32, a2: F
     case 1n+p Tuple{a, +x} Tuple{b, +y}:
       dotr(p, (ia + sa : U32), (ib + sb : U32), sa, sb, a1, a2, a3, (a0 + (x * y : F32) : F32), Array.get(F32, a, (ia + sa : U32)), Array.get(F32, b, (ib + sb : U32)))
 
-def dotg(k: Nat, +ia: U32, +ib: U32, +sa: U32, +sb: U32, acc: F32, ra: Array<F32> & F32, rb: Array<F32> & F32) -> R:
-  dotr(k, ia, ib, sa, sb, acc, 0.0, 0.0, 0.0, ra, rb)
+# dotr's state between two steps: the four partial sums and the two pending reads
+type D4 is Type:
+  D4{a0: F32, a1: F32, a2: F32, a3: F32, ra: Array<F32> & F32, rb: Array<F32> & F32}
+
+# one step of dotr: adds the pending product to a0, rotates the sums, reads the next pair at ia, ib
+def dstep(+ia: U32, +ib: U32, s: D4) -> D4:
+  match s:
+    case D4{a0, a1, a2, a3, ra, rb}:
+      match ra rb:
+        case Tuple{a, +x} Tuple{b, +y}:
+          D4{a1, a2, a3, (a0 + (x * y : F32) : F32), Array.get(F32, a, ia), Array.get(F32, b, ib)}
+
+def dfin(k: Nat, +ia: U32, +ib: U32, +sa: U32, +sb: U32, s: D4) -> R:
+  match s:
+    case D4{a0, a1, a2, a3, ra, rb}:
+      dotr(k, ia, ib, sa, sb, a0, a1, a2, a3, ra, rb)
+
+# dotr with its loop unrolled by four: q rounds of four dstep, then the last rem (< 4) steps by dotr itself.
+# Every product goes to the same sum in the same order as in dotr (four rotations bring the names back), so the
+# result has dotr's bits (tests/dot4.bend). The compiled loop runs ~16% fewer instructions; one thread on a
+# 50,257 x 768 matrix · vector goes from 26.7 to 20.0 ms, smaller ones and 16 threads stay within noise (NOTES.md,
+# 2026-11-01). Eight steps a round were no faster.
+def dot4(q: Nat, +rem: Nat, +ia: U32, +ib: U32, +sa: U32, +sb: U32, s: D4) -> R:
+  match q:
+    case 0n:
+      dfin(rem, ia, ib, sa, sb, s)
+    case 1n+p:
+      dot4(p, rem, (ia + (4 * sa : U32) : U32), (ib + (4 * sb : U32) : U32), sa, sb, dstep((ia + (4 * sa : U32) : U32), (ib + (4 * sb : U32) : U32), dstep((ia + (3 * sa : U32) : U32), (ib + (3 * sb : U32) : U32), dstep((ia + (2 * sa : U32) : U32), (ib + (2 * sb : U32) : U32), dstep((ia + sa : U32), (ib + sb : U32), s)))))
+
+def dotg(+k: Nat, +ia: U32, +ib: U32, +sa: U32, +sb: U32, acc: F32, ra: Array<F32> & F32, rb: Array<F32> & F32) -> R:
+  dot4(Nat.div(k, 4n), Nat.sub(k, Nat.mul(4n, Nat.div(k, 4n))), ia, ib, sa, sb, D4{acc, 0.0, 0.0, 0.0, ra, rb})
 
 # writes one cell of C: c[idx] = x, or c[idx] = c[idx] + x when ac (an accumulating product, 0.1.10.0). x is computed
 # exactly as without ac and added once, so C + A·B has the bits of adding a separately computed A·B to C.
