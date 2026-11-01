@@ -81,7 +81,7 @@ def main():
 
     # 1c. tensor-fork: the one package whose parallel blocks share arrays through Base's @unsafe Array.fork; its unsafe
     # defs are exactly the blocks, the fork tree and what reaches them, no package with laws imports it, and it gives tensor-array's bits
-    fork_defs = ["blocks1", "join2", "blocks2", "join3", "blocks3", "join4", "blocks4", "par1", "par2", "par3", "par4", "pk_par", "rpar", "cpar", "t8_tree", "t8_go", "gemm_fork", "gemm_rows", "gemm_any2", "gemm_any", "matmul", "matmul_acc", "matmul_nt", "matmul_nt_acc", "matmul_tn", "matmul_tn_acc", "mp_s3", "mp_s2", "mp_step", "mp_go", "mm_precise2", "matmul_precise"]
+    fork_defs = ["blocks1", "join2", "blocks2", "join3", "blocks3", "join4", "blocks4", "par1", "par2", "par3", "par4", "pk_par", "rpar", "cpar", "t8_tree", "t8_go", "gemm_fork", "gemm_rows", "gemm_any2", "gemm_any", "matmul", "matmul_acc", "matmul_nt", "matmul_nt_acc", "matmul_tn", "matmul_tn_acc", "mp_s3", "mp_s2", "mp_step", "mp_go", "mm_precise2", "matmul_precise", "ce_par3", "softmax_ce2", "softmax_ce"]
     run("tensor-fork/main.bend: its @unsafe defs are the fork tree and what reaches it", [BEND, "tensor-fork/main.bend"],
         lambda o, c: f"{len(fork_defs)} defs rely on unsafe or foreign code" in o and outside_proofs(o) == fork_defs)
     clean = not any("tensor-fork" in open(os.path.join(ROOT, f)).read() for f in laws)
@@ -102,6 +102,11 @@ def main():
         for t in ["1", "16"]:
             run(f"tensor-fork's matmul_precise gives tensor-array's bits: 21 products ({t} threads)", [tfp, "+RTS", "--threads", t, "-RTS"],
                 lambda o, c: o.strip() == "0 21")
+        tfc = os.path.join(d, "tfc")
+        run("compile tensor-fork/tests/ce.bend", [BEND, "tensor-fork/tests/ce.bend", "-o", tfc])
+        for t in ["1", "16"]:
+            run(f"tensor-fork's softmax_ce with the rows in blocks gives tensor-array's bits: 11 cases at par 0..6 ({t} threads)",
+                [tfc, "+RTS", "--threads", t, "-RTS"], lambda o, c: o.strip().strip('"').split() == ["0"] * 11 + ["77"])
     if FULL:
         run("tensor-fork/tests/bits.bend on the JS lane", [BEND, "tensor-fork/tests/bits.bend"],
             lambda o, c: re.findall(r"^[0-9 ]+$", o, re.M) == ["0 0 14832", "0 0 0 0 0 0", "0 0 0 0 0 0 0"])
