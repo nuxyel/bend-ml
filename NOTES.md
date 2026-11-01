@@ -1729,3 +1729,40 @@ What moved:
   makes no speed claim.
 - `make check` 111/111 (108 before, with CUDA); `make lint` 0 findings.
 - Not published: it would be `bend-ml-tensor-fork@0.1.6.0` (a new capability; the products' code and bits unchanged).
+
+## tensor-fork: softmax_ce timed on an idle machine (2026-11-01)
+
+- The question left open above: does `TF.softmax_ce` on 16 threads beat tensor-array's one-thread loop, with the same
+  bits. `bench/ce_fork.bend` and `bench/ce_fork.py` (new): the logits filled, then `TF.softmax_ce` at par 0 (that is
+  `TA.Mat.softmax_ce` itself), 4 or 6, or the fill alone; one thread pinned to CPU 3, 16 threads through
+  `+RTS --threads 16 -RTS`; 11 rounds, every pair once a round in a shuffled order, medians and [min, max]. Idle
+  before every round (load1 under 1.0, no process over 10% CPU, performance profile, mains). Results in
+  `bench/results/ce_fork-2026-11-01.txt`.
+- Result in a line: on wide rows, 2.9x at par 6 and 2.6x at par 4 for the whole program, fill included; on MNIST's
+  100 x 10 it is slower, so par 0 there.
+
+  | rows x cols | tensor-array, 1 thread | par 4, 16 threads | par 6, 16 threads | the fill alone |
+  |---|---|---|---|---|
+  | 1,024 x 49,152 | 367.3 ms [366.0, 370.7] | 143.7 ms [136.0, 145.9] (2.56x) | 125.6 ms [121.0, 134.9] (2.92x) | 83.1 ms |
+  | 256 x 49,152 | 93.3 ms [91.2, 94.1] | 39.3 ms [36.3, 42.2] (2.37x) | 32.6 ms [31.4, 37.5] (2.86x) | 22.2 ms |
+  | 4,096 x 1,000 | 30.7 ms [28.9, 31.5] | 15.6 ms [12.8, 19.7] (1.97x) | 12.2 ms [10.4, 14.5] (2.51x) | 7.3 ms |
+  | 64 x 1,000 | 1.5 ms [1.4, 1.6] | 2.0 ms [1.8, 2.2] (0.74x) | 2.2 ms [1.7, 2.3] (0.67x) | 1.1 ms |
+  | 100 x 10 | 1.1 ms [1.0, 2.3] | 1.9 ms [1.3, 2.1] (0.55x) | 1.9 ms [1.4, 2.2] (0.56x) | 1.0 ms |
+
+  The fill is sequential and every variant pays it; without it (median minus median, an estimate) the cross-entropy
+  itself goes from 284 to 43 ms at 1,024 rows, about 6.7x at par 6 (a second, separate run of 11 rounds gave 6.1x).
+- Bits: the loss word and the sum of all gradient words are the same for par 0, 4 and 6 on 1 and 16 threads at every
+  shape (1,024 x 49,152: loss `1094078500`, gradient sum `2971427842`); `tests/ce.bend` stays the word-for-word check.
+- One thread costs nothing: par 4 and 6 within 1% of par 0 at every shape. tensor-array on 16 threads is its one-thread
+  time (366.7 against 367.3 ms), as expected of a loop with no fork.
+- Instructions (`perf stat -e cpu_core/instructions/u`, one thread on CPU 3, medians of 3): 1,024 x 49,152 6,123.3 M at
+  par 0, 6,123.3 M at par 4, 6,130.5 M at par 6; 256 x 49,152 1,539.7, 1,540.4, 1,540.7 M (the fill differs from the
+  1,402 M entry above, so the totals do too). On 16 threads `cpu_core` + `cpu_atom` grow to 8.0-9.4 G at 1,024 rows
+  with runs 3 G apart: the waiting workers' spinning is counted, so it is not a measure of work.
+- Schedule check, though the gap is far over 20%: the 1,024-row par 0 and par 4 programs compiled a second time ran at
+  362.5 and 142.6 ms against 361.1 and 143.3 ms on 16 threads (the first harness run, same protocol).
+- Losses: small matrices lose on 16 threads, 0.8 ms on 100 x 10 and 0.5-0.7 ms on 64 x 1,000, a cost of handing out the
+  blocks; whether it is paid per call or once per run is not separated here, so MNIST-sized callers should keep par 0.
+  Spread on 16 threads is up to 19% of the median (256 rows, par 4) against 2-4% on one thread. Par 6 beats par 4 on
+  every wide shape (64 blocks balance 16 threads better than 16 blocks). MetalBend's preflight reported "busy" for the
+  agent processes alone (claude, codex: present, under 10% CPU); the other checks passed.
