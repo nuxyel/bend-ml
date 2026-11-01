@@ -53,7 +53,7 @@ function bars(x0, y0, w, h, title, max, items) {
   const W = 1020, H = 674, bh = 92;
   const P = {
     nat: [40, 226, 236], bpe: [356, 64, 300], ten: [356, 178, 300], aut: [356, 292, 300], arr: [356, 406, 300],
-    brd: [356, 520, 300], gpt: [736, 150, 244], mni: [736, 330, 244],
+    brd: [356, 520, 300], gpt: [736, 64, 244], mni: [736, 178, 244], frk: [736, 406, 244], gpu: [736, 520, 244],
   };
   const box = (k, name, sub, marks) => {
     const [x, y, w] = P[k];
@@ -65,22 +65,24 @@ function bars(x0, y0, w, h, title, max, items) {
   };
   const R2 = (k) => [P[k][0] + P[k][2], P[k][1] + bh / 2], L2 = (k) => [P[k][0], P[k][1] + bh / 2];
   let b = `<defs><marker id="ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="${C.b1}"/></marker></defs>`;
-  for (const [a, c] of [["nat", "bpe"], ["nat", "ten"], ["nat", "aut"], ["bpe", "gpt"], ["ten", "gpt"], ["arr", "gpt"], ["arr", "mni"], ["ten", "mni"], ["brd", "gpt"]]) {
+  for (const [a, c] of [["nat", "bpe"], ["nat", "ten"], ["nat", "aut"], ["bpe", "gpt"], ["ten", "gpt"], ["arr", "gpt"], ["arr", "mni"], ["ten", "mni"], ["brd", "gpt"], ["arr", "frk"], ["arr", "gpu"]]) {
     const [x1, y1] = R2(a), [x2, y2] = L2(c), mx = (x1 + x2) / 2;
     b += `<path d="M${x1} ${y1} C${mx} ${y1} ${mx} ${y2} ${x2 - 2} ${y2}" fill="none" stroke="${C.b1}" stroke-width="1.2" marker-end="url(#ar)"/>`;
   }
   b += `<path d="M${P.ten[0] + 150} ${P.ten[1] + bh} L${P.aut[0] + 150} ${P.aut[1] - 2}" stroke="${C.b1}" stroke-width="1.2" marker-end="url(#ar)"/>`;
   b += T(40, 40, `${N.project.packages} packages on BendHub · ${N.project.laws} laws proved`, { size: 17, fill: C.b02, weight: 700 });
-  b += box("nat", "nat-lemmas", "Nat and List lemmas", [["15 laws", C.grn]]);
+  b += box("nat", "nat-lemmas", "Nat and List lemmas", [["17 laws", C.grn]]);
   b += box("bpe", "bpe-tokenizer", "byte-level BPE, GPT-2 style", [["5 laws", C.grn], ["fuzzed", C.b00]]);
   b += box("ten", "tensor", "Mat<r,c> over lists", [["2 laws", C.grn], ["vs PyTorch", C.b00]]);
   b += box("aut", "autograd", "reverse mode = forward mode", [["1 law", C.grn], ["gradcheck", C.b00]]);
-  b += box("arr", "tensor-array", "Mat<r,c> and Bands over a flat Array", [["4 laws", C.grn], ["vs PyTorch", C.b00], ["Array.new", C.ora]]);
-  b += box("brd", "binary-read", "F32 weights straight into an Array", [["foreign code", C.ora], ["C and JS lanes", C.b00]]);
+  b += box("arr", "tensor-array", "Mat<r,c> and Bands over a flat Array", [["5 laws", C.grn], ["vs PyTorch", C.b00], ["Array.new", C.ora]]);
+  b += box("brd", "binary-read", "F32 and BF16 weights into an Array", [["foreign code", C.ora], ["C and JS lanes", C.b00]]);
+  b += box("frk", "tensor-fork", "products on shared arrays", [["@unsafe fork", C.ora], ["same bits", C.b00]]);
+  b += box("gpu", "tensor-gpu", "products as GPU calls", [["@unsafe fork", C.ora], ["same bits", C.b00]]);
   b += box("gpt", "GPT-2 demo", "same tokens as PyTorch", [["vs tiktoken", C.b00]]);
   b += box("mni", "MNIST demo", "typed training step", [["vs PyTorch", C.b00]]);
   b += T(40, H - 26, "proved by the kernel", { size: 13, fill: C.grn, weight: 700 }) + T(230, H - 26, "tested against a reference", { size: 13, fill: C.b00, weight: 700 }) + T(470, H - 26, "trusted or foreign", { size: 13, fill: C.ora, weight: 700 }) + T(980, H - 26, "arrows: imports", { size: 13, fill: C.b1, anchor: "end" });
-  out("diagram.svg", svg(W, H, "The six packages, how they import each other, and what is proved, tested, trusted or foreign", b));
+  out("diagram.svg", svg(W, H, `The ${N.project.packages} packages, how they import each other, and what is proved, tested, trusted or foreign`, b));
 }
 
 {

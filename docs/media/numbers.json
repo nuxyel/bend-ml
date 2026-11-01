@@ -33,11 +33,11 @@
   "source": "NOTES.md, experiment 10"
  },
  "project": {
-  "packages": 6,
-  "laws": 27,
+  "packages": 8,
+  "laws": 30,
   "checks_quick": 53,
   "checks_full": 61,
-  "bend": "2.0.37",
+  "bend": "2.0.39",
   "lean": "4.34.0"
  },
  "ratios": {
