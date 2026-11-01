@@ -1651,3 +1651,53 @@ It is address space the runtime reserves, and its size follows the thread count,
   same is likely (not tested; this machine runs mode 0).
 - Nothing to change in bend-ml: the sizes are the runtime's. The GPT-2 README's "reserves ~41 GB of address space,
   which is not memory in use" stays true for 16 threads.
+
+## The README numbers measured again on an idle machine (2026-11-01, Bend 2.0.39)
+
+Pending since v3: the README charts still showed v1.3.2 (2026-10-16, Bend 2.0.37) and the matrix · vector and
+compile-time results were from 2026-10-11 (Bend 2.0.36).
+
+- Machine: Intel Core Ultra 7 155H, 32 GB, AC power, `performance` profile, nothing else running (idle Claude Code and
+  Codex sessions at ~0.1% CPU). Load1 before each block: 0.32 (`make bench`, 05:43), 1.35 decaying from it
+  (compile times, 05:57), 0.69 (the evidence blocks, 05:58); during the 16-thread runs it rises from the runs themselves.
+- Method: the protocol of 2026-10-11 (black-box marginal cost, t(33 tokens) - t(1) over 32 for GPT-2 and t(600 batches)
+  - t(50) over 550 for MNIST; cases in a seeded random order per round; 1 thread pinned to CPU 3; GPT-2 7 rounds, MNIST
+  and the thread curve 5; peak memory from one extra run). Built with Bend 2.0.39 from tag v1.8.0 (`fast.bend` on
+  tensor-array 0.1.18.0, as published; HEAD differs only in comments), next to v1.3.2 (Bend 2.0.37) as the anchor,
+  PyTorch 2.14.1 and NumPy 2.5.3. Every case gave the same tokens or the same loss.
+- `make bench` stopped at the GPT-2 row of `scripts/compile_times.py`: `bend --check-only` exits 1 on binary-read's
+  foreign-code report although the check passes. Fixed in the script; the compile times were rerun alone.
+
+Medians, ms (IQR in brackets):
+
+| | 1 thread | 16 threads | peak MB (16 t) |
+|---|---|---|---|
+| GPT-2 v1.8.0, per token | 128.9 [126.4-129.9] | 84.7 [83.0-85.9] | 869 |
+| GPT-2 v1.3.2, per token | 138.2 [137.5-139.1] | 105.9 [105.4-107.3] | 880 |
+| GPT-2 PyTorch | 18.8 | 11.0 [10.8-11.2] | 1199 |
+| GPT-2 NumPy | 18.6 | 14.8 [9.7-16.3] | 1007 |
+| MNIST v1.8.0, per batch | 9.49 | 5.69 | 85 |
+| MNIST v1.3.2, per batch | 20.03 | 7.75 | 107 |
+| MNIST PyTorch | 0.49 | 0.42 | 592 |
+| MNIST NumPy | 0.42 | 1.46 | 388 |
+
+GPT-2 v1.8.0 by thread count: 128.9 (1), 129.7 (2), 84.5 (4), 79.4 (8), 83.8 (12), 84.7 (16), 78.8 (22); PyTorch 18.8,
+13.0, 9.7, 10.3, 10.4, 11.0, 12.6. GPT-2 v1.8.0 starts in 0.80 s (v1.3.2 1.02 s), peak 831 MB on one thread.
+
+What moved:
+
+- The anchors held: v1.3.2 within 1% of 2026-10-16 (138.8 / 107.1 ms, 19.97 / 7.67 ms), PyTorch and NumPy within 2% on
+  one thread. On 16 threads PyTorch (11.0 against 9.4) and NumPy (14.8 against 11.2) came out slower with a wide
+  spread; the charts keep every reference system's numbers of 2026-10-11 and add v1.8.0.
+- GPT-2: 138 → 129 ms on one thread, 106 → 85 on 16, as Bend 2.0.39 alone gave on 2026-10-24 (128 / 86).
+  MNIST: 20.0 → 9.5 ms on one thread, 7.8 → 5.7 on 16, peak 107 → 85 MB.
+- A loss in the chart's story: the thread slide said Bend keeps gaining up to 22 threads. v1.8.0 flattens after 4
+  (84.5 ms; 78.8 at best), and so did v1.3.2 (107.8 at 4, 96.7 on 22); the slide now says it levels off.
+- Matrix · vector (`bench/results/mv_bands-2026-11-01.txt` against 2026-10-11): unchanged within noise. The sequential
+  products are 2-8% slower (768 x 768: 0.239 → 0.258 ms), under the 15% between sessions that I do not call a result;
+  the 50257-row rows with 20 products swing both ways at 16 threads (one at 0.99 ms against 3.96) and are not results.
+- Compile times (`bench/results/compile-times-2026-11-01.md` against 2026-10-11): checks 0.12-0.23 s, builds 0.71-3.56 s
+  (GPT-2 4.11 → 3.56 s, its file 588 → 559 lines; the rest within 0.2 s).
+- `numbers.json` holds the run as `rerun_2026_11_01`; `checks_quick`/`checks_full` are 108/119 (99/110 without CUDA).
+  `make_media.sh --capture` refreshed the outputs: `make check-full` 119/119; `law_count.txt` reads 33 laws because the
+  tree has tensor-array 0.1.19.0's source, not published, so the badge stays at 30.
