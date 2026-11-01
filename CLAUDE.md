@@ -118,4 +118,5 @@ Issues live in GitHub Issues (via the `gh` CLI). See `docs/agents/issue-tracker.
 
 ### Domain docs
 
-Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+None yet: there is no `CONTEXT.md` or `docs/adr/`. `docs/agents/domain.md` says how the skills would use them
+if they are written.
