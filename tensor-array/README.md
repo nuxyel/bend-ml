@@ -8,7 +8,7 @@ Tensors in Bend 2 over a flat `Array<F32>`, **with the shape in the type**: the 
 
 ```python
 import Base
-import bend-ml-tensor-array@0.1.18.0/main.bend as TA
+import bend-ml-tensor-array@0.1.19.0/main.bend as TA
 
 def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 128n>:
   TA.Mat.matmul(100n, 784n, 128n, 3n, a, w)   # 3n = 2^3 = 8 parallel blocks
@@ -129,7 +129,11 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 
 ## Versions
 
-- Unreleased (`devel`): the laws `size_set`, `get_after_set` and `get_other_set` about Base's `Array` (helpers `ASet.*`); every other def is 0.1.18.0's.
+- `0.1.19.0`: the laws `size_set`, `get_after_set` and `get_other_set` about Base's `Array` (helpers `ASet.*`), asked for
+  in bend-ml #26. Every other def is 0.1.18.0's, with its bits. The round trip `Mat.to_list(Mat.of_list(xs)) == xs` is
+  still tested, not proved: it needs a lemma about `Array.new`'s trees that `tests/apart.bend` checks on every pair of
+  indices through depth 7 (by @adeerkhan, bend-ml #28). `tensor-fork` 0.1.5.0 and `tensor-gpu` 0.1.5.0 still import
+  0.1.18.0, so a program that uses one of them stays on 0.1.18.0.
 - `0.1.18.0`: the law `to_list_len` (`Mat.to_list` reads exactly `r*c` numbers) and a fix: `Mat.to_list` of a matrix
   with no numbers (0 rows or 0 columns) now gives `Nil`, where it gave a one-element list before. `tests/roundtrip.bend`
   checks `Mat.of_list` then `Mat.to_list` on empty, row, column and rectangular matrices, word for word (the numbers are
