@@ -1935,3 +1935,37 @@ output equal to C's).
   pieces (one `matvec_l` band -25% on one thread, `read_l` -35% to -45% per number, the GPT-2 demo's load -29%).
   The law `matvec_l_len` (in progress) stays out: its proof was written against the old `read_l` and does not check on the
   new one.
+
+## tensor-array: matvec_l_len, the whole-tree length law (2026-11-01, on devel, not published)
+
+- The open law of v3.1 ("`Bands.matvec_l` gives exactly r numbers"), proved: `law matvec_l_len`,
+  `{bl_len(r, c, Bands.matvec_l(r, c, b, x)) == r}` for every `b : Bands<r, c>` and `x`, whatever the depth. It ships
+  in the next tensor-array after 0.1.19.0; it adds no API.
+- Why the direct induction failed: in a node it calls `join_len` on the two recursive results and on the induction
+  hypotheses about the same calls, so each band's `Array` (and each copy of x) is used twice at run-time positions
+  (`x2 (consumed more than once)`). `join_len` has to take the results at run time because it matches them to unfold
+  `bv_join`.
+- What works: each lemma returns a witness instead of a bare count. In plain words, instead of proving "this call gives
+  n numbers" and then needing the call again to say anything else about it, each step hands back a receipt: the list it
+  produced, a note saying "the result is exactly this list in its box", and the list's length. The list is plain data
+  and can be reused; the arrays appear only in the note's type, which never runs. `WBL<r, c, s, n>` holds the list `y`
+  (a `List<&2, F32>`), an equation `BL{bl_b(s), y} == s` (the result in its constructor, its bands written as a
+  projection of `s`) and `length(y) == n`; `WAL` is the same for `read_l`'s `AL`. Each array is then used once, by the
+  call that builds the receipt: `read_w` follows `read_l`'s recursion, `g_w` opens the gemm's `G`, `node_w` rewrites
+  both halves into constructors with the two equations, after which `bv_join` unfolds and `app_len` plus `half_cover`
+  count `y1 ++ y2`. `w_len` turns the receipt into the count.
+- First written against the old `read_l` (build the list, then reverse it), it no longer checked once `read_l` read from
+  the last index down (earlier today): `read_w` expected `List.reverse.go(...)` where the new code gives `v <> acc`.
+  Redone on the new `read_l`, the proof got shorter, the same way `leaf_len` and `read_ml_len` did: with no reverse, a
+  read of one number gives `v <> acc`, whose length is `1 + length(acc)` by the definitions alone, so `read_w`'s last
+  step is `{==}` and needs neither `rev_len` (gone) nor `zero_out`; the recursion walks `idx - 1` instead of `idx + 1`,
+  and `g_w` starts the read at index `p` (the band's last row) as `bv_g` does.
+- 18 new defs, all added lines (`git diff` removes only `join_len`'s comment that called the law open); every existing
+  def keeps its code. The 16 tensor-array test programs that compile give byte-identical C before and after.
+  `bend tensor-array/main.bend` and `--verdict`: ALL PROOFS CHECK, no `@unsafe`, `?TODO` or axiom. Three mutants are
+  refused: the claim `== 1n+r`, a node that appends the halves the other way round, and a one-number read that drops the
+  number from its receipt. `list_laws.py --check-readme`: 34 laws in 5 packages, ok (the main README's badge stays at 33,
+  the published count). `make check` 116/116; `make lint` 0 findings (bmv_w's two recursive calls carry a `disable`
+  directive: a proof, never run).
+- The same move should open other laws blocked the same way (a statement about a function applied to results that
+  hold arrays): return the data part as a witness with an equation, instead of proving facts about the call twice.
