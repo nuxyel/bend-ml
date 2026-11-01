@@ -63,5 +63,5 @@ Part B:
 | compile times | checking: 0.22 s for 8 distinct layers, 0.27 s for 128; build (clang) 1.1 to 4.7 s |
 | upstream | two reports, posted as bendlang/bend#1374 and #1376 (the erased-parameter bug with a minimal repro; a read-only `Array` borrow without `@unsafe`) |
 
-Not done: an idle-machine re-measure of GPT-2 for the README chart (the machine had background load all
+Not done then (the README chart was measured on an idle machine on 2026-11-01, see NOTES): an idle-machine re-measure of GPT-2 for the README chart (the machine had background load all
 evening); a list-returning variant of `Bands.matvec` to remove the one-thread overhead.
