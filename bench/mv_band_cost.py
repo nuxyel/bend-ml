@@ -26,7 +26,7 @@ CONFIGS = [("kernel-1t", "mv_band_cost.bend", 1, {"MODE": "0n"}),
 def src(name, ta, subs):
     t = open(os.path.join(WT, "bench", name)).read()
     t = t.replace("import TAPATH as TA", f"import {ta} as TA")
-    t = t.replace("import bend-ml-tensor-array@0.1.18.0/main.bend as TA", f"import {ta} as TA")
+    t = t.replace("import bend-ml-tensor-array@0.1.19.0/main.bend as TA", f"import {ta} as TA")
     for k, v in subs.items():
         t = t.replace(k, v)
     return t

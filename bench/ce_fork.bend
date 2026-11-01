@@ -4,7 +4,7 @@
 #   MODE 1: the fill and softmax_ce; prints the loss word and three gradient words
 #   MODE 2: as 1, then the sum of every gradient word (for the bits, not timed)
 import Base
-import bend-ml-tensor-array@0.1.18.0/main.bend as TA
+import bend-ml-tensor-array@0.1.19.0/main.bend as TA
 import ../tensor-fork/main.bend as TF
 
 def val(+i: U32) -> F32:
