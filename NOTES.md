@@ -1608,3 +1608,12 @@ through pull request #14 (CI green).
 - The package table, the badge (33 laws), the diagram, the demos, the benchmarks and `reference/test_published.py` stay
   on 0.1.18.0 until it is on BendHub: `test_published.py` reads the table, so a version there that the hub does not
   have fails the checks. tensor-fork and tensor-gpu 0.1.5.0 keep importing 0.1.18.0.
+
+## tensor-array: the Array laws on the C lane (2026-11-01)
+
+- `tests/array_laws.bend` runs on the JavaScript lane only: the compiled runtime keeps an `Array` as one flat block and
+  stops with `runtime fail-stop` on its hand-built unbalanced tree (filed upstream by adeerkhan as bendlang/bend#1980).
+  `tests/array_laws_c.bend` uses the same three laws on perfect trees only (an 8-cell literal and a hand-built tree of 4
+  leaves), so both lanes print `(1.5, 2.5, 3.0, 9.0)`: get after set, a write at 13 (wrapped to 5) leaving cell 2
+  alone, and on the 4-leaf tree a write at 2 leaving cell 3 alone and seen by a read at 2. `make check` runs it on both
+  lanes and with `--verdict` (4 checks; 108 in all on this machine with CUDA).
