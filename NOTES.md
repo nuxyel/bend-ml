@@ -1813,3 +1813,48 @@ of 9 shuffled rounds on an idle machine, one thread pinned with `taskset -c 3`, 
 - **Release:** the change sits in the tree's 0.1.19.0 source, which the README describes as 0.1.18.0's defs plus three
   laws; whether it ships as 0.1.19.0 or 0.1.20.0 is still open, and the README's version line needs a sentence either
   way.
+
+## The GPT-2 weights decoded in parallel at the `ANode` halves (negative), and the band tree walked by depth (2026-11-01, on devel)
+
+The v3.1 notes left "loading in parallel: split a band's `Array` by its `ANode` halves and decode each half in a parallel
+let" open (2026-10-06, before binary-read). I tried it on today's loader. Results in
+`bench/results/gpt2_load-2026-11-01.txt` (`bench/gpt2_load.py`, two blocks of 9 shuffled rounds on an idle machine, one
+thread pinned with `taskset -c 3`, 16 threads in `+RTS ... -RTS`, "Hi" + 1 token, the demo's own "weights loaded in"
+line in milliseconds).
+
+- **Nothing is left to decode.** Since binary-read (2026-10-16) every matrix is one `pread` straight into its `Array`,
+  already as F32; only the 0.1 M numbers of the biases and LayerNorms still go through byte lists. A profile of the
+  load on one thread: the `Array.new` fill before each read, a `TA.Bands.zeros` tree filled with zeros, the kernel's
+  copy of the file, and the drop of the zero tree. So the hypothesis became: does handing a band's halves to 16
+  threads pay for itself at all?
+- **It does not: an `ANode` split is a copy.** As the pitfall says, matching an `Array` copies each half into its own
+  block, and building one from two halves copies them back. A 256 MiB probe: `Array.new` 24 ms; built from halves 4
+  levels deep in parallel lets 168 ms on 1 thread and 128 ms on 16; split 4 levels and joined again 233 / 267 ms, with
+  3-7x the memory. In the loader (medians, block A / B):
+
+| variant | 1 thread | 16 threads |
+|---|---|---|
+| base (5a041a7) | 306 / 306 ms | 337 / 331 ms |
+| each band split at its halves and joined, after the read | 770 / 771 ms (+152%) | 695 / 686 ms (+106%) |
+| each band built from its halves instead of `Array.new` | 583 / 581 ms (+90%) | 459 / 458 ms (+38%) |
+| band tree walked by depth (kept) | 218 / 217 ms (-29%) | 238 / 241 ms (-29% / -27%) |
+
+  The parallel variants lose on both thread counts and give the same bits; discarded. A parallel fill or decode of one
+  flat block needs `Array.fork` (`@unsafe`, tensor-fork's terms), and there is no decode left to give it.
+- **Change kept:** `load_tree` in `demos/gpt2/fast.bend` walks the band depth `d` instead of building
+  `TA.Bands.zeros(d, r, c)` and matching it. The zero tree held a zero-filled copy of every banded matrix (about 490 MB
+  before the padding) that the loader dropped unread. The same rows split the same way (`TA.half`), so the bands are the same. Instructions for the
+  whole run 5,404 M → 3,760 M on one thread. Demo only: no package changes.
+- **Bits:** `reference/test_gpt2_load.py` (in `make check` when the split weights are present) builds the demo with its
+  generation replaced by an FNV-1a hash of every loaded weight (every cell of every `Array` with its size, every list
+  number) and compares it with a pinned value for 1 and 16 threads (their band layouts differ). The same hash for base,
+  both `ANode` variants and the kept change; a mutant that reads each node's second half from the first half's
+  offset gives a different 16-thread hash. `reference/test_gpt2.py`: 11 prompts against PyTorch, 0 failures. `make
+  check`: 114/114.
+- **Schedule check:** block B rebuilt every binary (byte-identical to A's) and ran a fresh order; every median moved by
+  under 2%. The kept gap (29%) is above the 15-20% bar anyway.
+- **Leftovers.** 16 threads still load slower than one (238 against 218 ms): 16 bands per matrix are 16 smaller reads,
+  each into its own fresh array. What remains is `Array.new`'s fill (about 45 ms for these 490 MB, scaled from the probe) and the
+  copy from the page cache; neither can be split without `@unsafe` or new C. llama.bend's loaders
+  (`llama/load.bend`, `llama/main.bend`) build the same `TA.Bands.zeros` tree before reading into it; not measured
+  there. MetalBend's preflight reported "busy" for idle agent processes only (claude, codex, under 3% CPU).
