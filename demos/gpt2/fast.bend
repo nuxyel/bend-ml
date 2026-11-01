@@ -273,23 +273,25 @@ def get_mat(+name: String, +r: Nat, +c: Nat) -> IO(TA.Mat<r, c>):
     check_size(wpath(name), Nat.mul(r, c))
     get_band(wpath(name), r, r, c, 0n)
 
-# fills the bands of b (whose shape comes from TA.Bands.zeros) in row order; rr is r at run time
-def load_tree(+c: Nat, -r: Nat, b: TA.Bands<r, c>, +rr: Nat, -e: {rr == r : Nat}, +path: String, +start: Nat) -> IO(TA.Bands<r, c>):
-  match b:
-    case TA.BLeaf{m}:
+# fills a tree of 2^d bands (TA.Bands.zeros's shape: each node halves its rows with TA.half) in row order; rr is r at
+# run time. The tree is walked by its depth, not built first with TA.Bands.zeros and matched: that tree's zero-filled
+# arrays were dropped unread, a quarter of the load time (NOTES.md, 2026-11-01)
+def load_tree(+c: Nat, -r: Nat, +d: Nat, +rr: Nat, -e: {rr == r : Nat}, +path: String, +start: Nat) -> IO(TA.Bands<r, c>):
+  match d:
+    case 0n:
       do IO<TA.Bands<r, c>>:
         band : TA.Mat<r, c> <- get_band(path, r, rr, c, start)
         return TA.BLeaf{band}
-    case TA.BNode{x, y}:
+    case 1n+q:
       do IO<TA.Bands<r, c>>:
-        x2 : TA.Bands<TA.half(r), c> <- load_tree(c, TA.half(r), x, TA.half(rr), TA.eq_half(rr, r, e), path, start)
-        y2 : TA.Bands<Nat.sub(r, TA.half(r)), c> <- load_tree(c, Nat.sub(r, TA.half(r)), y, Nat.sub(rr, TA.half(rr)), TA.eq_rest(rr, r, e), path, Nat.add(start, Nat.mul(TA.half(rr), c)))
+        x2 : TA.Bands<TA.half(r), c> <- load_tree(c, TA.half(r), q, TA.half(rr), TA.eq_half(rr, r, e), path, start)
+        y2 : TA.Bands<Nat.sub(r, TA.half(r)), c> <- load_tree(c, Nat.sub(r, TA.half(r)), q, Nat.sub(rr, TA.half(rr)), TA.eq_rest(rr, r, e), path, Nat.add(start, Nat.mul(TA.half(rr), c)))
         return TA.BNode{x2, y2}
 
 def get_bands(+name: String, +d: Nat, +r: Nat, +c: Nat) -> IO(TA.Bands<r, c>):
   do IO<TA.Bands<r, c>>:
     check_size(wpath(name), Nat.mul(r, c))
-    load_tree(c, r, TA.Bands.zeros(d, r, c), r, {==}, wpath(name), 0n)
+    load_tree(c, r, d, r, {==}, wpath(name), 0n)
 
 def load_layer(+d: Nat, +i: Nat) -> IO(Layer):
   do IO<Layer>:
