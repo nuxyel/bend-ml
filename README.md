@@ -143,5 +143,6 @@ What this project found in Bend and reported:
 - [#1375](https://github.com/bendlang/bend/issues/1375): `IO.fork` does not spread pure work over cores. The guide now says so ([#1415](https://github.com/bendlang/bend/pull/1415)).
 - [#1376](https://github.com/bendlang/bend/issues/1376): a read-only borrow of an `Array` for a parallel let, without `@unsafe`. Open.
 - [#1573](https://github.com/bendlang/bend/issues/1573): a file read into an array instead of a list with one cell per byte. Open; `bend-ml-binary-read` is the library workaround until then.
+- [#1934](https://github.com/bendlang/bend/issues/1934): whether Base should state three laws about `Array.set` (it keeps `Array.size`, a read after a write sees it, a write leaves the other cells alone). Open; `tensor-array/main.bend` proves them meanwhile.
 
 <p align="center"><sub>MIT · the visual identity uses Bend's own colours, from bend-lang.com · the launch video (v1.0): <a href="https://github.com/nuxyel/bend-ml/releases/download/v1.0.0/bend-ml.mp4">bend-ml.mp4</a></sub></p>
