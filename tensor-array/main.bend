@@ -1862,16 +1862,130 @@ def band_len(r, c, rows, x, w):
     case 1n+p:
       g_len(r, c, p, gemm(1n, 1n+p, c, U32.from_nat(c), 1, 1, U32.from_nat(c), x, w, Array.new(F32, cap_depth(1n+p), 0.0)))
 
-# joining two halves of h1 and h2 numbers gives h1 + h2 numbers. (The statement for the whole tree,
-# "Bands.matvec_l gives r numbers", would apply this to the results of the two recursive calls and
-# to the induction hypotheses about the same calls; that uses each band's Array twice, which Bend's
-# affine rules refuse. It stays open, covered by tests: NOTES.md, v3.1.)
+# joining two halves of h1 and h2 numbers gives h1 + h2 numbers. (The law for the whole tree, matvec_l_len below, cannot
+# use it: it would need each band's Array twice. It goes through witnesses instead.)
 def join_len(-r: Nat, -c: Nat, -h1: Nat, -h2: Nat, p: BL<half(r), c>, q: BL<Nat.sub(r, half(r)), c>, hp: {bl_len(half(r), c, p) == h1 : Nat}, hq: {bl_len(Nat.sub(r, half(r)), c, q) == h2 : Nat}) -> {bl_len(r, c, bv_join(r, c, p, q)) == Nat.add(h1, h2) : Nat}:
   match p q:
     case BL{bx, +yx} BL{by, +yy}:
       %hp : {List.length(&2, F32, List.append(&2, F32, yx, yy)) == Nat.add(_, h2) : Nat}
       %hq : {List.length(&2, F32, List.append(&2, F32, yx, yy)) == Nat.add(List.length(&2, F32, yx), _) : Nat}
       app_len(yx, yy)
+
+# ---- the whole tree: Bands.matvec_l gives exactly r numbers ----
+#
+# The obvious induction applies join_len to the two recursive results and to the induction hypotheses about the same
+# calls, which uses each band's Array twice, and Bend's affine rules refuse that. The way round: every lemma below
+# returns a witness instead of a bare count, a record holding the list itself (Data, so it may be used freely), an
+# equation saying the result is that list in its constructor (the arrays appear only in the types, which never run),
+# and the list's length. So each array is used once, by the one call that builds the witness; the node case rewrites
+# both halves into constructors with the two equations, after which bv_join unfolds and app_len counts the appended
+# list. The same structure as the code: read_w follows read_l, g_w a band's gemm, bmv_w the tree.
+
+def al_c(al: AL) -> Array<F32>:
+  match al:
+    case AL{c, l}:
+      c
+
+def bl_b(-r: Nat, -c: Nat, bl: BL<r, c>) -> Bands<r, c>:
+  match bl:
+    case BL{b, y}:
+      b
+
+# a read's list y, with s == AL{s's array, y} and y of length n
+type WAL<-s: AL, -n: Nat> is Type:
+  WAL{y: List<&2, F32>, e: {AL{al_c(s), y} == s : AL}, l: {List.length(&2, F32, y) == n : Nat}}
+
+# a product's list y, with s == BL{s's bands, y} and y of length n
+type WBL<-r: Nat, -c: Nat, -s: BL<r, c>, -n: Nat> is Type:
+  WBL{y: List<&2, F32>, e: {BL{bl_b(r, c, s), y} == s : BL<r, c>}, l: {List.length(&2, F32, y) == n : Nat}}
+
+# moves the 1 out of the length's sum (len_step on the witness)
+def wal_step(-s: AL, +p: Nat, +l: Nat, w: WAL<s, 1n+Nat.add(p, 1n+l)>) -> WAL<s, 2n+Nat.add(p, l)>:
+  match w:
+    case WAL{+y, e, h}:
+      WAL{y, e, len_step(List.length(&2, F32, y), p, l, h)}
+
+# read_l reads mleft + 1 numbers onto acc: by induction on mleft, as leaf_len
+def read_w(+mleft: Nat, +idx: U32, +acc: List<&2, F32>, rc: Array<F32> & F32) -> WAL<read_l(mleft, idx, acc, rc), Nat.add(1n+mleft, List.length(&2, F32, acc))>:
+  match mleft rc:
+    case 0n Tuple{d, +v}:
+      WAL{v <> acc, {==}, {==}}
+    case 1n+p Tuple{d, +v}:
+      wal_step(read_l(p, (idx - 1 : U32), v <> acc, Array.get(F32, d, (idx - 1 : U32))), p, List.length(&2, F32, acc), read_w(p, (idx - 1 : U32), v <> acc, Array.get(F32, d, (idx - 1 : U32))))
+
+# n + 0 -> n in the length
+def wal_zero(-s: AL, +n: Nat, w: WAL<s, Nat.add(n, 0n)>) -> WAL<s, n>:
+  match w:
+    case WAL{+y, e, h}:
+      WAL{y, e, zero_out(List.length(&2, F32, y), n, h)}
+
+# a band's list is the read's list: rewrite the read into its constructor, then bv_g2 unfolds
+def g2_w(-r: Nat, -c: Nat, -w: Array<F32>, -al: AL, -n: Nat, a: WAL<al, n>) -> WBL<r, c, bv_g2(r, c, w, al), n>:
+  match a:
+    case WAL{+y, e, h}:
+      %e : WBL<r, c, bv_g2(r, c, w, _), n>
+      WBL{y, {==}, h}
+
+# whatever the gemm wrote, reading 1 + p rows back gives 1 + p numbers
+def g_w(-r: Nat, -c: Nat, +p: Nat, g: G) -> WBL<r, c, bv_g(r, c, p, g), 1n+p>:
+  match g:
+    case G{a, b, y}:
+      g2_w(r, c, b, read_l(p, U32.from_nat(p), Nil{}, Array.get(F32, y, U32.from_nat(p))), 1n+p, wal_zero(read_l(p, U32.from_nat(p), Nil{}, Array.get(F32, y, U32.from_nat(p))), 1n+p, read_w(p, U32.from_nat(p), Nil{}, Array.get(F32, y, U32.from_nat(p)))))
+
+# one band of `rows` rows: no numbers for 0 rows, else g_w
+def gemm_w(-r: Nat, +c: Nat, rows: Nat, +rr: Nat, x: Array<F32>, w: Array<F32>) -> WBL<r, c, bv_gemm(r, c, rows, rr, x, w), rows>:
+  match rows:
+    case 0n:
+      WBL{Nil{}, {==}, {==}}
+    case 1n+p:
+      g_w(r, c, p, gemm(1n, rr, c, U32.from_nat(c), 1, 1, U32.from_nat(c), x, w, Array.new(F32, cap_depth(rr), 0.0)))
+
+# a leaf of the tree is one band of rr rows
+def mat_w(-r: Nat, +c: Nat, +rr: Nat, x: Array<F32>, m: Mat<r, c>) -> WBL<r, c, bv_mat(r, c, rr, x, m), rr>:
+  match m:
+    case Mat{w}:
+      gemm_w(r, c, rr, rr, x, w)
+
+# two halves of half(rr) and rr - half(rr) numbers give rr numbers
+def join_n(+rr: Nat, +y1: List<&2, F32>, +y2: List<&2, F32>, l1: {List.length(&2, F32, y1) == half(rr) : Nat}, l2: {List.length(&2, F32, y2) == Nat.sub(rr, half(rr)) : Nat}) -> {List.length(&2, F32, List.append(&2, F32, y1, y2)) == rr : Nat}:
+  %Equal.sym(Nat, rr, Nat.add(half(rr), Nat.sub(rr, half(rr))), half_cover(rr)) : {List.length(&2, F32, List.append(&2, F32, y1, y2)) == _ : Nat}
+  %l1 : {List.length(&2, F32, List.append(&2, F32, y1, y2)) == Nat.add(_, Nat.sub(rr, half(rr))) : Nat}
+  %l2 : {List.length(&2, F32, List.append(&2, F32, y1, y2)) == Nat.add(List.length(&2, F32, y1), _) : Nat}
+  app_len(y1, y2)
+
+# a node: both halves rewritten into constructors (e1, e2), so bv_join unfolds to BL{BNode{..}, y1 ++ y2}
+def node_w(-r: Nat, -c: Nat, +rr: Nat, -p: BL<half(r), c>, -q: BL<Nat.sub(r, half(r)), c>, w1: WBL<half(r), c, p, half(rr)>, w2: WBL<Nat.sub(r, half(r)), c, q, Nat.sub(rr, half(rr))>) -> WBL<r, c, bv_join(r, c, p, q), rr>:
+  match w1 w2:
+    case WBL{+y1, e1, l1} WBL{+y2, e2, l2}:
+      %e1 : WBL<r, c, bv_join(r, c, _, q), rr>
+      %e2 : WBL<r, c, bv_join(r, c, BL{bl_b(half(r), c, p), y1}, _), rr>
+      WBL{List.append(&2, F32, y1, y2), {==}, join_n(rr, y1, y2, l1, l2)}
+
+# the tree, by induction on the bands; each band and each copy of x is used once, by its own call
+def bmv_w(+c: Nat, -r: Nat, b: Bands<r, c>, +rr: Nat, -e: {rr == r : Nat}, xp: Array<F32> & Array<F32>) -> WBL<r, c, bmv(c, r, b, rr, e, xp), rr>:
+  match b xp:
+    case BLeaf{m} Tuple{x, x2}:
+      mat_w(r, c, rr, x, m)
+    case BNode{bx, by} Tuple{x1, x2}:
+      node_w(r, c, rr, bmv(c, half(r), bx, half(rr), eq_half(rr, r, e), Array.clone(F32, x1)), bmv(c, Nat.sub(r, half(r)), by, Nat.sub(rr, half(rr)), eq_rest(rr, r, e), Array.clone(F32, x2)), bmv_w(c, half(r), bx, half(rr), eq_half(rr, r, e), Array.clone(F32, x1)), bmv_w(c, Nat.sub(r, half(r)), by, Nat.sub(rr, half(rr)), eq_rest(rr, r, e), Array.clone(F32, x2)))
+
+# a witness gives the count
+def w_len(-r: Nat, -c: Nat, -s: BL<r, c>, -n: Nat, w: WBL<r, c, s, n>) -> {bl_len(r, c, s) == n : Nat}:
+  match w:
+    case WBL{+y, e, h}:
+      %e : {bl_len(r, c, _) == n : Nat}
+      h
+
+# LAW (matvec_l_len): Bands.matvec_l gives exactly r numbers, one per row of the matrix, whatever the bands' depth.
+law matvec_l_len:
+  for +r: Nat
+  for +c: Nat
+  for b: Bands<r, c>
+  for +x: List<&2, F32>
+  {bl_len(r, c, Bands.matvec_l(r, c, b, x)) == r : Nat}
+
+def matvec_l_len(r, c, b, x):
+  w_len(r, c, Bands.matvec_l(r, c, b, x), r, bmv_w(c, r, b, r, {==}, Array.clone(F32, fill_list(x, 0, Array.new(F32, cap_depth(c), 0.0)))))
 
 # Mat.to_list_count reads exactly n numbers, and n = 0 reads none.
 def to_list_count_len(-r: Nat, -c: Nat, d: Array<F32>, +n: Nat) -> {ML.len(r, c, Mat.to_list_count(r, c, d, n)) == n : Nat}:
