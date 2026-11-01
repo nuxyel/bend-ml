@@ -89,9 +89,19 @@ A matrix · vector over the same sharing was not adopted: it beat `Bands.matvec`
 inside a whole generation (SmolLM2-135M 10% faster, 360M even, 1.7B 13.5% slower). The GPU (a bang over the same tree)
 runs it with the same bits but 5-10x slower than the CPU on this machine.
 
-`softmax_ce` with its rows in blocks has not been timed yet: it was written on a busy machine, and a speed claim waits
-for an idle one. On one thread, counted rather than timed (user-mode instructions, 256 rows of 49,152, the fill
-included): 1,402.3 M at par 4 against 1,402.2 M through tensor-array, so the shared blocks add no copy.
+`softmax_ce` with its rows in blocks (`bench/ce_fork.py`, 11 shuffled rounds, medians, Core Ultra 7 155H, idle,
+2026-11-01; the sequential fill of the logits included in every column):
+
+| rows x cols | `TA.Mat.softmax_ce`, 1 thread | par 4, 16 threads | par 6, 16 threads |
+|---|---|---|---|
+| 1,024 x 49,152 | 367 ms | 144 ms (2.6x) | **126 ms (2.9x)** |
+| 256 x 49,152 | 93 ms | 39 ms (2.4x) | **33 ms (2.9x)** |
+| 4,096 x 1,000 | 31 ms | 16 ms (2.0x) | **12 ms (2.5x)** |
+| 100 x 10 (MNIST's batch) | **1.1 ms** | 1.9 ms | 1.9 ms |
+
+The same loss and gradient bits in every run. On one thread the blocks cost nothing (within 1% of tensor-array, and
+the same user-mode instruction count on a P-core); on small matrices handing out the blocks costs more than it gives,
+so keep par 0 there.
 
 ## What is checked, and what is not
 
