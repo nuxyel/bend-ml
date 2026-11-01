@@ -12,7 +12,7 @@
 # test sees a lane that differs: with F32.sin and F32.cos in rng_sc_x instead of rng_sin and rng_cos, the GPU run gives
 # 1 to 6,410 differing Gaussians a line and 69,913 in the Mat (2026-10-27), the CPU threads 0.
 import Base
-import bend-ml-tensor-array@0.1.18.0/main.bend as TA
+import bend-ml-tensor-array@0.1.19.0/main.bend as TA
 import ../main.bend as TG
 
 def bits(x: F32) -> U32:
