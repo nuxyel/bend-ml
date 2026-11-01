@@ -53,7 +53,7 @@ these `Mat` values (Bend treats each version's `Mat` as its own type).
 
 <p align="center"><img src="docs/media/shots/law-roundtrip.png" alt="The roundtrip law as Bend states it, and ALL PROOFS CHECK" width="80%"></p>
 
-<p align="center"><img src="docs/media/diagram.svg" alt="The six packages: nat-lemmas is imported by bpe-tokenizer, tensor and autograd; tensor-array stands alone; binary-read is foreign code; the GPT-2 demo uses bpe-tokenizer, tensor, tensor-array and binary-read; the MNIST demo uses tensor and tensor-array" width="90%"></p>
+<p align="center"><img src="docs/media/diagram.svg" alt="The eight packages: nat-lemmas is imported by bpe-tokenizer, tensor and autograd; tensor-array is imported by tensor-fork and tensor-gpu, which rely on @unsafe Array.fork and give its bits; binary-read is foreign code; the GPT-2 demo uses bpe-tokenizer, tensor, tensor-array and binary-read; the MNIST demo uses tensor and tensor-array" width="90%"></p>
 
 Every package with laws passes `bend X/main.bend --verdict`, the re-check by Bend's Lean-proved kernel, with no `@unsafe`
 and no `?TODO`. `bend-ml-binary-read` is the exception by design: its reads are written in C and JavaScript, six
