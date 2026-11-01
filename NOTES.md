@@ -1858,3 +1858,55 @@ line in milliseconds).
   copy from the page cache; neither can be split without `@unsafe` or new C. llama.bend's loaders
   (`llama/load.bend`, `llama/main.bend`) build the same `TA.Bands.zeros` tree before reading into it; not measured
   there. MetalBend's preflight reported "busy" for idle agent processes only (claude, codex, under 3% CPU).
+
+## Array's per-element cost against C, and read_l without the reverse (2026-11-01, on devel, not published)
+
+The notes kept "the per-element cost of `Array`" open since 2026-10-11. I measured each operation against a C loop doing
+the same work, then looked at the emitted C and the disassembly for where the instructions go. Results in
+`bench/results/array_cost-2026-11-01.txt` (`bench/array_cost.py`, `.bend` and its C twin `.c`, three blocks of 9, 9 and 7
+shuffled rounds on an idle machine, one thread pinned with `taskset -c 3`, arrays of 2^12 to 2^24 numbers, every Bend
+output equal to C's).
+
+| per element, 2^16 numbers (in cache) / 2^24 (memory) | Bend instr | C instr | Bend ns | C ns |
+|---|---|---|---|---|
+| `get` (a U32 sum) | 4.0 | 0.9 | 0.21 / 0.23 | 0.04 / 0.20 |
+| fold (one F32 sum, tensor-array's loops) | 4.0 | 1.4 | 0.42 / 0.53 | 0.42 / 0.50 |
+| `set` | 5.8 | 1.3 | 0.19 / 0.31 | 0.05 / 0.27 |
+| `Array.new`, literal depth | 0.35 | 0.63 | 0.05 / 0.28 | 0.05 / 0.28 |
+| `Array.new`, depth computed at run time (`cap_depth`, as `Mat.zeros`) | 8.0 | 0.63 | 0.43 / 0.45 | 0.05 / 0.27 |
+| `Mat.to_list` + sum of the list | 43 → 34 | 13.5 | 4.36 → 2.80 / 6.6-7.2 → 4.04 | 1.38 / 5.2-5.7 |
+| `Mat.to_list` + `Mat.fill_at` back | 45 → 36 | 17.5 | 4.2 → 2.7 / 6.5-7.0 → 3.84-3.89 | 1.39 / 2.9-3.1 |
+| Base's `Array.to_list` (+ `Array.new`, sum) | 195-208 | 14 | 11.7 / 15.2 | 1.45 / 5.5-6.2 |
+
+- **Where the instructions go.** `get` and `set` are what the pitfall says: an index mask and a load or store. clang
+  unrolls the loop by four and hoists the mask, so a read is a `lea`, an `and` and a load-add, but the mask keeps the loop
+  from being vectorized; C's loop is vectorized. In memory both wait on the same bytes (1.13-1.17x); in cache the gap is
+  3-6x. The fold is bound by its one F32 addition chain on both sides (1.00-1.07x). That gap is bendlang/bend#1781 and
+  #1936, and `Array.get_unchecked` (#1880, on main) already removes it for reads; nothing to change in Bend here.
+- **`Array.new` with a computed depth is not vectorized on 2.0.39**: `blk_new`'s loop tests `(i >> c) == 0`, which clang
+  cannot count, so it fills one cell at a time (8 instructions a cell, 0.43 ns). With a literal depth it is a vector fill
+  as fast as C. bendlang/bend#1928 (merged for #1890, not in a release) fixes this loop; every `Mat.zeros` and the GPT-2
+  loader's fill get it with the next Bend.
+- **Change kept: `read_l` reads from the last index down.** It used to read up and reverse the list at the end (a second
+  pass over every cell). Consing each number onto the list while stepping down gives the list in order with no reverse.
+  Callers now pass the last index and its read; the seven call sites (`Mat.to_list`, `Mat.read_row`, `Mat.add_row`,
+  `Bands`' leaves, the cross-entropy and count rows) changed accordingly. The two length laws that go through it
+  (`leaf_len`, `read_ml_len` for `to_list_len`) got simpler: their base case holds by the definitions, so `rev_len` is gone.
+  Pure Bend, no `@unsafe`. **Result:** -21% instructions and -35% to -45% time per element on both blocks (2.60 against
+  4.00 ns at 2^12, 4.03 against 6.6-7.2 ns at 2^24). The list path is still 2.5x C's instructions: one cell allocated and
+  freed per number.
+- **Bits:** `tensor-array/tests/tolist.bend` (in `make check`) checks `Mat.to_list` and every `Mat.read_row` against a list
+  built by a forward recursion on 8 shapes (1 x 1 to 5 x 1025, sizes just past a power of two included): 0 differences on
+  both the old and the new code; a mutant that passes the first index instead of the last gives "0 5 12 63 1024 1025 1023
+  5125" (an index mutant in `Mat.to_list` itself is refused by `to_list_len`'s proof). `bench/mv_band_cost.py bits` gives
+  the same hashes for `Bands.matvec_l` (1 and 2^4 bands) and `Mat.matmul_nt` on its 9 shapes before and after. `make
+  check`: 116/116.
+- **Base's `Array.to_list` costs 13-15x a C loop** (195-208 instructions a cell): it walks by `match`, so every `ANode`
+  copies its halves into fresh blocks, plus a block per leaf. tensor-array does not use it (read_l is a `get` loop). JS
+  got a flat walk for the same reason (bendlang/bend#1661); C kept the walk. An issue draft is in my private notes.
+- **Losses and leftovers.** The gain is in the conversion itself; I did not measure a whole program. The users are list
+  APIs: one band of `Bands.matvec_l` reads 50,257 numbers back, about 0.07 ms of its 20 ms by the per-element numbers. The
+  release question of the last two entries (0.1.19.0 or 0.1.20.0, and the README's version line) now covers this change
+  too. Block B's preflight read load1 1.49 just after my own builds; block C waited for load1 under 1.0, rebuilt
+  byte-identical binaries, swapped the order, and moved every median by under 5%. MetalBend's preflight reported "busy"
+  for idle agent processes only.
