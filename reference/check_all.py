@@ -173,6 +173,12 @@ def main():
     run("tensor-array/tests/array_laws.bend: the Array laws used, and the unbalanced tree's 9.0", [BEND, "tensor-array/tests/array_laws.bend"],
         lambda o, c: c == 0 and o.strip() == "(1.5, 2.5, 9.0)")
     run("tensor-array/tests/array_laws.bend --verdict", [BEND, "tensor-array/tests/array_laws.bend", "--verdict"], lambda o, c: o.strip().endswith("ALL PROOFS CHECK"))
+    run("tensor-array/tests/apart.bend: 21,590 pairs of distinct indices through depth 7, 0 failures", [BEND, "tensor-array/tests/apart.bend"],
+        lambda o, c: c == 0 and o.strip() == "apart_pairs: 21590\napart_failures: 0")
+    with tempfile.TemporaryDirectory() as d:
+        apart = os.path.join(d, "apart")
+        run("compile tensor-array/tests/apart.bend", [BEND, "tensor-array/tests/apart.bend", "-o", apart])
+        run("tensor-array/tests/apart.bend on the C lane", [apart], lambda o, c: c == 0 and o.strip() == "apart_pairs: 21590\napart_failures: 0")
     with tempfile.TemporaryDirectory() as d:
         roundtrip = os.path.join(d, "roundtrip")
         run("compile tensor-array/tests/roundtrip.bend", [BEND, "tensor-array/tests/roundtrip.bend", "-o", roundtrip])
