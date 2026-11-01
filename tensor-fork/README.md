@@ -3,18 +3,18 @@
 The six products of [`bend-ml-tensor-array`](../tensor-array) (`matmul`, `matmul_nt`, `matmul_tn` and their accumulating
 forms), with the same arguments, result types and bits, but with the parallel blocks **sharing** their operands instead
 of copying them, `par1`..`par4`, which run any kernel of yours over blocks of a range on up to four shared arrays, and
-`softmax_ce`, tensor-array's cross-entropy with its rows in blocks (on `devel`, not published yet).
+`softmax_ce`, tensor-array's cross-entropy with its rows in blocks (since 0.1.6.0).
 It is faster wherever the work splits into blocks; it is **not proved**, and says so.
 
-- Bend: **2.0.39** · License: MIT · Depends on `bend-ml-tensor-array@0.1.18.0`.
+- Bend: **2.0.39** · License: MIT · Depends on `bend-ml-tensor-array@0.1.19.0`.
 - `bend tensor-fork/main.bend` → `SOME PROOFS FAIL`, naming the 35 defs that rely on `@unsafe` code (below). All of it is
   Bend: no foreign code.
 - Tests: `tests/bits.bend`, `tests/precise.bend` and `tests/ce.bend`, against tensor-array, bit for bit (below).
 
 ```python
 import Base
-import bend-ml-tensor-array@0.1.18.0/main.bend as TA
-import bend-ml-tensor-fork@0.1.5.0/main.bend as TF
+import bend-ml-tensor-array@0.1.19.0/main.bend as TA
+import bend-ml-tensor-fork@0.1.6.0/main.bend as TF
 
 def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 128n>:
   TF.matmul(100n, 784n, 128n, 3n, a, w)   # instead of TA.Mat.matmul(100n, 784n, 128n, 3n, a, w)
@@ -155,5 +155,6 @@ first rows, so they run after the blocks, in order, as in tensor-array.
 - `0.1.4.0` (2026-10-25): 0.1.2.0's code on tensor-array 0.1.16.0 (0.1.14.0's code), with its bits.
 - `0.1.5.0` (2026-10-30): on tensor-array 0.1.18.0, so a program that also uses tensor-gpu 0.1.5.0 or tensor-array
   0.1.18.0 passes the same `Mat` to all of them (bend-ml #29, by @adeerkhan). The same code and bits.
-- Next (on `devel`, not published; it would be `0.1.6.0`, a new capability): `softmax_ce` with its rows in blocks,
-  `TA.Mat.softmax_ce`'s bits (`tests/ce.bend`). The products unchanged.
+- `0.1.6.0` (2026-11-01): `softmax_ce` with its rows in blocks, `TA.Mat.softmax_ce`'s bits (`tests/ce.bend`), on
+  tensor-array 0.1.19.0, so a program that also uses tensor-gpu 0.1.5.1 or tensor-array 0.1.19.0 passes the same `Mat`
+  to all of them. The products' code and bits unchanged (hash `0x00977eb08bd5a81deaf111443555211b`).
