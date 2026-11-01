@@ -1766,3 +1766,50 @@ What moved:
   Spread on 16 threads is up to 19% of the median (256 rows, par 4) against 2-4% on one thread. Par 6 beats par 4 on
   every wide shape (64 blocks balance 16 threads better than 16 blocks). MetalBend's preflight reported "busy" for the
   agent processes alone (claude, codex: present, under 10% CPU); the other checks passed.
+
+## matvec_l's one-band cost, and the dot product unrolled by four (2026-11-01, on devel, not published)
+
+The plan after v1.2 kept "`matvec_l`'s ~25% one-band cost on the 50257-row matrix" open (2026-10-06, measured on a busy
+machine against `Mat.matmul_nt`). I measured what one band costs against the bare kernel it runs, then tried to make the
+kernel cheaper in pure Bend. Results in `bench/results/mv_band_cost-2026-11-01.txt` (`bench/mv_band_cost.py`, two blocks
+of 9 shuffled rounds on an idle machine, one thread pinned with `taskset -c 3`, 16 threads in `+RTS ... -RTS`).
+
+- **The 25% is gone.** On 50,257 x 768, one thread, `Bands.matvec_l` with one band takes 26.7 ms and the bare `gemm` with
+  x and y kept as arrays and reused 26.9-27.1 ms: the list in, the fresh output array and the list out add 4% of the
+  instructions (483 M against 464 M per product) and no time. Exp. 14 (the gemm into an array, read back) had already
+  removed what the 2026-10-06 number measured. So the cost of one band is the cost of the dot product: ~12 instructions
+  per multiply-add.
+- **Change kept:** `dotg` runs `dotr` unrolled by four: a round of four `dstep` (one step each: the pending product
+  into `a0`, the sums rotated, the next pair read), then the last `k mod 4` steps through `dotr` itself. Every product
+  goes to the same partial sum in the same order (four rotations bring the names back), so the bits are `dotr`'s.
+  `dstep` compiles to an inlined helper; the loop runs 16% fewer instructions. Pure Bend, no `@unsafe`, no new law;
+  `dotr` stays as it was (the remainder, `matmul_precise`'s blocks and `tests/blocks.bend` use it).
+- **Bits:** `tensor-array/tests/dot4.bend` (in `make check`) compares `dotg` with `dotr` for every k from 0 to 40 with
+  NaN, infinities and subnormals mixed in, with unit and wider strides, and three long dots: 0 differences; a mutant
+  that drops the rotation gives 22 21 23 3. `bench/mv_band_cost.py bits` hashes every output of `Bands.matvec_l` (1 and
+  2^4 bands) and `Mat.matmul_nt` on 9 shapes, 1 x 1 to 50,257 x 768: the same sha256 before and after. `tests/t8.bend`
+  (cells of 8 against the scalar loop) and `tests/onerow.bend` still pass, and `make check` passes.
+- **Result** (medians over 9 rounds, block A / block B):
+
+| W | setting | before | after | change |
+|---|---|---|---|---|
+| 50,257 x 768 | one band, 1 thread | 26.73 / 26.69 ms | 20.07 / 20.01 ms | -25% / -25% |
+| 50,257 x 768 | bare kernel, 1 thread | 26.95 / 27.09 ms | 18.74 / 18.84 ms | -30% / -30% |
+| 768 x 768 to 3072 x 768 | bare kernel, 1 thread | | | -6% to -8% |
+| 768 x 768 to 3072 x 768 | one band, 1 thread | | | -1% to +1% |
+| all five shapes | 2^4 bands, 16 threads | | | -4% to +9%, inside the spread |
+
+- **Schedule checks.** The rebuilt binaries were byte-identical, so the second block repeats the first with a fresh run
+  order; the 25% held to the tenth of a millisecond. A control with the same `D4`/`dstep` structure but one step a round
+  times like the old loop (26.8 ms, +0.5%), so the gain comes from the four steps a round, not from the rewrite.
+- **Losses and leftovers.** The gain is the big matrix on one thread (154 MB of weights, read from memory); on matrices
+  that fit in the cache the bare kernel gains 6-8% but the one-band call does not move, which I cannot explain yet. On
+  16 threads nothing changes: block A read +2% to +9% on every shape, block B -4% to +4.5%, both inside the run-to-run
+  spread (e.g. 3.15-4.33 ms against 3.43-4.62 at 50,257 rows); I do not count it as a loss or a gain. Eight steps a
+  round were no faster (393 M instructions against 388 M, and a little slower in a quick check). After the change the
+  list conversions show: one band is 20.0 ms against 18.8 for the bare kernel (+6.5%), the next thing to cut on one
+  thread. Not measured: the GPT-2 demo end to end (it imports the published package); llama.bend, tensor-fork and
+  tensor-gpu get the kernel only when they move to a version that has it.
+- **Release:** the change sits in the tree's 0.1.19.0 source, which the README describes as 0.1.18.0's defs plus three
+  laws; whether it ships as 0.1.19.0 or 0.1.20.0 is still open, and the README's version line needs a sentence either
+  way.
