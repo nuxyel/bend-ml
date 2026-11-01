@@ -307,3 +307,118 @@ def mm_precise2(long: Bool, +n: Nat, +k: Nat, +m: Nat, +par: Nat, a: TA.Mat<n, k
 @unsafe
 def matmul_precise(+n: Nat, +k: Nat, +m: Nat, +par: Nat, a: TA.Mat<n, k>, b: TA.Mat<k, m>) -> TA.MMul<n, k, m>:
   mm_precise2(Nat.is_lt(1024n, k), n, k, m, par, a, b)
+
+# ---- softmax_ce with the rows in blocks (TA.Mat.softmax_ce's bits) ----
+# tensor-array walks the rows one after another (cea_rows), adding each row's loss term to the running loss. Here the
+# rows run in 2^d blocks through par3, sharing the logits (each block writes only its own rows), the labels (read) and
+# an array t of one loss term per row (each block writes only its own cells). The loss is then summed from t in row
+# order, from +0.0, with the same subtraction as cea_rows (loss - log(max(p, 1e-12))), so the bits are the same at
+# every depth and thread count. The rows are tensor-array's own loops (cea_max, cea_exp, cea_p, cea_grad).
+# Labels past the n rows (a list longer than the matrix) run after the blocks through TA.cea_rows, in order, as in
+# tensor-array: those rows reach past the matrix and may wrap around onto its first rows, so they cannot share a
+# block. A matrix with no columns, or par = 0, runs TA.Mat.softmax_ce itself.
+
+type SE is Data:
+  SE{mm1: Nat, mu: U32, nf: F32}
+
+# a row's loss term log(max(p, 1e-12)) and its gradient: cea_row3..cea_row0 without the running loss
+def sr3(+mm1: Nat, +o: U32, +label: Nat, +s: F32, +nf: F32, q: TA.AF) -> TA.L2:
+  match q:
+    case TA.AF{c, +p}:
+      TA.L2{F32.log(F32.max(p, 0.000000000001)), TA.cea_grad(mm1, o, 0n, label, s, nf, Array.get(F32, c, o))}
+
+def sr2(+mm1: Nat, +o: U32, +label: Nat, +nf: F32, q: TA.AF) -> TA.L2:
+  match q:
+    case TA.AF{c, +s}:
+      sr3(mm1, o, label, s, nf, TA.cea_p(Nat.is_le(label, mm1), o, label, s, c))
+
+def sr1(+mm1: Nat, +o: U32, +label: Nat, +nf: F32, q: TA.AF) -> TA.L2:
+  match q:
+    case TA.AF{c, +m}:
+      sr2(mm1, o, label, nf, TA.cea_exp(mm1, o, m, 0.0, Array.get(F32, c, o)))
+
+def sr0(+mm1: Nat, +o: U32, +label: Nat, +nf: F32, r: Array<F32> & F32) -> TA.L2:
+  match r:
+    case Tuple{c, +x0}:
+      sr1(mm1, o, label, nf, TA.cea_max(mm1, o, x0, Array.get(F32, c, o)))
+
+def ce_put(+i: U32, lab: Array<U32>, t: Array<F32>, q: TA.L2) -> B3<F32, U32, F32>:
+  match q:
+    case TA.L2{+x, z}:
+      B3{z, lab, Array.set(F32, t, i, x)}
+
+def ce_row(+mm1: Nat, +mu: U32, +nf: F32, +i: U32, z: Array<F32>, t: Array<F32>, r: Array<U32> & U32) -> B3<F32, U32, F32>:
+  match r:
+    case Tuple{lab, +y}:
+      ce_put(i, lab, t, sr0(mm1, (i * mu : U32), U32.to_nat(y), nf, Array.get(F32, z, (i * mu : U32))))
+
+def ce_step(+mm1: Nat, +mu: U32, +nf: F32, +i: U32, g: B3<F32, U32, F32>) -> B3<F32, U32, F32>:
+  match g:
+    case B3{z, lab, t}:
+      ce_row(mm1, mu, nf, i, z, t, Array.get(U32, lab, i))
+
+def ce_loop(k: Nat, +mm1: Nat, +mu: U32, +nf: F32, +i: U32, g: B3<F32, U32, F32>) -> B3<F32, U32, F32>:
+  match k:
+    case 0n:
+      g
+    case 1n+p:
+      ce_loop(p, mm1, mu, nf, (i + 1 : U32), ce_step(mm1, mu, nf, i, g))
+
+# rows i0 .. i0+cnt-1: their gradients in the logits, their loss terms in t
+def ce_leaf(+e: SE, +i0: U32, +cnt: Nat, g: B3<F32, U32, F32>) -> B3<F32, U32, F32>:
+  match e:
+    case SE{+mm1, +mu, +nf}:
+      ce_loop(cnt, mm1, mu, nf, i0, g)
+
+# the loss over k terms, in row order from +0.0, as cea_rows adds them
+def ce_sum(k: Nat, +i: U32, +loss: F32, r: Array<F32> & F32) -> F32:
+  match k r:
+    case 0n Tuple{t, x}:
+      loss
+    case 1n+p Tuple{t, +x}:
+      ce_sum(p, (i + 1 : U32), (loss - x : F32), Array.get(F32, t, (i + 1 : U32)))
+
+type CL is Type:
+  CL{a: Array<U32>, k: Nat, rest: List<&2, Nat>}
+
+# a label past the row gives p = 0 and no one-hot cell, as c does: kept as c so that it fits a U32
+def lab_fit(inside: Bool, +y: Nat, +c: Nat) -> Nat:
+  match inside:
+    case True{}:
+      y
+    case False{}:
+      c
+
+# up to n labels into a, counted in k; the rest stays a list
+def lab_take(n: Nat, labels: List<&2, Nat>, +mm1: Nat, +c: Nat, +i: U32, +k: Nat, a: Array<U32>) -> CL:
+  match n labels:
+    case 0n ls:
+      CL{a, k, ls}
+    case 1n+p Nil{}:
+      CL{a, k, Nil{}}
+    case 1n+p Con{+y, t}:
+      lab_take(p, t, mm1, c, (i + 1 : U32), 1n+k, Array.set(U32, a, i, U32.from_nat(lab_fit(Nat.is_le(y, mm1), y, c))))
+
+# after the blocks: the loss from t, then any labels past the n rows, in order, then tensor-array's mean
+def ce_fin2(-n: Nat, -c: Nat, +nf: F32, +mm1: Nat, +mu: U32, +k: Nat, rest: List<&2, Nat>, g: B3<F32, U32, F32>) -> TA.MCE<n, c>:
+  match g:
+    case B3{z, lab, t}:
+      TA.ce_fin(n, c, nf, TA.cea_rows(rest, mm1, mu, nf, U32.from_nat(k), TA.L2{ce_sum(k, 0, 0.0, Array.get(F32, t, 0)), z}))
+
+@unsafe
+def ce_par3(-n: Nat, -c: Nat, +nf: F32, +mm1: Nat, +mu: U32, +d: Nat, z: Array<F32>, lt: CL) -> TA.MCE<n, c>:
+  match lt:
+    case CL{lab, +k, rest}:
+      ce_fin2(n, c, nf, mm1, mu, k, rest, par3(~SE, ~F32, ~U32, ~F32, ~ce_leaf, SE{mm1, mu, nf}, Nat.min(d, depth(k)), k, z, lab, Array.new(F32, depth(k), 0.0)))
+
+def softmax_ce2(seq: Bool, +n: Nat, +c: Nat, +d: Nat, z: TA.Mat<n, c>, labels: List<&2, Nat>) -> TA.MCE<n, c>:
+  match seq z:
+    case True{} z:
+      TA.Mat.softmax_ce(n, c, z, labels)
+    case False{} TA.Mat{x}:
+      ce_par3(n, c, F32.from_nat(n), Nat.sub(c, 1n), U32.from_nat(c), d, x, lab_take(n, labels, Nat.sub(c, 1n), c, 0, 0n, Array.new(U32, depth(n), 0)))
+
+# mean cross-entropy and its gradient, TA.Mat.softmax_ce's arguments and bits, with the rows in up to 2^par blocks
+# (par = 0: tensor-array's own loop)
+def softmax_ce(+n: Nat, +c: Nat, +par: Nat, z: TA.Mat<n, c>, labels: List<&2, Nat>) -> TA.MCE<n, c>:
+  softmax_ce2(Bool.or(Nat.is_eq(par, 0n), Nat.is_eq(c, 0n)), n, c, par, z, labels)
