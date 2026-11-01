@@ -98,6 +98,7 @@ def attn(h: Nat, +off: Nat, +q: List<&2, F32>, +ks: List<&2, List<&2, F32>>, +vs
     case 0n:
       Nil{}
     case 1n+p:
+      # bend-lint: disable-next bend-lint-rules/performance/list_index_loop -- 12 slices of a 768-list per layer not-expected-because: against 124 M multiply-adds per token, below the noise; the GPT-2 demo is the list baseline (NOTES 2026-10-17)
       List.append(&2, F32, head_out(slice64(q, off), ks, vs, off), attn(p, Nat.add(off, 64n), q, ks, vs))
 
 # ---------------------------------------------------------------------

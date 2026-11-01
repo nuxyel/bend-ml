@@ -8,7 +8,7 @@ Tensors in Bend 2 over a flat `Array<F32>`, **with the shape in the type**: the 
 
 ```python
 import Base
-import bend-ml-tensor-array@0.1.18.0/main.bend as TA
+import bend-ml-tensor-array@0.1.19.0/main.bend as TA
 
 def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 128n>:
   TA.Mat.matmul(100n, 784n, 128n, 3n, a, w)   # 3n = 2^3 = 8 parallel blocks
@@ -78,6 +78,15 @@ Ultra 7 155H (`bench/mv_bands.py`, `bench/results/`):
 | `half_cover` | the two bands of a node, `half(r)` rows and `r - half(r)` rows, add up to exactly `r` rows: no row is lost and none is counted twice |
 | `leaf_len` | reading a band's results back from its `Array` (`read_l`, then `bv_g2`) gives exactly one number per row read |
 | `band_len` | the product of one band with `rows` rows gives exactly `rows` numbers |
+| `size_set` | writing any value at any index keeps an `Array`'s size (Base's `Array.set` and `Array.size`, for any element type) |
+| `get_after_set` | reading at `i` right after writing `v` at `i` gives back `v` |
+| `get_other_set` | a write at `i` leaves alone the cell a read at `k` reaches, when the two walks down the tree split before a leaf (`ASet.Apart`); on a concrete tree that condition computes to true and `Unit{}` proves it |
+
+The last three are about Base's `Array` itself and live here until Base states them
+([bendlang/bend#1934](https://github.com/bendlang/bend/issues/1934)). Their condition is not "`i` and `k` differ after
+the mask": on a tree that is not perfectly balanced two different indices can reach the same leaf
+(`tests/array_laws.bend` shows one). On the perfect trees `Array.new` and literals build, the two coincide, but that is
+not proved here.
 
 Not proved yet: that the whole tree (`Bands.matvec_l`) gives exactly `r` numbers. The proof would apply the
 join lemma (`join_len`, proved) to the two recursive results and to the induction hypotheses about the same
@@ -115,11 +124,19 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 
 - The capacity arithmetic is proved (`cap_ok`: `2^cap_depth(n) >= n`), but that `Array.new(d)` really allocates `2^d` slots is a property of the runtime and stays trusted. The invariant "the `Array` capacity is `>= r*c`" is not carried in the type of `Mat`; the constructors (`zeros`, `fill`, `of_list`) establish it.
 - `softmax_ce` and `count_correct` expect `labels` with `n` entries (one per row); the type does not check it. Use `softmax_ce_checked` and `count_correct_checked`, which return `None` when `length(labels) != n`.
-- The list conversion's **count** is proved (`to_list_len`); that it gives back the same **numbers** is tested, not proved: `tensor-array/tests/roundtrip.bend` checks `Mat.of_list` then `Mat.to_list` on empty, row, column and rectangular matrices, with -0, infinities, NaN and a subnormal. A content law needs the checker to follow `Array.set`/`Array.get` on a neutral array, which it does not do today; `leaf_len` and `band_len` count lists for the same reason.
+- The list conversion's **count** is proved (`to_list_len`); that it gives back the same **numbers** is tested, not proved: `tensor-array/tests/roundtrip.bend` checks `Mat.of_list` then `Mat.to_list` on empty, row, column and rectangular matrices, with -0, infinities, NaN and a subnormal. The Array laws it needs (`size_set`, `get_after_set`, `get_other_set`) are now proved; the round trip on top of them is open ([#26](https://github.com/nuxyel/bend-ml/issues/26)). `leaf_len` and `band_len` count lists for the same reason.
 - `F32` numerics are validated by tests against PyTorch, not by proof.
 
 ## Versions
 
+- `0.1.19.0`: the laws `size_set`, `get_after_set` and `get_other_set` about Base's `Array` (helpers `ASet.*`), asked for
+  in bend-ml #26. Two defs get faster with the same bits: the dot product under `matvec_l` and `matmul_nt` takes four
+  steps a turn (one band of the 50257x768 product 25% faster on one thread, no change on 16), and `Mat.to_list` reads
+  from the last index down instead of reversing a list (35-45% less time per number). Every other def is 0.1.18.0's,
+  with its bits. The round trip `Mat.to_list(Mat.of_list(xs)) == xs` is
+  still tested, not proved: it needs a lemma about `Array.new`'s trees that `tests/apart.bend` checks on every pair of
+  indices through depth 7 (by @adeerkhan, bend-ml #28). `tensor-fork` 0.1.6.0 and `tensor-gpu` 0.1.5.1 import
+  0.1.19.0 (hash `0x54fd18094240d26f3074e1ee00279d63`).
 - `0.1.18.0`: the law `to_list_len` (`Mat.to_list` reads exactly `r*c` numbers) and a fix: `Mat.to_list` of a matrix
   with no numbers (0 rows or 0 columns) now gives `Nil`, where it gave a one-element list before. `tests/roundtrip.bend`
   checks `Mat.of_list` then `Mat.to_list` on empty, row, column and rectangular matrices, word for word (the numbers are

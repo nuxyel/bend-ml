@@ -6,14 +6,14 @@
   <a href="https://github.com/nuxyel/bend-ml/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/nuxyel/bend-ml/ci.yml?branch=main&style=flat-square&label=ci&labelColor=4d4a44&color=7e9a5e" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8b83b5?style=flat-square&labelColor=4d4a44" alt="MIT license"></a>
   <a href="https://bend-lang.com"><img src="https://img.shields.io/badge/Bend-2.0.39-8b83b5?style=flat-square&labelColor=4d4a44" alt="Bend 2.0.39"></a>
-  <img src="https://img.shields.io/badge/laws%20proved-30-7e9a5e?style=flat-square&labelColor=4d4a44" alt="30 laws proved">
+  <img src="https://img.shields.io/badge/laws%20proved-33-7e9a5e?style=flat-square&labelColor=4d4a44" alt="33 laws proved">
 </p>
 
 **bend-ml** is machine learning for [Bend 2](https://bend-lang.com). The shape of every tensor lives in its type, so a
 product of mismatched matrices does not compile, and the structural guarantees (a tokenizer that never loses a byte, a
 reverse mode that agrees with the forward mode, a parallel product that covers every row) are laws that Bend's kernel
-checks. Six packages are on BendHub, and two demos run on them: an MNIST classifier that trains, and GPT-2 small, which
-generates the same tokens as PyTorch. The current release is [v1.5.0](https://github.com/nuxyel/bend-ml/releases/tag/v1.5.0).
+checks. Eight packages are on BendHub, and two demos run on them: an MNIST classifier that trains, and GPT-2 small, which
+generates the same tokens as PyTorch. The current release is [v1.8.0](https://github.com/nuxyel/bend-ml/releases/tag/v1.8.0).
 
 ## 01 · A shape error is a type error
 
@@ -37,24 +37,23 @@ only compiles with a proof that the number of elements does not change, even whe
 | [`bend-ml-nat-lemmas`](nat-lemmas) | 0.1.2.0 | `Nat` and `List` lemmas that Base does not have | `add_comm`, `add_assoc`, `mul_comm`, `mul_assoc`, `mul_dist`, `append_assoc`, `length_append`, `product_append`, `add4`, `mul_dist_l`... (17) |
 | [`bend-ml-bpe-tokenizer`](bpe) | 0.1.3.0 | Byte-level BPE tokenizer (GPT-2 style) | **roundtrip** `decode(encode(s)) = s`, `vocab_bound`, `dec_append`, `train_wf`, `roundtrip_trained` |
 | [`bend-ml-tensor`](tensor) | 0.1.2.0 | `Vec<n>` and `Mat<r,c>` with the shape in the type, over lists. **Frozen** (2026-10-19): no new versions; superseded by tensor-array | `reshape_swap`, `reshape_flat` |
-| [`bend-ml-tensor-array`](tensor-array) | 0.1.18.0 | the same guarantees over a flat `Array<F32>`; `Bands<r,c>` for a parallel matrix · vector | `cap_ok`, `to_list_len`, `half_cover`, `leaf_len`, `band_len`; typed `matmul`, `matmul_nt`, `matmul_tn` (and their accumulating forms), `Bands.matvec` |
+| [`bend-ml-tensor-array`](tensor-array) | 0.1.19.0 | the same guarantees over a flat `Array<F32>`; `Bands<r,c>` for a parallel matrix · vector | `cap_ok`, `to_list_len`, `half_cover`, `leaf_len`, `band_len`, `size_set`, `get_after_set`, `get_other_set`; typed `matmul`, `matmul_nt`, `matmul_tn` (and their accumulating forms), `Bands.matvec` |
 | [`bend-ml-autograd`](autograd) | 0.1.1.0 | Automatic differentiation and layers with typed backward. **Frozen** (2026-10-19): no new versions; training moves to [BendTorch](https://github.com/nuxyel/bendtorch) | **`reverse_eq_forward`** |
 | [`bend-ml-binary-read`](binary-read) | 0.2.0.0 | F32 and BF16 weights read from a file straight into an `Array<F32>`, at offsets past 4 GiB; foreign code (C and JavaScript), kept out of the packages with laws | none: an effect, tested on both lanes |
-| [`bend-ml-tensor-fork`](tensor-fork) | 0.1.4.0 | tensor-array's six products with the parallel blocks sharing A, B and C (`Array.fork`, `@unsafe` in Base) instead of copying them: an MNIST epoch 12.0 → 6.2 s on one thread, 4.4 → 3.0 s on 16; `par1`..`par4`, any kernel over blocks of shared arrays | none: the same bits as tensor-array, tested on 14,835 products; kept out of the packages with laws |
-| [`bend-ml-tensor-gpu`](tensor-gpu) | 0.1.5.0 | tensor-array's six products as one `!` call each, so they run on the GPU (`Array.fork`, `@unsafe` in Base); at SmolLM2-135M's sizes 1.6-2.8x faster than tensor-fork on 16 threads, 512 x 4096 x 512 4.5x; `run1`..`run4`, bangs over any leaf code written in plain Bend; uniform and Gaussian fills of a counter (`fill_gauss`, `gauss_mat`, and `_at` forms for a slice), made on the device | none: the same bits as tensor-array on the GPU and the CPU, tested on 2,967 products; the fills' words the same on every lane and in a NumPy twin; kept out of the packages with laws |
+| [`bend-ml-tensor-fork`](tensor-fork) | 0.1.6.0 | tensor-array's six products with the parallel blocks sharing A, B and C (`Array.fork`, `@unsafe` in Base) instead of copying them: an MNIST epoch 12.0 → 6.2 s on one thread, 4.4 → 3.0 s on 16; `par1`..`par4`, any kernel over blocks of shared arrays; `softmax_ce` with the rows in blocks, 2.9x the one-thread tensor-array on 16 threads for wide rows, slower on small matrices | none: the same bits as tensor-array, tested on 14,835 products and 11 cross-entropy cases; kept out of the packages with laws |
+| [`bend-ml-tensor-gpu`](tensor-gpu) | 0.1.5.1 | tensor-array's six products as one `!` call each, so they run on the GPU (`Array.fork`, `@unsafe` in Base); at SmolLM2-135M's sizes 1.6-2.8x faster than tensor-fork on 16 threads, 512 x 4096 x 512 4.5x; `run1`..`run4`, bangs over any leaf code written in plain Bend; uniform and Gaussian fills of a counter (`fill_gauss`, `gauss_mat`, and `_at` forms for a slice), made on the device | none: the same bits as tensor-array on the GPU and the CPU, tested on 2,967 products; the fills' words the same on every lane and in a NumPy twin; kept out of the packages with laws |
 
 ```python
-import bend-ml-tensor-array@0.1.18.0/main.bend as TA
+import bend-ml-tensor-array@0.1.19.0/main.bend as TA
 import bend-ml-bpe-tokenizer@0.1.3.0/main.bend as BPE
 ```
 
-`bend-ml-tensor-gpu` 0.1.5.0 imports tensor-array 0.1.18.0, so its products take these `Mat` values; `bend-ml-tensor-fork`
-0.1.4.0 still imports 0.1.16.0, and a program that uses it stays on 0.1.16.0 (Bend treats each version's `Mat` as its own
-type).
+`bend-ml-tensor-gpu` 0.1.5.1 and `bend-ml-tensor-fork` 0.1.6.0 import tensor-array 0.1.19.0, so their products take
+these `Mat` values (Bend treats each version's `Mat` as its own type).
 
 <p align="center"><img src="docs/media/shots/law-roundtrip.png" alt="The roundtrip law as Bend states it, and ALL PROOFS CHECK" width="80%"></p>
 
-<p align="center"><img src="docs/media/diagram.svg" alt="The six packages: nat-lemmas is imported by bpe-tokenizer, tensor and autograd; tensor-array stands alone; binary-read is foreign code; the GPT-2 demo uses bpe-tokenizer, tensor, tensor-array and binary-read; the MNIST demo uses tensor and tensor-array" width="90%"></p>
+<p align="center"><img src="docs/media/diagram.svg" alt="The eight packages: nat-lemmas is imported by bpe-tokenizer, tensor and autograd; tensor-array is imported by tensor-fork and tensor-gpu, which rely on @unsafe Array.fork and give its bits; binary-read is foreign code; the GPT-2 demo uses bpe-tokenizer, tensor, tensor-array and binary-read; the MNIST demo uses tensor and tensor-array" width="90%"></p>
 
 Every package with laws passes `bend X/main.bend --verdict`, the re-check by Bend's Lean-proved kernel, with no `@unsafe`
 and no `?TODO`. `bend-ml-binary-read` is the exception by design: its reads are written in C and JavaScript, six
@@ -81,23 +80,29 @@ same tokens as `transformers`; its typed layers are on BendHub as `bend-ml-llama
 ## 04 · How it compares
 
 Every release up to v1.2.2 was measured on 2026-10-11 next to six reference systems, in one session with one protocol
-(medians of alternated rounds on an Intel Core Ultra 7 155H). v1.3.2 was measured on 2026-10-16 with the same protocol,
-next to v1.2.2, PyTorch and NumPy again, which came out within 2% of their numbers of 2026-10-11; llama.cpp, llm.c,
-dfdx and candle keep theirs. GPT-2's cost per token is unchanged since v1.2.2 (139 ms on one thread, 107 on 16); what
-changed is the start (1.0 s instead of 5.4, at 831 MB instead of 1,464 MB) and training: an MNIST batch takes 20.0 ms
-instead of 29.9 on one thread, 7.7 instead of 12.8 on 16.
-Bend 2.0.39 alone then took a token to 128 ms on one thread and 86 on 16, against 138 and 106 for the same commit
-built with 2.0.38 (idle machine, 7 alternated rounds, 2026-10-24); the charts below still show the earlier numbers.
+(medians of alternated rounds on an Intel Core Ultra 7 155H, 32 GB, AC power, performance profile). v1.3.2 was measured
+on 2026-10-16 the same way, and v1.8.0 on 2026-11-01 with Bend 2.0.39 on an idle machine (load1 0.7 at the start),
+next to v1.3.2, PyTorch and NumPy again. v1.3.2 came out within 1% of its numbers of 2026-10-16 (GPT-2 138 and 106 ms
+a token, MNIST 20.0 and 7.8 ms a batch), and PyTorch and NumPy within 2% on one thread; on 16 threads they came out
+slower than on 2026-10-11 (PyTorch 11.0 ms against 9.4, NumPy 14.8 against 11.2, both with a wide spread), so the
+charts keep every reference system's numbers of 2026-10-11.
 
-<p align="center"><img src="docs/media/deck/frames/04-vs-references.webp" alt="GPT-2 small, ms per token: PyTorch 18.5 and 9.4, NumPy 18.5 and 11.2, llama.cpp 22.2 and 9.8, bend-ml v1.3.2 139 and 107, llm.c without a key/value cache 529 and 142, on 1 and 16 threads" width="90%"></p>
+From v1.3.2 to v1.8.0, a GPT-2 token went from 138 to 129 ms on one thread and from 106 to 85 on 16, most of it from
+Bend 2.0.39 (2026-10-24: 128 and 86 ms for the same commit, against 138 and 106 with 2.0.38); an MNIST batch from 20.0
+to 9.5 ms on one thread and from 7.8 to 5.7 on 16, at 85 MB instead of 107. GPT-2 starts in 0.8 s instead of 1.0. What
+did not move: PyTorch is still 7x ahead on one thread and 9x on 16 for GPT-2; for MNIST NumPy and PyTorch are 20x
+ahead on one thread and 6-14x on 16; and the thread curve still flattens after 4 threads (85 ms at 4, 79 at best, on 8
+and 22), as v1.3.2's did (108 at 4, 97 on 22).
 
-<p align="center"><img src="docs/media/deck/frames/05-threads.webp" alt="ms per token by thread count: Bend keeps improving up to 22 threads" width="90%"></p>
+<p align="center"><img src="docs/media/deck/frames/04-vs-references.webp" alt="GPT-2 small, ms per token: PyTorch 18.5 and 9.4, NumPy 18.5 and 11.2, llama.cpp 22.2 and 9.8, bend-ml v1.8.0 129 and 85, llm.c without a key/value cache 529 and 142, on 1 and 16 threads" width="90%"></p>
 
-<p align="center"><img src="docs/media/deck/frames/06-mnist.webp" alt="MNIST, ms per batch at 16 threads and peak memory: bend-ml v1.3.2 7.7 ms, slower than the others, with the smallest footprint (107 MB)" width="90%"></p>
+<p align="center"><img src="docs/media/deck/frames/05-threads.webp" alt="ms per token by thread count: bend-ml v1.8.0 129 ms on one thread, 85 on 4, 79 at best" width="90%"></p>
+
+<p align="center"><img src="docs/media/deck/frames/06-mnist.webp" alt="MNIST, ms per batch at 16 threads and peak memory: bend-ml v1.8.0 5.7 ms, slower than the others, with the smallest footprint (85 MB)" width="90%"></p>
 
 ## 05 · Every release
 
-<p align="center"><img src="docs/media/deck/frames/03-history.webp" alt="GPT-2 ms per token by release, from v0.2 to v1.3.2, on 1 and 16 threads" width="90%"></p>
+<p align="center"><img src="docs/media/deck/frames/03-history.webp" alt="GPT-2 ms per token by release, from v0.2 to v1.8.0, on 1 and 16 threads" width="90%"></p>
 
 Since v1.2.2, each change keeps the output bits it had (checked word by word, or against PyTorch where the order of
 sums changed on purpose):
@@ -117,6 +122,7 @@ sums changed on purpose):
 | v1.7.0 | Bend 2.0.39; `binary-read` 0.2.0.0: reads at 64-bit offsets, BF16 files and reads into a cell offset; `nat-lemmas` 0.1.2.0: `add4`, `mul_dist_l`; `tensor-array` 0.1.16.0 with `tensor-fork` and `tensor-gpu` 0.1.4.0 (0.1.14.0's code again, after 0.1.15.0's faster loop proved slower inside a whole program) | GPT-2 128 ms a token on one thread, 86 on 16 (138 and 106 with Bend 2.0.38); the products' bits those of 0.1.14.0 |
 | v1.7.1 | `tensor-array` 0.1.17.0: `Mat.softmax_ce` walks its rows over the array, with the same bits | the cross-entropy of 64 rows of 49,152 3.7x faster on 16 threads; MNIST unchanged |
 | v1.8.0 | `tensor-gpu` 0.1.5.0: uniform and Gaussian fills of a counter made on the device, with offset forms for slices (asked in #23); `tensor-array` 0.1.18.0: the law `to_list_len` and an empty `Mat.to_list` that gives `Nil` (#22, by @adeerkhan) | the fills' words the same on the GPU, the CPU threads, the JS lane and a NumPy twin; 6.0-7.6 ms a 256 x 3072 Gaussian fill on every lane; the products' bits unchanged |
+| v1.9.0 | `tensor-fork` 0.1.6.0: `softmax_ce` with the rows in blocks; `tensor-array` 0.1.19.0: three laws about Base's `Array` (#26), the dot product unrolled by four, `Mat.to_list` without a reverse; `tensor-gpu` 0.1.5.1 on it; the GPT-2 demo loads without a zero tree | the cross-entropy of 1,024 rows of 49,152 2.9x faster on 16 threads than tensor-array's one-thread loop (slower on small matrices); one band of `matvec_l` 25% faster on one thread; the GPT-2 weights load 29% faster; the bits unchanged |
 
 Versions are numbered as in [`docs/VERSIONING.md`](docs/VERSIONING.md); each release has its notes on GitHub.
 
@@ -127,8 +133,8 @@ Linux x86_64 (or WSL), clang ≥ 14, Python ≥ 3.12, `curl`, ~3 GB of disk, 8 G
 ```bash
 git clone https://github.com/nuxyel/bend-ml.git && cd bend-ml
 make setup          # Bend 2.0.39 (SHA256-checked), Lean 4.34.0, Python venv, data; no sudo
-make check          # 82 checks
-make check-full     # the same plus GPT-2 and MNIST
+make check          # 116 checks (107 without a CUDA toolkit)
+make check-full     # 127: the same plus GPT-2, MNIST, and tensor-fork and tensor-gpu on the JS lane
 make media          # regenerate the figures on this page (needs node, ffmpeg, Brave)
 ```
 
@@ -144,5 +150,6 @@ What this project found in Bend and reported:
 - [#1375](https://github.com/bendlang/bend/issues/1375): `IO.fork` does not spread pure work over cores. The guide now says so ([#1415](https://github.com/bendlang/bend/pull/1415)).
 - [#1376](https://github.com/bendlang/bend/issues/1376): a read-only borrow of an `Array` for a parallel let, without `@unsafe`. Open.
 - [#1573](https://github.com/bendlang/bend/issues/1573): a file read into an array instead of a list with one cell per byte. Open; `bend-ml-binary-read` is the library workaround until then.
+- [#1934](https://github.com/bendlang/bend/issues/1934): whether Base should state three laws about `Array.set` (it keeps `Array.size`, a read after a write sees it, a write leaves the other cells alone). Open; `tensor-array/main.bend` proves them meanwhile.
 
 <p align="center"><sub>MIT · the visual identity uses Bend's own colours, from bend-lang.com · the launch video (v1.0): <a href="https://github.com/nuxyel/bend-ml/releases/download/v1.0.0/bend-ml.mp4">bend-ml.mp4</a></sub></p>

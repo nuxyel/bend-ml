@@ -4,7 +4,7 @@
   "workspaces": {
     "": {
       "devDependencies": {
-        "bend-lint": "^0.1.0",
+        "bend-lint": "^0.2.2",
       },
     },
   },
@@ -12,6 +12,6 @@
     "bend-lint",
   ],
   "packages": {
-    "bend-lint": ["bend-lint@0.1.0", "", { "bin": { "bend-lint": "src/linter/seam.ts" } }, "sha512-nPjkcg+fLLu4B0lZCUjvnqlDNF2xQeQW9Gjivx79UOclWR2DuVLxJaN1IqNqlUog3el1zH/3BHox9vnQsdlYpg=="],
+    "bend-lint": ["bend-lint@0.2.2", "", { "bin": { "bend-lint": "src/linter/seam.ts" } }, "sha512-P5XCpZgxeYv6YA50o0W1Q4mBX3z1IGvbhLneQtMT0a4vurJmNfG4gGijV+H+Cc/TjGqCChL8qBcO8/DKF0FHoA=="],
   }
 }

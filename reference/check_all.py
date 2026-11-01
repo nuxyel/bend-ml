@@ -81,7 +81,7 @@ def main():
 
     # 1c. tensor-fork: the one package whose parallel blocks share arrays through Base's @unsafe Array.fork; its unsafe
     # defs are exactly the blocks, the fork tree and what reaches them, no package with laws imports it, and it gives tensor-array's bits
-    fork_defs = ["blocks1", "join2", "blocks2", "join3", "blocks3", "join4", "blocks4", "par1", "par2", "par3", "par4", "pk_par", "rpar", "cpar", "t8_tree", "t8_go", "gemm_fork", "gemm_rows", "gemm_any2", "gemm_any", "matmul", "matmul_acc", "matmul_nt", "matmul_nt_acc", "matmul_tn", "matmul_tn_acc", "mp_s3", "mp_s2", "mp_step", "mp_go", "mm_precise2", "matmul_precise"]
+    fork_defs = ["blocks1", "join2", "blocks2", "join3", "blocks3", "join4", "blocks4", "par1", "par2", "par3", "par4", "pk_par", "rpar", "cpar", "t8_tree", "t8_go", "gemm_fork", "gemm_rows", "gemm_any2", "gemm_any", "matmul", "matmul_acc", "matmul_nt", "matmul_nt_acc", "matmul_tn", "matmul_tn_acc", "mp_s3", "mp_s2", "mp_step", "mp_go", "mm_precise2", "matmul_precise", "ce_par3", "softmax_ce2", "softmax_ce"]
     run("tensor-fork/main.bend: its @unsafe defs are the fork tree and what reaches it", [BEND, "tensor-fork/main.bend"],
         lambda o, c: f"{len(fork_defs)} defs rely on unsafe or foreign code" in o and outside_proofs(o) == fork_defs)
     clean = not any("tensor-fork" in open(os.path.join(ROOT, f)).read() for f in laws)
@@ -102,6 +102,11 @@ def main():
         for t in ["1", "16"]:
             run(f"tensor-fork's matmul_precise gives tensor-array's bits: 21 products ({t} threads)", [tfp, "+RTS", "--threads", t, "-RTS"],
                 lambda o, c: o.strip() == "0 21")
+        tfc = os.path.join(d, "tfc")
+        run("compile tensor-fork/tests/ce.bend", [BEND, "tensor-fork/tests/ce.bend", "-o", tfc])
+        for t in ["1", "16"]:
+            run(f"tensor-fork's softmax_ce with the rows in blocks gives tensor-array's bits: 11 cases at par 0..6 ({t} threads)",
+                [tfc, "+RTS", "--threads", t, "-RTS"], lambda o, c: o.strip().strip('"').split() == ["0"] * 11 + ["77"])
     if FULL:
         run("tensor-fork/tests/bits.bend on the JS lane", [BEND, "tensor-fork/tests/bits.bend"],
             lambda o, c: re.findall(r"^[0-9 ]+$", o, re.M) == ["0 0 14832", "0 0 0 0 0 0", "0 0 0 0 0 0 0"])
@@ -170,6 +175,23 @@ def main():
         run(f"{f} must be a type error", [BEND, f], lambda o, c, m=msg: "SOME PROOFS FAIL" in o and m in o)
     run("tensor/tests/ok.bend compiles and runs", [BEND, "tensor/tests/ok.bend"], lambda o, c: "18 18 18 18" in o)
     run("tensor-array/tests/ok.bend compiles and runs", [BEND, "tensor-array/tests/ok.bend"], lambda o, c: o.strip() == "8n")
+    run("tensor-array/tests/array_laws.bend: the Array laws used, and the unbalanced tree's 9.0", [BEND, "tensor-array/tests/array_laws.bend"],
+        lambda o, c: c == 0 and o.strip() == "(1.5, 2.5, 9.0)")
+    run("tensor-array/tests/array_laws.bend --verdict", [BEND, "tensor-array/tests/array_laws.bend", "--verdict"], lambda o, c: o.strip().endswith("ALL PROOFS CHECK"))
+    # the same laws on perfect trees only, so the C lane runs them too (it fail-stops on array_laws.bend's unbalanced tree)
+    run("tensor-array/tests/array_laws_c.bend: the Array laws used on perfect trees", [BEND, "tensor-array/tests/array_laws_c.bend"],
+        lambda o, c: c == 0 and o.strip() == "(1.5, 2.5, 3.0, 9.0)")
+    run("tensor-array/tests/array_laws_c.bend --verdict", [BEND, "tensor-array/tests/array_laws_c.bend", "--verdict"], lambda o, c: o.strip().endswith("ALL PROOFS CHECK"))
+    with tempfile.TemporaryDirectory() as d:
+        alc = os.path.join(d, "alc")
+        run("compile tensor-array/tests/array_laws_c.bend", [BEND, "tensor-array/tests/array_laws_c.bend", "-o", alc])
+        run("tensor-array/tests/array_laws_c.bend on the C lane", [alc], lambda o, c: c == 0 and o.strip() == "(1.5, 2.5, 3.0, 9.0)")
+    run("tensor-array/tests/apart.bend: 21,590 pairs of distinct indices through depth 7, 0 failures", [BEND, "tensor-array/tests/apart.bend"],
+        lambda o, c: c == 0 and o.strip() == "apart_pairs: 21590\napart_failures: 0")
+    with tempfile.TemporaryDirectory() as d:
+        apart = os.path.join(d, "apart")
+        run("compile tensor-array/tests/apart.bend", [BEND, "tensor-array/tests/apart.bend", "-o", apart])
+        run("tensor-array/tests/apart.bend on the C lane", [apart], lambda o, c: c == 0 and o.strip() == "apart_pairs: 21590\napart_failures: 0")
     with tempfile.TemporaryDirectory() as d:
         roundtrip = os.path.join(d, "roundtrip")
         run("compile tensor-array/tests/roundtrip.bend", [BEND, "tensor-array/tests/roundtrip.bend", "-o", roundtrip])
@@ -187,6 +209,12 @@ def main():
         t8 = os.path.join(d, "t8")
         run("compile tensor-array/tests/t8.bend", [BEND, "tensor-array/tests/t8.bend", "-o", t8])
         run("the products in cells of 8 give the scalar loop's bits (tensor-array/tests/t8.bend)", [t8], lambda o, c: o.strip().strip('"') == "0 0 0 0 0 0 0 0")
+        dot4 = os.path.join(d, "dot4")
+        run("compile tensor-array/tests/dot4.bend", [BEND, "tensor-array/tests/dot4.bend", "-o", dot4])
+        run("the dot product unrolled by four gives dotr's bits (tensor-array/tests/dot4.bend)", [dot4], lambda o, c: o.strip().strip('"') == "0 0 0 0")
+        tolist = os.path.join(d, "tolist")
+        run("compile tensor-array/tests/tolist.bend", [BEND, "tensor-array/tests/tolist.bend", "-o", tolist])
+        run("Mat.to_list and Mat.read_row give the numbers in row order (tensor-array/tests/tolist.bend)", [tolist], lambda o, c: o.strip().strip('"') == "0 0 0 0 0 0 0 0")
         acc = os.path.join(d, "acc")
         run("compile tensor-array/tests/acc.bend", [BEND, "tensor-array/tests/acc.bend", "-o", acc])
         run("the accumulating products give the bits of Mat.add(C, A·B) (tensor-array/tests/acc.bend)", [acc], lambda o, c: o.strip().strip('"') == "0 0 0 0 0 0")
@@ -235,6 +263,10 @@ def main():
             run("GPT-2 tokenizer vs tiktoken", [PY, "reference/test_gpt2_tok.py", exe])
     else:
         print("skipped: GPT-2 tokenizer (run reference/gpt2_prep.py first)")
+    if os.path.isdir(os.path.join(ROOT, "demos/gpt2/data/w")):
+        run("GPT-2 demo's weights load bit for bit (pinned hash, 1 and 16 threads)", [PY, "reference/test_gpt2_load.py"])
+    else:
+        print("skipped: GPT-2 weight hash (run reference/gpt2_prep.py --split first)")
 
     # 5. full demos (--full)
     if FULL:

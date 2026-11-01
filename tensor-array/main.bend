@@ -1,6 +1,6 @@
 # bend-ml-tensor-array: tensors over a flat Array<F32>, with the shape in the type.
 #
-#   import bend-ml-tensor-array@0.1.18.0/main.bend as TA
+#   import bend-ml-tensor-array@0.1.19.0/main.bend as TA
 #
 # Mat<r, c> stores r*c numbers in an Array<F32>, row by row (index i*c + j). The
 # dimensions are erased type parameters: the same guarantee as bend-ml-tensor
@@ -39,8 +39,37 @@ def dotr(k: Nat, +ia: U32, +ib: U32, +sa: U32, +sb: U32, a0: F32, a1: F32, a2: F
     case 1n+p Tuple{a, +x} Tuple{b, +y}:
       dotr(p, (ia + sa : U32), (ib + sb : U32), sa, sb, a1, a2, a3, (a0 + (x * y : F32) : F32), Array.get(F32, a, (ia + sa : U32)), Array.get(F32, b, (ib + sb : U32)))
 
-def dotg(k: Nat, +ia: U32, +ib: U32, +sa: U32, +sb: U32, acc: F32, ra: Array<F32> & F32, rb: Array<F32> & F32) -> R:
-  dotr(k, ia, ib, sa, sb, acc, 0.0, 0.0, 0.0, ra, rb)
+# dotr's state between two steps: the four partial sums and the two pending reads
+type D4 is Type:
+  D4{a0: F32, a1: F32, a2: F32, a3: F32, ra: Array<F32> & F32, rb: Array<F32> & F32}
+
+# one step of dotr: adds the pending product to a0, rotates the sums, reads the next pair at ia, ib
+def dstep(+ia: U32, +ib: U32, s: D4) -> D4:
+  match s:
+    case D4{a0, a1, a2, a3, ra, rb}:
+      match ra rb:
+        case Tuple{a, +x} Tuple{b, +y}:
+          D4{a1, a2, a3, (a0 + (x * y : F32) : F32), Array.get(F32, a, ia), Array.get(F32, b, ib)}
+
+def dfin(k: Nat, +ia: U32, +ib: U32, +sa: U32, +sb: U32, s: D4) -> R:
+  match s:
+    case D4{a0, a1, a2, a3, ra, rb}:
+      dotr(k, ia, ib, sa, sb, a0, a1, a2, a3, ra, rb)
+
+# dotr with its loop unrolled by four: q rounds of four dstep, then the last rem (< 4) steps by dotr itself.
+# Every product goes to the same sum in the same order as in dotr (four rotations bring the names back), so the
+# result has dotr's bits (tests/dot4.bend). The compiled loop runs ~16% fewer instructions; one thread on a
+# 50,257 x 768 matrix · vector goes from 26.7 to 20.0 ms, smaller ones and 16 threads stay within noise (NOTES.md,
+# 2026-11-01). Eight steps a round were no faster.
+def dot4(q: Nat, +rem: Nat, +ia: U32, +ib: U32, +sa: U32, +sb: U32, s: D4) -> R:
+  match q:
+    case 0n:
+      dfin(rem, ia, ib, sa, sb, s)
+    case 1n+p:
+      dot4(p, rem, (ia + (4 * sa : U32) : U32), (ib + (4 * sb : U32) : U32), sa, sb, dstep((ia + (4 * sa : U32) : U32), (ib + (4 * sb : U32) : U32), dstep((ia + (3 * sa : U32) : U32), (ib + (3 * sb : U32) : U32), dstep((ia + (2 * sa : U32) : U32), (ib + (2 * sb : U32) : U32), dstep((ia + sa : U32), (ib + sb : U32), s)))))
+
+def dotg(+k: Nat, +ia: U32, +ib: U32, +sa: U32, +sb: U32, acc: F32, ra: Array<F32> & F32, rb: Array<F32> & F32) -> R:
+  dot4(Nat.div(k, 4n), Nat.sub(k, Nat.mul(4n, Nat.div(k, 4n))), ia, ib, sa, sb, D4{acc, 0.0, 0.0, 0.0, ra, rb})
 
 # writes one cell of C: c[idx] = x, or c[idx] = c[idx] + x when ac (an accumulating product, 0.1.10.0). x is computed
 # exactly as without ac and added once, so C + A·B has the bits of adding a separately computed A·B to C.
@@ -208,14 +237,16 @@ type P2 is Type:
 type AL is Type:
   AL{c: Array<F32>, l: List<&2, F32>}
 
-# list of m elements starting at idx (reads with Array.get, returning the array)
+# list of mleft + 1 elements ending at idx (reads with Array.get, returning the array). It reads from
+# idx down and conses each number onto acc, so the list comes out in index order with no reverse
+# (NOTES.md, 2026-11-01): callers pass the last index and its read.
 
 def read_l(mleft: Nat, +idx: U32, acc: List<&2, F32>, rc: Array<F32> & F32) -> AL:
   match mleft rc:
     case 0n Tuple{c, +v}:
-      AL{c, List.reverse(&2, F32, v <> acc)}
+      AL{c, v <> acc}
     case 1n+p Tuple{c, +v}:
-      read_l(p, (idx + 1 : U32), v <> acc, Array.get(F32, c, (idx + 1 : U32)))
+      read_l(p, (idx - 1 : U32), v <> acc, Array.get(F32, c, (idx - 1 : U32)))
 
 # writes the list starting at idx
 
@@ -365,7 +396,7 @@ def ce_rows(labels: List<&2, Nat>, +mm1: Nat, +mu: U32, +nf: F32, +i: U32, r: L2
     case Nil{} L2{loss, c}:
       L2{loss, c}
     case Con{+y, t} L2{loss, c}:
-      ce_rows(t, mm1, mu, nf, (i + 1 : U32), ce_row(read_l(mm1, (i * mu : U32), Nil{}, Array.get(F32, c, (i * mu : U32))), y, nf, (i * mu : U32), loss))
+      ce_rows(t, mm1, mu, nf, (i + 1 : U32), ce_row(read_l(mm1, ((i * mu : U32) + U32.from_nat(mm1) : U32), Nil{}, Array.get(F32, c, ((i * mu : U32) + U32.from_nat(mm1) : U32))), y, nf, (i * mu : U32), loss))
 
 # ---- the same rows over the array itself: no lists ----
 # The list version above reads each row into a list and walks it five times. This one walks the row in place with tail
@@ -490,7 +521,7 @@ def count_rows(labels: List<&2, Nat>, +mm1: Nat, +mu: U32, +i: U32, r: CR) -> CR
     case Nil{} CR{c, n}:
       CR{c, n}
     case Con{+y, t} CR{c, n}:
-      count_rows(t, mm1, mu, (i + 1 : U32), count_rows3(y, n, read_l(mm1, (i * mu : U32), Nil{}, Array.get(F32, c, (i * mu : U32)))))
+      count_rows(t, mm1, mu, (i + 1 : U32), count_rows3(y, n, read_l(mm1, ((i * mu : U32) + U32.from_nat(mm1) : U32), Nil{}, Array.get(F32, c, ((i * mu : U32) + U32.from_nat(mm1) : U32)))))
 
 
 # =====================================================================
@@ -528,6 +559,7 @@ def pow2(d: Nat) -> Nat:
     case 0n:
       1n
     case 1n++q:
+      # bend-lint: disable-next bend-lint-rules/performance/repeated_call -- pow2 appears only in proofs' types not-expected-because: the package never runs it (NOTES 2026-10-17)
       Nat.add(pow2(q), pow2(q))
 
 # smallest power of two >= n, by structural recursion on n: returns (depth, 2^depth)
@@ -774,12 +806,12 @@ def ML.len(-r: Nat, -c: Nat, ml: ML<r, c>) -> Nat:
       List.length(&2, F32, l)
 
 # n numbers from index 0, in row order; n = 0 gives the empty list (a Mat with no numbers)
-def Mat.to_list_count(-r: Nat, -c: Nat, d: Array<F32>, n: Nat) -> ML<r, c>:
+def Mat.to_list_count(-r: Nat, -c: Nat, d: Array<F32>, +n: Nat) -> ML<r, c>:
   match n:
     case 0n:
       ML{Mat{d}, Nil{}}
     case 1n+p:
-      Mat.to_list2(r, c, read_l(p, 0, Nil{}, Array.get(F32, d, 0)))
+      Mat.to_list2(r, c, read_l(p, (U32.from_nat(n) - 1 : U32), Nil{}, Array.get(F32, d, (U32.from_nat(n) - 1 : U32))))
 
 # two independent copies
 
@@ -1293,7 +1325,7 @@ def add_row2(-n: Nat, -m: Nat, +nn: Nat, +mm: Nat, cd: Array<F32>, al: AL) -> MB
 def Mat.add_row(+n: Nat, +m: Nat, c: Mat<n, m>, b: Mat<1n, m>) -> MBias<n, m>:
   match c b:
     case Mat{cd} Mat{bd}:
-      add_row2(n, m, n, m, cd, read_l(Nat.sub(m, 1n), 0, Nil{}, Array.get(F32, bd, 0)))
+      add_row2(n, m, n, m, cd, read_l(Nat.sub(m, 1n), U32.from_nat(Nat.sub(m, 1n)), Nil{}, Array.get(F32, bd, U32.from_nat(Nat.sub(m, 1n)))))
 
 # pair of matrices of the same shape (the result of an operation that reads two operands)
 
@@ -1401,7 +1433,7 @@ def row_fin(-r: Nat, -c: Nat, al: AL) -> MRow<r, c>:
 def Mat.read_row(+r: Nat, +c: Nat, m: Mat<r, c>, +i: U32) -> MRow<r, c>:
   match m:
     case Mat{d}:
-      row_fin(r, c, read_l(Nat.sub(c, 1n), (i * U32.from_nat(c) : U32), Nil{}, Array.get(F32, d, (i * U32.from_nat(c) : U32))))
+      row_fin(r, c, read_l(Nat.sub(c, 1n), ((i * U32.from_nat(c) : U32) + U32.from_nat(Nat.sub(c, 1n)) : U32), Nil{}, Array.get(F32, d, ((i * U32.from_nat(c) : U32) + U32.from_nat(Nat.sub(c, 1n)) : U32))))
 
 def Mat.write_row(-r: Nat, +c: Nat, m: Mat<r, c>, +i: U32, xs: List<&2, F32>) -> Mat<r, c>:
   match m:
@@ -1549,6 +1581,7 @@ def Bands.zeros(+d: Nat, +r: Nat, +c: Nat) -> Bands<r, c>:
     case 0n:
       BLeaf{Mat.zeros(r, c)}
     case 1n+q:
+      # bend-lint: disable-next bend-lint-rules/performance/missed_fork -- bands are built once at load not-expected-because: forking them measured as no change (NOTES 2026-10-16)
       BNode{Bands.zeros(q, half(r), c), Bands.zeros(q, Nat.sub(r, half(r)), c)}
 
 # the row counts of the two bands follow the row count of the node: if rr == r at run
@@ -1594,6 +1627,7 @@ def bfill(+c: Nat, -r: Nat, b: Bands<r, c>, l: Bool, rt: Bool, +rr: Nat, -e: {rr
     case BNode{x, y} False{} True{}:
       BNode{x, bfill(c, Nat.sub(r, half(r)), y, bfill_l(Nat.sub(rr, half(rr)), c, Nat.sub(i, Nat.mul(half(rr), c)), n), bfill_r(Nat.sub(rr, half(rr)), c, Nat.sub(i, Nat.mul(half(rr), c))), Nat.sub(rr, half(rr)), eq_rest(rr, r, e), Nat.sub(i, Nat.mul(half(rr), c)), n, xs)}
     case BNode{x, y} False{} False{}:
+      # bend-lint: disable-next bend-lint-rules/performance/missed_fork -- bands are built once at load not-expected-because: forking them measured as no change (NOTES 2026-10-16)
       BNode{bfill(c, half(r), x, bfill_l(half(rr), c, i, Nat.sub(Nat.mul(half(rr), c), i)), bfill_r(half(rr), c, i), half(rr), eq_half(rr, r, e), i, Nat.sub(Nat.mul(half(rr), c), i), xs), bfill(c, Nat.sub(r, half(r)), y, bfill_l(Nat.sub(rr, half(rr)), c, 0n, Nat.sub(n, Nat.sub(Nat.mul(half(rr), c), i))), bfill_r(Nat.sub(rr, half(rr)), c, 0n), Nat.sub(rr, half(rr)), eq_rest(rr, r, e), 0n, Nat.sub(n, Nat.sub(Nat.mul(half(rr), c), i)), List.drop(&2, F32, xs, Nat.sub(Nat.mul(half(rr), c), i)))}
 
 def bfill_top(ok: Bool, +r: Nat, +c: Nat, b: Bands<r, c>, +i: Nat, +n: Nat, +xs: List<&2, F32>) -> Bands<r, c>:
@@ -1627,7 +1661,7 @@ def bv_g2(-r: Nat, -c: Nat, w: Array<F32>, al: AL) -> BL<r, c>:
 def bv_g(-r: Nat, -c: Nat, +m: Nat, g: G) -> BL<r, c>:
   match g:
     case G{a, b, y}:
-      bv_g2(r, c, b, read_l(m, 0, Nil{}, Array.get(F32, y, 0)))
+      bv_g2(r, c, b, read_l(m, U32.from_nat(m), Nil{}, Array.get(F32, y, U32.from_nat(m))))
 
 # the rows of one band, one dot product each, with the gemm of Mat.matmul_nt (n = 1), so the
 # results are identical. Writing the results into an Array and reading them back is faster than
@@ -1689,12 +1723,12 @@ def brow_fin(-r: Nat, -c: Nat, al: AL) -> BRow<r, c>:
       BRow{BLeaf{Mat{d}}, l}
 
 # n numbers starting at flat index i of one band (a band may have no rows)
-def brow_leaf2(-r: Nat, -c: Nat, n: Nat, +i: U32, d: Array<F32>) -> BRow<r, c>:
+def brow_leaf2(-r: Nat, -c: Nat, +n: Nat, +i: U32, d: Array<F32>) -> BRow<r, c>:
   match n:
     case 0n:
       BRow{BLeaf{Mat{d}}, Nil{}}
     case 1n+p:
-      brow_fin(r, c, read_l(p, i, Nil{}, Array.get(F32, d, i)))
+      brow_fin(r, c, read_l(p, ((i + U32.from_nat(n) : U32) - 1 : U32), Nil{}, Array.get(F32, d, ((i + U32.from_nat(n) : U32) - 1 : U32))))
 
 def brow_leaf(-r: Nat, -c: Nat, m: Mat<r, c>, +i: U32, n: Nat) -> BRow<r, c>:
   match m:
@@ -1735,6 +1769,7 @@ def blist(+c: Nat, -r: Nat, b: Bands<r, c>, +rr: Nat, -e: {rr == r : Nat}) -> BR
     case BLeaf{m}:
       brow_leaf(r, c, m, 0, Nat.mul(rr, c))
     case BNode{x, y}:
+      # bend-lint: disable-next bend-lint-rules/performance/missed_fork -- bands are built once at load not-expected-because: forking them measured as no change (NOTES 2026-10-16)
       bl_join(r, c, blist(c, half(r), x, half(rr), eq_half(rr, r, e)), blist(c, Nat.sub(r, half(r)), y, Nat.sub(rr, half(rr)), eq_rest(rr, r, e)))
 
 # all r*c numbers in row order (in BRow.row)
@@ -1766,14 +1801,6 @@ def zero_out(-s: Nat, +n: Nat, e: {s == Nat.add(n, 0n) : Nat}) -> {s == n : Nat}
   %add_zero_r(n) : {s == _ : Nat}
   e
 
-# reversing onto acc adds the lengths
-def rev_len(+xs: List<&2, F32>, +acc: List<&2, F32>) -> {List.length(&2, F32, List.reverse.go(&2, F32, xs, acc)) == Nat.add(List.length(&2, F32, xs), List.length(&2, F32, acc)) : Nat}:
-  match xs:
-    case Nil{}:
-      {==}
-    case Con{h, t}:
-      succ_out(List.length(&2, F32, List.reverse.go(&2, F32, t, h <> acc)), List.length(&2, F32, t), List.length(&2, F32, acc), rev_len(t, h <> acc))
-
 # appending adds the lengths
 def app_len(+xs: List<&2, F32>, +ys: List<&2, F32>) -> {List.length(&2, F32, List.append(&2, F32, xs, ys)) == Nat.add(List.length(&2, F32, xs), List.length(&2, F32, ys)) : Nat}:
   match xs:
@@ -1787,13 +1814,13 @@ def app_len(+xs: List<&2, F32>, +ys: List<&2, F32>) -> {List.length(&2, F32, Lis
 def read_ml_len(-r: Nat, -c: Nat, +mleft: Nat, +idx: U32, +acc: List<&2, F32>, rc: Array<F32> & F32) -> {ML.len(r, c, Mat.to_list2(r, c, read_l(mleft, idx, acc, rc))) == Nat.add(1n+mleft, List.length(&2, F32, acc)) : Nat}:
   match mleft rc:
     case 0n Tuple{d, +v}:
-      zero_out(ML.len(r, c, Mat.to_list2(r, c, read_l(0n, idx, acc, Tuple{d, v}))), 1n+List.length(&2, F32, acc), rev_len(v <> acc, Nil{}))
+      {==}
     case 1n+p Tuple{d, +v}:
-      len_step(ML.len(r, c, Mat.to_list2(r, c, read_l(p, (idx + 1 : U32), v <> acc, Array.get(F32, d, (idx + 1 : U32))))), p, List.length(&2, F32, acc), read_ml_len(r, c, p, (idx + 1 : U32), v <> acc, Array.get(F32, d, (idx + 1 : U32))))
+      len_step(ML.len(r, c, Mat.to_list2(r, c, read_l(p, (idx - 1 : U32), v <> acc, Array.get(F32, d, (idx - 1 : U32))))), p, List.length(&2, F32, acc), read_ml_len(r, c, p, (idx - 1 : U32), v <> acc, Array.get(F32, d, (idx - 1 : U32))))
 
-# a leaf's list: read_l reads mleft + 1 numbers onto acc and reverses them. By induction on
-# mleft: with 0 left it reads one number (rev_len counts the reversed list); with 1 + p left it
-# reads one and recurses, and len_step moves the 1 out of the sum.
+# a leaf's list: read_l reads mleft + 1 numbers onto acc. By induction on mleft: with 0 left it
+# reads one number onto acc (1 + the length of acc, by the definitions); with 1 + p left it reads
+# one and recurses, and len_step moves the 1 out of the sum.
 law leaf_len:
   for -r: Nat
   for -c: Nat
@@ -1807,16 +1834,16 @@ law leaf_len:
 def leaf_len(r, c, w, mleft, idx, acc, rc):
   match mleft rc:
     case 0n Tuple{d, +v}:
-      zero_out(List.length(&2, F32, List.reverse.go(&2, F32, v <> acc, Nil{})), 1n+List.length(&2, F32, acc), rev_len(v <> acc, Nil{}))
+      {==}
     case 1n+p Tuple{d, +v}:
-      len_step(bl_len(r, c, bv_g2(r, c, w, read_l(p, (idx + 1 : U32), v <> acc, Array.get(F32, d, (idx + 1 : U32))))), p, List.length(&2, F32, acc), leaf_len(r, c, w, p, (idx + 1 : U32), v <> acc, Array.get(F32, d, (idx + 1 : U32))))
+      len_step(bl_len(r, c, bv_g2(r, c, w, read_l(p, (idx - 1 : U32), v <> acc, Array.get(F32, d, (idx - 1 : U32))))), p, List.length(&2, F32, acc), leaf_len(r, c, w, p, (idx - 1 : U32), v <> acc, Array.get(F32, d, (idx - 1 : U32))))
 
 # whatever the gemm wrote, reading 1 + p rows back gives 1 + p numbers (G has one constructor, so
 # matching g opens it, and leaf_len counts the list)
 def g_len(-r: Nat, -c: Nat, +p: Nat, g: G) -> {bl_len(r, c, bv_g(r, c, p, g)) == 1n+p : Nat}:
   match g:
     case G{a, b, y}:
-      zero_out(bl_len(r, c, bv_g2(r, c, b, read_l(p, 0, Nil{}, Array.get(F32, y, 0)))), 1n+p, leaf_len(r, c, b, p, 0, Nil{}, Array.get(F32, y, 0)))
+      zero_out(bl_len(r, c, bv_g2(r, c, b, read_l(p, U32.from_nat(p), Nil{}, Array.get(F32, y, U32.from_nat(p))))), 1n+p, leaf_len(r, c, b, p, U32.from_nat(p), Nil{}, Array.get(F32, y, U32.from_nat(p))))
 
 # LAW (band_len): the product of one band with `rows` rows gives exactly `rows` numbers.
 # 0 rows give the empty list; 1 + p rows go through the gemm, and g_len counts what is read back.
@@ -1852,7 +1879,7 @@ def to_list_count_len(-r: Nat, -c: Nat, d: Array<F32>, +n: Nat) -> {ML.len(r, c,
     case 0n:
       {==}
     case 1n+p:
-      zero_out(ML.len(r, c, Mat.to_list_count(r, c, d, 1n+p)), 1n+p, read_ml_len(r, c, p, 0, Nil{}, Array.get(F32, d, 0)))
+      zero_out(ML.len(r, c, Mat.to_list_count(r, c, d, 1n+p)), 1n+p, read_ml_len(r, c, p, (U32.from_nat(1n+p) - 1 : U32), Nil{}, Array.get(F32, d, (U32.from_nat(1n+p) - 1 : U32))))
 
 # LAW (to_list_len): Mat.to_list reads exactly r*c numbers, no more and no fewer.
 law to_list_len:
@@ -1865,3 +1892,449 @@ def to_list_len(r, c, m):
   match m:
     case Mat{d}:
       to_list_count_len(r, c, d, Nat.mul(r, c))
+
+# ---------------------------------------------------------------------
+# Base's Array: three laws about Array.set and Array.get
+# ---------------------------------------------------------------------
+#
+# - size_set: Array.set keeps Array.size;
+# - get_after_set: what Array.set writes at i, Array.get reads back at i;
+# - get_other_set: a write at i leaves alone the cell that a read at k reaches, when the two descents part.
+# They are about Base's Array, for any element type, and live here until Base states them
+# (bendlang/bend#1934; nuxyel/bend-ml#26). The helpers are named ASet.*.
+#
+# The first two hold for every i (the two descents wrap i the same way) and for every tree Base can build,
+# balanced or not, since a write replaces one leaf and leaves the tree's shape alone. "The size" is the
+# second component of the pair Array.size returns, read with Base's Pair.snd (ASet.sz); the value is
+# Pair.snd of the pair Array.get returns.
+#
+# The third law's hypothesis says that the descent Array.set makes for i and the descent Array.get makes
+# for k take different branches at some node before either reaches a leaf (ASet.Apart). It is not "i and
+# k differ after the mask", because that is false on an unbalanced tree: Array.size follows the leftmost
+# path, so in ANode{ANode{ALeaf, ALeaf}, ALeaf} (size 4) the indices 2 and 3 differ but both reach the
+# last leaf, and a write at 2 changes what a read at 3 returns (tests/array_laws.bend prints it: 9.0). On a
+# perfect tree of 2^d leaves, which Array.new and literals build, the descents part exactly when the masked
+# indices differ; that equivalence is not proved here, since it needs lemmas about U32 bits. For a concrete
+# tree ASet.Apart computes to Unit, so Unit{} proves it (tests/array_laws.bend).
+#
+# Why the proofs are shaped this way: an Array is affine, and so is it inside a proof, so a proof may use a
+# given array once. The obvious lemmas each need the same subtree again (one to say Array.size of it is
+# (it, its size), one for the induction step, one to open the pair the descent returns), so they cannot
+# be combined. Instead, one pass over the tree (ASet.facts) proves all six facts the step needs at once;
+# each fact is an equation, and equations can be reused (+). A second pass (ASet.copy) hands back the same
+# array and its size as a plain value, which the top-level proof needs to pick the first branch. The third
+# law uses one pass too (ASet.both): it proves the six facts and four more about the read along k, and on
+# the half the write does not enter it runs a smaller pass (ASet.side).
+#
+# The trailing Unit in ASet.Facts, ASet.Copy, ASet.Side and ASet.Reads works around bendlang/bend#1077: a +
+# binder on the last field of a nested pair fails to check, so no fact sits in the last field.
+
+
+# ASet.sz(T, a): the size of a as a plain U32, the second component of the pair Array.size returns
+def ASet.sz(-T: Data, a: Array<T>) -> U32:
+  Pair.snd(Array<T>, U32, Array.size(T, a))
+
+# the three results the descents build: the swapped pair, the written array, and the read pair
+def ASet.G(-T: Data, a: Array<T>, +n: U32, +j: U32, +v: T, +z: Bool) -> Array<T> & T:
+  Array.swap.go(T, a, n, j, v, z)
+
+def ASet.NA(-T: Data, a: Array<T>, +n: U32, +j: U32, +v: T, +z: Bool) -> Array<T>:
+  Array.set.fin(T, ASet.G(T, a, n, j, v, z))
+
+def ASet.K(-T: Data, a: Array<T>, +n: U32, +j: U32, +v: T, +z: Bool) -> Array<T> & T:
+  Array.get.go(T, ASet.NA(T, a, n, j, v, z), n, j, z)
+
+# ASet.Facts: what one pass over the tree a proves, for any n, j, v, z (n need not be a's real size):
+# 1. Array.size(a) is the pair (a, ASet.sz(a));
+# 2. the pair the write's descent returns is (the written array, the old value);
+# 3. Array.size of the written array is the pair (written array, its sz);
+# 4. the written array has a's sz;
+# 5. reading the written array along the same path gives v;
+# 6. the pair the read returns is (its first component, its second).
+def ASet.Facts(-T: Data, -a: Array<T>, -n: U32, -j: U32, -v: T, -z: Bool) -> Type:
+  {(a, ASet.sz(T, a)) == Array.size(T, a) : Array<T> & U32} & {(ASet.NA(T, a, n, j, v, z), Pair.snd(Array<T>, T, ASet.G(T, a, n, j, v, z))) == ASet.G(T, a, n, j, v, z) : Array<T> & T} & {(ASet.NA(T, a, n, j, v, z), ASet.sz(T, ASet.NA(T, a, n, j, v, z))) == Array.size(T, ASet.NA(T, a, n, j, v, z)) : Array<T> & U32} & {ASet.sz(T, ASet.NA(T, a, n, j, v, z)) == ASet.sz(T, a) : U32} & {Pair.snd(Array<T>, T, ASet.K(T, a, n, j, v, z)) == v : T} & {(Pair.fst(Array<T>, T, ASet.K(T, a, n, j, v, z)), Pair.snd(Array<T>, T, ASet.K(T, a, n, j, v, z))) == ASet.K(T, a, n, j, v, z) : Array<T> & T} & Unit
+
+# Array.size hands back the array it measured, next to ASet.sz(T, a)
+def ASet.size_pair(-T: Data, a: Array<T>) -> {(a, ASet.sz(T, a)) == Array.size(T, a) : Array<T> & U32}:
+  match a:
+    case ALeaf{x}:
+      {==}
+    case ANode{xs, ys}:
+      %ASet.size_pair(T, xs) : {(ANode{xs, ys}, Pair.snd(Array<T>, U32, Array.size.node(T, ys, _))) == Array.size.node(T, ys, _) : Array<T> & U32}
+      {==}
+
+def ASet.node_t(-T: Data, -xs: Array<T>, -ys: Array<T>, +n: U32, +j: U32, +v: T, f: ASet.Facts(T, xs, U32.shr(n), j, v, U32.is_lt(j, U32.shr(U32.shr(n))))) -> ASet.Facts(T, ANode{xs, ys}, n, j, v, True{}):
+  match f:
+    case Tuple{+c1, r1}:
+      match r1:
+        case Tuple{+c2, r2}:
+          match r2:
+            case Tuple{+c3, r3}:
+              match r3:
+                case Tuple{+c4, r4}:
+                  match r4:
+                    case Tuple{+c5, r5}:
+                      match r5:
+                        case Tuple{+c6, u}:
+                          ({(%c1 : {(ANode{xs, ys}, Pair.snd(Array<T>, U32, Array.size.node(T, ys, _))) == Array.size.node(T, ys, _) : Array<T> & U32}; {==}) : {(ANode{xs, ys}, ASet.sz(T, ANode{xs, ys})) == Array.size(T, ANode{xs, ys}) : Array<T> & U32}}, {(%c2 : {(Array.set.fin(T, Array.swap.lo(T, ys, _)), Pair.snd(Array<T>, T, Array.swap.lo(T, ys, _))) == Array.swap.lo(T, ys, _) : Array<T> & T}; {==}) : {(ASet.NA(T, ANode{xs, ys}, n, j, v, True{}), Pair.snd(Array<T>, T, ASet.G(T, ANode{xs, ys}, n, j, v, True{}))) == ASet.G(T, ANode{xs, ys}, n, j, v, True{}) : Array<T> & T}}, {(%c2 : {(Array.set.fin(T, Array.swap.lo(T, ys, _)), ASet.sz(T, Array.set.fin(T, Array.swap.lo(T, ys, _)))) == Array.size(T, Array.set.fin(T, Array.swap.lo(T, ys, _))) : Array<T> & U32}; %c3 : {(ANode{Array.set.fin(T, ASet.G(T, xs, U32.shr(n), j, v, U32.is_lt(j, U32.shr(U32.shr(n))))), ys}, Pair.snd(Array<T>, U32, Array.size.node(T, ys, _))) == Array.size.node(T, ys, _) : Array<T> & U32}; {==}) : {(ASet.NA(T, ANode{xs, ys}, n, j, v, True{}), ASet.sz(T, ASet.NA(T, ANode{xs, ys}, n, j, v, True{}))) == Array.size(T, ASet.NA(T, ANode{xs, ys}, n, j, v, True{})) : Array<T> & U32}}, {(%c2 : {ASet.sz(T, Array.set.fin(T, Array.swap.lo(T, ys, _))) == ASet.sz(T, ANode{xs, ys}) : U32}; %c3 : {Pair.snd(Array<T>, U32, Array.size.node(T, ys, _)) == ASet.sz(T, ANode{xs, ys}) : U32}; %c1 : {U32.shl(ASet.sz(T, Array.set.fin(T, ASet.G(T, xs, U32.shr(n), j, v, U32.is_lt(j, U32.shr(U32.shr(n))))))) == Pair.snd(Array<T>, U32, Array.size.node(T, ys, _)) : U32}; %c4 : {U32.shl(ASet.sz(T, Array.set.fin(T, ASet.G(T, xs, U32.shr(n), j, v, U32.is_lt(j, U32.shr(U32.shr(n))))))) == U32.shl(_) : U32}; {==}) : {ASet.sz(T, ASet.NA(T, ANode{xs, ys}, n, j, v, True{})) == ASet.sz(T, ANode{xs, ys}) : U32}}, {(%c2 : {Pair.snd(Array<T>, T, Array.get.go(T, Array.set.fin(T, Array.swap.lo(T, ys, _)), n, j, True{})) == v : T}; %c6 : {Pair.snd(Array<T>, T, Array.swap.lo(T, ys, _)) == v : T}; c5) : {Pair.snd(Array<T>, T, ASet.K(T, ANode{xs, ys}, n, j, v, True{})) == v : T}}, {(%c2 : {(Pair.fst(Array<T>, T, Array.get.go(T, Array.set.fin(T, Array.swap.lo(T, ys, _)), n, j, True{})), Pair.snd(Array<T>, T, Array.get.go(T, Array.set.fin(T, Array.swap.lo(T, ys, _)), n, j, True{}))) == Array.get.go(T, Array.set.fin(T, Array.swap.lo(T, ys, _)), n, j, True{}) : Array<T> & T}; %c6 : {(Pair.fst(Array<T>, T, Array.swap.lo(T, ys, _)), Pair.snd(Array<T>, T, Array.swap.lo(T, ys, _))) == Array.swap.lo(T, ys, _) : Array<T> & T}; {==}) : {(Pair.fst(Array<T>, T, ASet.K(T, ANode{xs, ys}, n, j, v, True{})), Pair.snd(Array<T>, T, ASet.K(T, ANode{xs, ys}, n, j, v, True{}))) == ASet.K(T, ANode{xs, ys}, n, j, v, True{}) : Array<T> & T}}, Unit{})
+
+def ASet.node_f(-T: Data, -xs: Array<T>, -ys: Array<T>, +n: U32, +j: U32, +v: T, +s: {(xs, ASet.sz(T, xs)) == Array.size(T, xs) : Array<T> & U32}, f: ASet.Facts(T, ys, U32.shr(n), U32.sub(j, U32.shr(n)), v, U32.is_lt(U32.sub(j, U32.shr(n)), U32.shr(U32.shr(n))))) -> ASet.Facts(T, ANode{xs, ys}, n, j, v, False{}):
+  match f:
+    case Tuple{+c1, r1}:
+      match r1:
+        case Tuple{+c2, r2}:
+          match r2:
+            case Tuple{+c3, r3}:
+              match r3:
+                case Tuple{+c4, r4}:
+                  match r4:
+                    case Tuple{+c5, r5}:
+                      match r5:
+                        case Tuple{+c6, u}:
+                          ({(%s : {(ANode{xs, ys}, Pair.snd(Array<T>, U32, Array.size.node(T, ys, _))) == Array.size.node(T, ys, _) : Array<T> & U32}; {==}) : {(ANode{xs, ys}, ASet.sz(T, ANode{xs, ys})) == Array.size(T, ANode{xs, ys}) : Array<T> & U32}}, {(%c2 : {(Array.set.fin(T, Array.swap.hi(T, xs, _)), Pair.snd(Array<T>, T, Array.swap.hi(T, xs, _))) == Array.swap.hi(T, xs, _) : Array<T> & T}; {==}) : {(ASet.NA(T, ANode{xs, ys}, n, j, v, False{}), Pair.snd(Array<T>, T, ASet.G(T, ANode{xs, ys}, n, j, v, False{}))) == ASet.G(T, ANode{xs, ys}, n, j, v, False{}) : Array<T> & T}}, {(%c2 : {(Array.set.fin(T, Array.swap.hi(T, xs, _)), ASet.sz(T, Array.set.fin(T, Array.swap.hi(T, xs, _)))) == Array.size(T, Array.set.fin(T, Array.swap.hi(T, xs, _))) : Array<T> & U32}; %s : {(ANode{xs, Array.set.fin(T, ASet.G(T, ys, U32.shr(n), U32.sub(j, U32.shr(n)), v, U32.is_lt(U32.sub(j, U32.shr(n)), U32.shr(U32.shr(n)))))}, Pair.snd(Array<T>, U32, Array.size.node(T, Array.set.fin(T, ASet.G(T, ys, U32.shr(n), U32.sub(j, U32.shr(n)), v, U32.is_lt(U32.sub(j, U32.shr(n)), U32.shr(U32.shr(n))))), _))) == Array.size.node(T, Array.set.fin(T, ASet.G(T, ys, U32.shr(n), U32.sub(j, U32.shr(n)), v, U32.is_lt(U32.sub(j, U32.shr(n)), U32.shr(U32.shr(n))))), _) : Array<T> & U32}; {==}) : {(ASet.NA(T, ANode{xs, ys}, n, j, v, False{}), ASet.sz(T, ASet.NA(T, ANode{xs, ys}, n, j, v, False{}))) == Array.size(T, ASet.NA(T, ANode{xs, ys}, n, j, v, False{})) : Array<T> & U32}}, {(%c2 : {ASet.sz(T, Array.set.fin(T, Array.swap.hi(T, xs, _))) == ASet.sz(T, ANode{xs, ys}) : U32}; %s : {Pair.snd(Array<T>, U32, Array.size.node(T, Array.set.fin(T, ASet.G(T, ys, U32.shr(n), U32.sub(j, U32.shr(n)), v, U32.is_lt(U32.sub(j, U32.shr(n)), U32.shr(U32.shr(n))))), _)) == Pair.snd(Array<T>, U32, Array.size.node(T, ys, _)) : U32}; {==}) : {ASet.sz(T, ASet.NA(T, ANode{xs, ys}, n, j, v, False{})) == ASet.sz(T, ANode{xs, ys}) : U32}}, {(%c2 : {Pair.snd(Array<T>, T, Array.get.go(T, Array.set.fin(T, Array.swap.hi(T, xs, _)), n, j, False{})) == v : T}; %c6 : {Pair.snd(Array<T>, T, Array.swap.hi(T, xs, _)) == v : T}; c5) : {Pair.snd(Array<T>, T, ASet.K(T, ANode{xs, ys}, n, j, v, False{})) == v : T}}, {(%c2 : {(Pair.fst(Array<T>, T, Array.get.go(T, Array.set.fin(T, Array.swap.hi(T, xs, _)), n, j, False{})), Pair.snd(Array<T>, T, Array.get.go(T, Array.set.fin(T, Array.swap.hi(T, xs, _)), n, j, False{}))) == Array.get.go(T, Array.set.fin(T, Array.swap.hi(T, xs, _)), n, j, False{}) : Array<T> & T}; %c6 : {(Pair.fst(Array<T>, T, Array.swap.hi(T, xs, _)), Pair.snd(Array<T>, T, Array.swap.hi(T, xs, _))) == Array.swap.hi(T, xs, _) : Array<T> & T}; {==}) : {(Pair.fst(Array<T>, T, ASet.K(T, ANode{xs, ys}, n, j, v, False{})), Pair.snd(Array<T>, T, ASet.K(T, ANode{xs, ys}, n, j, v, False{}))) == ASet.K(T, ANode{xs, ys}, n, j, v, False{}) : Array<T> & T}}, Unit{})
+
+def ASet.facts(-T: Data, a: Array<T>, +n: U32, +j: U32, +v: T, +z: Bool) -> ASet.Facts(T, a, n, j, v, z):
+  match a z:
+    case ALeaf{x} _:
+      ({==}, {==}, {==}, {==}, {==}, {==}, Unit{})
+    case ANode{xs, ys} True{}:
+      ASet.node_t(T, xs, ys, n, j, v, ASet.facts(T, xs, U32.shr(n), j, v, U32.is_lt(j, U32.shr(U32.shr(n)))))
+    case ANode{xs, ys} False{}:
+      ASet.node_f(T, xs, ys, n, j, v, ASet.size_pair(T, xs), ASet.facts(T, ys, U32.shr(n), U32.sub(j, U32.shr(n)), v, U32.is_lt(U32.sub(j, U32.shr(n)), U32.shr(U32.shr(n)))))
+
+# ASet.copy(T, a): one pass over a hands back the same array b, its size n as a value, and the facts
+# that tie them to a: b is a, n is ASet.sz(T, b), and Array.size(b) is the pair (b, ASet.sz(T, b))
+def ASet.Copy(-T: Data, -a: Array<T>) -> Type:
+  &b: Array<T> -> &n: U32 -> {b == a : Array<T>} & {n == ASet.sz(T, b) : U32} & {(b, ASet.sz(T, b)) == Array.size(T, b) : Array<T> & U32} & Unit
+
+def ASet.copy_node(-T: Data, -xs: Array<T>, ys: Array<T>, r: ASet.Copy(T, xs)) -> ASet.Copy(T, ANode{xs, ys}):
+  match r:
+    case Tuple{b, r1}:
+      match r1:
+        case Tuple{+m, r2}:
+          match r2:
+            case Tuple{+p, r3}:
+              match r3:
+                case Tuple{+q, r4}:
+                  match r4:
+                    case Tuple{+s, u}:
+                      (ANode{b, ys}, U32.shl(m),
+                        {(%p : {ANode{b, ys} == ANode{_, ys} : Array<T>}; {==}) : {ANode{b, ys} == ANode{xs, ys} : Array<T>}},
+                        {(%s : {U32.shl(m) == Pair.snd(Array<T>, U32, Array.size.node(T, ys, _)) : U32}; %q : {U32.shl(m) == U32.shl(_) : U32}; {==}) : {U32.shl(m) == ASet.sz(T, ANode{b, ys}) : U32}},
+                        {(%s : {(ANode{b, ys}, Pair.snd(Array<T>, U32, Array.size.node(T, ys, _))) == Array.size.node(T, ys, _) : Array<T> & U32}; {==}) : {(ANode{b, ys}, ASet.sz(T, ANode{b, ys})) == Array.size(T, ANode{b, ys}) : Array<T> & U32}},
+                        Unit{})
+
+def ASet.copy(-T: Data, a: Array<T>) -> ASet.Copy(T, a):
+  match a:
+    case ALeaf{x}:
+      (ALeaf{x}, 1, {==}, {==}, {==}, Unit{})
+    case ANode{xs, ys}:
+      ASet.copy_node(T, xs, ys, ASet.copy(T, xs))
+
+# the masked index and the first branch, as Array.swap.at and Array.get.at compute them from a size n
+def ASet.J(+i: U32, +n: U32) -> U32:
+  U32.and(i, U32.sub(n, 1))
+
+def ASet.Z(+i: U32, +n: U32) -> Bool:
+  U32.is_lt(ASet.J(i, n), U32.shr(n))
+
+def ASet.close_size(-T: Data, -b: Array<T>, +n: U32, +i: U32, +v: T, +q: {n == ASet.sz(T, b) : U32}, f: ASet.Facts(T, b, n, ASet.J(i, n), v, ASet.Z(i, n))) -> {ASet.sz(T, Array.set(T, b, i, v)) == ASet.sz(T, b) : U32}:
+  match f:
+    case Tuple{+c1, r1}:
+      match r1:
+        case Tuple{+c2, r2}:
+          match r2:
+            case Tuple{+c3, r3}:
+              match r3:
+                case Tuple{+c4, r4}:
+                  %c1 : {ASet.sz(T, Array.set.fin(T, Array.swap.at(T, i, v, _))) == ASet.sz(T, b) : U32}
+                  %q : {ASet.sz(T, Array.set.fin(T, Array.swap.go(T, b, _, ASet.J(i, _), v, ASet.Z(i, _)))) == _ : U32}
+                  Equal.trans(U32, ASet.sz(T, ASet.NA(T, b, n, ASet.J(i, n), v, ASet.Z(i, n))), ASet.sz(T, b), n, c4, Equal.sym(U32, n, ASet.sz(T, b), q))
+
+def ASet.close_get(-T: Data, -b: Array<T>, +n: U32, +i: U32, +v: T, +q: {n == ASet.sz(T, b) : U32}, f: ASet.Facts(T, b, n, ASet.J(i, n), v, ASet.Z(i, n))) -> {Pair.snd(Array<T>, T, Array.get(T, Array.set(T, b, i, v), i)) == v : T}:
+  match f:
+    case Tuple{+c1, r1}:
+      match r1:
+        case Tuple{+c2, r2}:
+          match r2:
+            case Tuple{+c3, r3}:
+              match r3:
+                case Tuple{+c4, r4}:
+                  match r4:
+                    case Tuple{+c5, r5}:
+                      %c1 : {Pair.snd(Array<T>, T, Array.get.at(T, i, Array.size(T, Array.set.fin(T, Array.swap.at(T, i, v, _))))) == v : T}
+                      %q : {Pair.snd(Array<T>, T, Array.get.at(T, i, Array.size(T, Array.set.fin(T, Array.swap.go(T, b, _, ASet.J(i, _), v, ASet.Z(i, _)))))) == v : T}
+                      %c3 : {Pair.snd(Array<T>, T, Array.get.at(T, i, _)) == v : T}
+                      %Equal.trans(U32, n, ASet.sz(T, b), ASet.sz(T, ASet.NA(T, b, n, ASet.J(i, n), v, ASet.Z(i, n))), q, Equal.sym(U32, ASet.sz(T, ASet.NA(T, b, n, ASet.J(i, n), v, ASet.Z(i, n))), ASet.sz(T, b), c4)) : {Pair.snd(Array<T>, T, Array.get.go(T, ASet.NA(T, b, n, ASet.J(i, n), v, ASet.Z(i, n)), _, ASet.J(i, _), ASet.Z(i, _))) == v : T}
+                      c5
+
+def ASet.top_size(-T: Data, -a: Array<T>, +i: U32, +v: T, r: ASet.Copy(T, a)) -> {ASet.sz(T, Array.set(T, a, i, v)) == ASet.sz(T, a) : U32}:
+  match r:
+    case Tuple{b, r1}:
+      match r1:
+        case Tuple{+n, r2}:
+          match r2:
+            case Tuple{+p, r3}:
+              match r3:
+                case Tuple{+q, r4}:
+                  %p : {ASet.sz(T, Array.set(T, _, i, v)) == ASet.sz(T, _) : U32}
+                  ASet.close_size(T, b, n, i, v, q, ASet.facts(T, b, n, ASet.J(i, n), v, ASet.Z(i, n)))
+
+def ASet.top_get(-T: Data, -a: Array<T>, +i: U32, +v: T, r: ASet.Copy(T, a)) -> {Pair.snd(Array<T>, T, Array.get(T, Array.set(T, a, i, v), i)) == v : T}:
+  match r:
+    case Tuple{b, r1}:
+      match r1:
+        case Tuple{+n, r2}:
+          match r2:
+            case Tuple{+p, r3}:
+              match r3:
+                case Tuple{+q, r4}:
+                  %p : {Pair.snd(Array<T>, T, Array.get(T, Array.set(T, _, i, v), i)) == v : T}
+                  ASet.close_get(T, b, n, i, v, q, ASet.facts(T, b, n, ASet.J(i, n), v, ASet.Z(i, n)))
+
+# LAW: writing v at i keeps the array's size (any i: the index wraps around)
+law size_set:
+  for -T: Data
+  for a: Array<T>
+  for +i: U32
+  for +v: T
+  {ASet.sz(T, Array.set(T, a, i, v)) == ASet.sz(T, a) : U32}
+
+def size_set(T, a, i, v):
+  ASet.top_size(T, a, i, v, ASet.copy(T, a))
+
+# LAW: what Array.set writes at i, Array.get reads at i (any i: both wrap it the same way)
+law get_after_set:
+  for -T: Data
+  for a: Array<T>
+  for +i: U32
+  for +v: T
+  {Pair.snd(Array<T>, T, Array.get(T, Array.set(T, a, i, v), i)) == v : T}
+
+def get_after_set(T, a, i, v):
+  ASet.top_get(T, a, i, v, ASet.copy(T, a))
+
+# ASet.Apart(T, a, n, j, z, k, w): the write's descent (index j, first branch z) and the read's descent (k, w),
+# both started from the size n, take different branches at some node of a before either reaches a leaf.
+# It is Empty when both reach the same leaf, and Unit at the node where they split.
+def ASet.Apart(-T: Data, a: Array<T>, +n: U32, +j: U32, +z: Bool, +k: U32, +w: Bool) -> Type:
+  match a z w:
+    case ALeaf{x} _ _:
+      Empty
+    case ANode{xs, ys} True{} True{}:
+      ASet.Apart(T, xs, U32.shr(n), j, U32.is_lt(j, U32.shr(U32.shr(n))), k, U32.is_lt(k, U32.shr(U32.shr(n))))
+    case ANode{xs, ys} False{} False{}:
+      ASet.Apart(T, ys, U32.shr(n), U32.sub(j, U32.shr(n)), U32.is_lt(U32.sub(j, U32.shr(n)), U32.shr(U32.shr(n))), U32.sub(k, U32.shr(n)), U32.is_lt(U32.sub(k, U32.shr(n)), U32.shr(U32.shr(n))))
+    case ANode{xs, ys} True{} False{}:
+      Unit
+    case ANode{xs, ys} False{} True{}:
+      Unit
+
+# ASet.Side: what a pass over a subtree the write does not enter proves: Array.size(a) is (a, ASet.sz(a)), and the
+# pair a read along (n, k, w) returns is (its first component, its second)
+def ASet.Side(-T: Data, -a: Array<T>, -n: U32, -k: U32, -w: Bool) -> Type:
+  {(a, ASet.sz(T, a)) == Array.size(T, a) : Array<T> & U32} & {(Pair.fst(Array<T>, T, Array.get.go(T, a, n, k, w)), Pair.snd(Array<T>, T, Array.get.go(T, a, n, k, w))) == Array.get.go(T, a, n, k, w) : Array<T> & T} & Unit
+
+def ASet.side_node(-T: Data, -xs: Array<T>, -ys: Array<T>, +n: U32, +k: U32, +w: Bool, sx: ASet.Side(T, xs, U32.shr(n), k, U32.is_lt(k, U32.shr(U32.shr(n)))), sy: ASet.Side(T, ys, U32.shr(n), U32.sub(k, U32.shr(n)), U32.is_lt(U32.sub(k, U32.shr(n)), U32.shr(U32.shr(n))))) -> ASet.Side(T, ANode{xs, ys}, n, k, w):
+  match w:
+    case True{}:
+      match sx:
+        case Tuple{+s1, r1}:
+          match r1:
+            case Tuple{+g1, u1}:
+              match sy:
+                case Tuple{+s2, r2}:
+                  match r2:
+                    case Tuple{+g2, u2}:
+                      ({(%s1 : {(ANode{xs, ys}, Pair.snd(Array<T>, U32, Array.size.node(T, ys, _))) == Array.size.node(T, ys, _) : Array<T> & U32}; {==}) : {(ANode{xs, ys}, ASet.sz(T, ANode{xs, ys})) == Array.size(T, ANode{xs, ys}) : Array<T> & U32}}, {(%g1 : {(Pair.fst(Array<T>, T, Array.swap.lo(T, ys, _)), Pair.snd(Array<T>, T, Array.swap.lo(T, ys, _))) == Array.swap.lo(T, ys, _) : Array<T> & T}; {==}) : {(Pair.fst(Array<T>, T, Array.get.go(T, ANode{xs, ys}, n, k, True{})), Pair.snd(Array<T>, T, Array.get.go(T, ANode{xs, ys}, n, k, True{}))) == Array.get.go(T, ANode{xs, ys}, n, k, True{}) : Array<T> & T}}, Unit{})
+    case False{}:
+      match sx:
+        case Tuple{+s1, r1}:
+          match r1:
+            case Tuple{+g1, u1}:
+              match sy:
+                case Tuple{+s2, r2}:
+                  match r2:
+                    case Tuple{+g2, u2}:
+                      ({(%s1 : {(ANode{xs, ys}, Pair.snd(Array<T>, U32, Array.size.node(T, ys, _))) == Array.size.node(T, ys, _) : Array<T> & U32}; {==}) : {(ANode{xs, ys}, ASet.sz(T, ANode{xs, ys})) == Array.size(T, ANode{xs, ys}) : Array<T> & U32}}, {(%g2 : {(Pair.fst(Array<T>, T, Array.swap.hi(T, xs, _)), Pair.snd(Array<T>, T, Array.swap.hi(T, xs, _))) == Array.swap.hi(T, xs, _) : Array<T> & T}; {==}) : {(Pair.fst(Array<T>, T, Array.get.go(T, ANode{xs, ys}, n, k, False{})), Pair.snd(Array<T>, T, Array.get.go(T, ANode{xs, ys}, n, k, False{}))) == Array.get.go(T, ANode{xs, ys}, n, k, False{}) : Array<T> & T}}, Unit{})
+
+def ASet.side(-T: Data, a: Array<T>, +n: U32, +k: U32, +w: Bool) -> ASet.Side(T, a, n, k, w):
+  match a:
+    case ALeaf{x}:
+      ({==}, {==}, Unit{})
+    case ANode{xs, ys}:
+      # bend-lint: disable-next bend-lint-rules/performance/missed_fork -- a proof by one pass over the tree not-expected-because: proofs are checked, never run
+      ASet.side_node(T, xs, ys, n, k, w, ASet.side(T, xs, U32.shr(n), k, U32.is_lt(k, U32.shr(U32.shr(n)))), ASet.side(T, ys, U32.shr(n), U32.sub(k, U32.shr(n)), U32.is_lt(U32.sub(k, U32.shr(n)), U32.shr(U32.shr(n)))))
+
+# ASet.Reads: what one pass over the tree a proves about a write along (n, j, v, z) and a read along (n, k, w):
+# 1. the pair the write's descent returns is (the written array, the old value);
+# 2. the read of a returns a pair (first component, second);
+# 3. so does the read of the written array;
+# 4. if the descents split, the read finds the same value in the written array as in a.
+def ASet.Reads(-T: Data, -a: Array<T>, -n: U32, -j: U32, -v: T, -z: Bool, -k: U32, -w: Bool) -> Type:
+  {(ASet.NA(T, a, n, j, v, z), Pair.snd(Array<T>, T, ASet.G(T, a, n, j, v, z))) == ASet.G(T, a, n, j, v, z) : Array<T> & T} & {(Pair.fst(Array<T>, T, Array.get.go(T, a, n, k, w)), Pair.snd(Array<T>, T, Array.get.go(T, a, n, k, w))) == Array.get.go(T, a, n, k, w) : Array<T> & T} & {(Pair.fst(Array<T>, T, Array.get.go(T, ASet.NA(T, a, n, j, v, z), n, k, w)), Pair.snd(Array<T>, T, Array.get.go(T, ASet.NA(T, a, n, j, v, z), n, k, w))) == Array.get.go(T, ASet.NA(T, a, n, j, v, z), n, k, w) : Array<T> & T} & (ASet.Apart(T, a, n, j, z, k, w) -> {Pair.snd(Array<T>, T, Array.get.go(T, ASet.NA(T, a, n, j, v, z), n, k, w)) == Pair.snd(Array<T>, T, Array.get.go(T, a, n, k, w)) : T}) & Unit
+
+# the written low half ASet.WL and the written high half ASet.WH of a node of size n
+def ASet.WL(-T: Data, xs: Array<T>, +n: U32, +j: U32, +v: T) -> Array<T>:
+  ASet.NA(T, xs, U32.shr(n), j, v, U32.is_lt(j, U32.shr(U32.shr(n))))
+
+def ASet.WH(-T: Data, ys: Array<T>, +n: U32, +j: U32, +v: T) -> Array<T>:
+  ASet.NA(T, ys, U32.shr(n), U32.sub(j, U32.shr(n)), v, U32.is_lt(U32.sub(j, U32.shr(n)), U32.shr(U32.shr(n))))
+
+# the read's descent into the low half and into the high half of a node of size n
+def ASet.RL(-T: Data, xs: Array<T>, +n: U32, +k: U32) -> Array<T> & T:
+  Array.get.go(T, xs, U32.shr(n), k, U32.is_lt(k, U32.shr(U32.shr(n))))
+
+def ASet.RH(-T: Data, ys: Array<T>, +n: U32, +k: U32) -> Array<T> & T:
+  Array.get.go(T, ys, U32.shr(n), U32.sub(k, U32.shr(n)), U32.is_lt(U32.sub(k, U32.shr(n)), U32.shr(U32.shr(n))))
+
+def ASet.no_leaf(-T: Data, -x: T, -n: U32, -j: U32, -v: T, -z: Bool, -k: U32, -w: Bool, h: ASet.Apart(T, ALeaf{x}, n, j, z, k, w)) -> {Pair.snd(Array<T>, T, Array.get.go(T, ASet.NA(T, ALeaf{x}, n, j, v, z), n, k, w)) == Pair.snd(Array<T>, T, Array.get.go(T, ALeaf{x}, n, k, w)) : T}:
+  match h:
+
+# the write goes into the low half xs
+def ASet.reads_t(-T: Data, -xs: Array<T>, -ys: Array<T>, +n: U32, +j: U32, +v: T, +k: U32, +w: Bool, +g: {(Pair.fst(Array<T>, T, ASet.RH(T, ys, n, k)), Pair.snd(Array<T>, T, ASet.RH(T, ys, n, k))) == ASet.RH(T, ys, n, k) : Array<T> & T}, r: ASet.Reads(T, xs, U32.shr(n), j, v, U32.is_lt(j, U32.shr(U32.shr(n))), k, U32.is_lt(k, U32.shr(U32.shr(n))))) -> ASet.Reads(T, ANode{xs, ys}, n, j, v, True{}, k, w):
+  match w:
+    case True{}:
+      match r:
+        case Tuple{+d, r1}:
+          match r1:
+            case Tuple{+e1, r2}:
+              match r2:
+                case Tuple{+e2, r3}:
+                  match r3:
+                    case Tuple{e3, u}:
+                      ({(%d : {(Array.set.fin(T, Array.swap.lo(T, ys, _)), Pair.snd(Array<T>, T, Array.swap.lo(T, ys, _))) == Array.swap.lo(T, ys, _) : Array<T> & T}; {==}) : {(ASet.NA(T, ANode{xs, ys}, n, j, v, True{}), Pair.snd(Array<T>, T, ASet.G(T, ANode{xs, ys}, n, j, v, True{}))) == ASet.G(T, ANode{xs, ys}, n, j, v, True{}) : Array<T> & T}},
+                        {(%e1 : {(Pair.fst(Array<T>, T, Array.swap.lo(T, ys, _)), Pair.snd(Array<T>, T, Array.swap.lo(T, ys, _))) == Array.swap.lo(T, ys, _) : Array<T> & T}; {==}) : {(Pair.fst(Array<T>, T, Array.get.go(T, ANode{xs, ys}, n, k, True{})), Pair.snd(Array<T>, T, Array.get.go(T, ANode{xs, ys}, n, k, True{}))) == Array.get.go(T, ANode{xs, ys}, n, k, True{}) : Array<T> & T}},
+                        {(%d : {(Pair.fst(Array<T>, T, Array.get.go(T, Array.set.fin(T, Array.swap.lo(T, ys, _)), n, k, True{})), Pair.snd(Array<T>, T, Array.get.go(T, Array.set.fin(T, Array.swap.lo(T, ys, _)), n, k, True{}))) == Array.get.go(T, Array.set.fin(T, Array.swap.lo(T, ys, _)), n, k, True{}) : Array<T> & T}; %e2 : {(Pair.fst(Array<T>, T, Array.swap.lo(T, ys, _)), Pair.snd(Array<T>, T, Array.swap.lo(T, ys, _))) == Array.swap.lo(T, ys, _) : Array<T> & T}; {==}) : {(Pair.fst(Array<T>, T, Array.get.go(T, ASet.NA(T, ANode{xs, ys}, n, j, v, True{}), n, k, True{})), Pair.snd(Array<T>, T, Array.get.go(T, ASet.NA(T, ANode{xs, ys}, n, j, v, True{}), n, k, True{}))) == Array.get.go(T, ASet.NA(T, ANode{xs, ys}, n, j, v, True{}), n, k, True{}) : Array<T> & T}},
+                        (h => (%d : {Pair.snd(Array<T>, T, Array.get.go(T, Array.set.fin(T, Array.swap.lo(T, ys, _)), n, k, True{})) == Pair.snd(Array<T>, T, Array.get.go(T, ANode{xs, ys}, n, k, True{})) : T}; %e2 : {Pair.snd(Array<T>, T, Array.swap.lo(T, ys, _)) == Pair.snd(Array<T>, T, Array.swap.lo(T, ys, ASet.RL(T, xs, n, k))) : T}; %e1 : {Pair.snd(Array<T>, T, ASet.RL(T, ASet.WL(T, xs, n, j, v), n, k)) == Pair.snd(Array<T>, T, Array.swap.lo(T, ys, _)) : T}; e3(h))),
+                        Unit{})
+    case False{}:
+      match r:
+        case Tuple{+d, r1}:
+          match r1:
+            case Tuple{+e1, r2}:
+              match r2:
+                case Tuple{+e2, r3}:
+                  match r3:
+                    case Tuple{e3, u}:
+                      ({(%d : {(Array.set.fin(T, Array.swap.lo(T, ys, _)), Pair.snd(Array<T>, T, Array.swap.lo(T, ys, _))) == Array.swap.lo(T, ys, _) : Array<T> & T}; {==}) : {(ASet.NA(T, ANode{xs, ys}, n, j, v, True{}), Pair.snd(Array<T>, T, ASet.G(T, ANode{xs, ys}, n, j, v, True{}))) == ASet.G(T, ANode{xs, ys}, n, j, v, True{}) : Array<T> & T}},
+                        {(%g : {(Pair.fst(Array<T>, T, Array.swap.hi(T, xs, _)), Pair.snd(Array<T>, T, Array.swap.hi(T, xs, _))) == Array.swap.hi(T, xs, _) : Array<T> & T}; {==}) : {(Pair.fst(Array<T>, T, Array.get.go(T, ANode{xs, ys}, n, k, False{})), Pair.snd(Array<T>, T, Array.get.go(T, ANode{xs, ys}, n, k, False{}))) == Array.get.go(T, ANode{xs, ys}, n, k, False{}) : Array<T> & T}},
+                        {(%d : {(Pair.fst(Array<T>, T, Array.get.go(T, Array.set.fin(T, Array.swap.lo(T, ys, _)), n, k, False{})), Pair.snd(Array<T>, T, Array.get.go(T, Array.set.fin(T, Array.swap.lo(T, ys, _)), n, k, False{}))) == Array.get.go(T, Array.set.fin(T, Array.swap.lo(T, ys, _)), n, k, False{}) : Array<T> & T}; %g : {(Pair.fst(Array<T>, T, Array.swap.hi(T, ASet.WL(T, xs, n, j, v), _)), Pair.snd(Array<T>, T, Array.swap.hi(T, ASet.WL(T, xs, n, j, v), _))) == Array.swap.hi(T, ASet.WL(T, xs, n, j, v), _) : Array<T> & T}; {==}) : {(Pair.fst(Array<T>, T, Array.get.go(T, ASet.NA(T, ANode{xs, ys}, n, j, v, True{}), n, k, False{})), Pair.snd(Array<T>, T, Array.get.go(T, ASet.NA(T, ANode{xs, ys}, n, j, v, True{}), n, k, False{}))) == Array.get.go(T, ASet.NA(T, ANode{xs, ys}, n, j, v, True{}), n, k, False{}) : Array<T> & T}},
+                        (h => (%d : {Pair.snd(Array<T>, T, Array.get.go(T, Array.set.fin(T, Array.swap.lo(T, ys, _)), n, k, False{})) == Pair.snd(Array<T>, T, Array.get.go(T, ANode{xs, ys}, n, k, False{})) : T}; %g : {Pair.snd(Array<T>, T, Array.swap.hi(T, ASet.WL(T, xs, n, j, v), _)) == Pair.snd(Array<T>, T, Array.swap.hi(T, xs, _)) : T}; {==})),
+                        Unit{})
+
+# the write goes into the high half ys
+def ASet.reads_f(-T: Data, -xs: Array<T>, -ys: Array<T>, +n: U32, +j: U32, +v: T, +k: U32, +w: Bool, +g: {(Pair.fst(Array<T>, T, ASet.RL(T, xs, n, k)), Pair.snd(Array<T>, T, ASet.RL(T, xs, n, k))) == ASet.RL(T, xs, n, k) : Array<T> & T}, r: ASet.Reads(T, ys, U32.shr(n), U32.sub(j, U32.shr(n)), v, U32.is_lt(U32.sub(j, U32.shr(n)), U32.shr(U32.shr(n))), U32.sub(k, U32.shr(n)), U32.is_lt(U32.sub(k, U32.shr(n)), U32.shr(U32.shr(n))))) -> ASet.Reads(T, ANode{xs, ys}, n, j, v, False{}, k, w):
+  match w:
+    case True{}:
+      match r:
+        case Tuple{+d, r1}:
+          match r1:
+            case Tuple{+e1, r2}:
+              match r2:
+                case Tuple{+e2, r3}:
+                  match r3:
+                    case Tuple{e3, u}:
+                      ({(%d : {(Array.set.fin(T, Array.swap.hi(T, xs, _)), Pair.snd(Array<T>, T, Array.swap.hi(T, xs, _))) == Array.swap.hi(T, xs, _) : Array<T> & T}; {==}) : {(ASet.NA(T, ANode{xs, ys}, n, j, v, False{}), Pair.snd(Array<T>, T, ASet.G(T, ANode{xs, ys}, n, j, v, False{}))) == ASet.G(T, ANode{xs, ys}, n, j, v, False{}) : Array<T> & T}},
+                        {(%g : {(Pair.fst(Array<T>, T, Array.swap.lo(T, ys, _)), Pair.snd(Array<T>, T, Array.swap.lo(T, ys, _))) == Array.swap.lo(T, ys, _) : Array<T> & T}; {==}) : {(Pair.fst(Array<T>, T, Array.get.go(T, ANode{xs, ys}, n, k, True{})), Pair.snd(Array<T>, T, Array.get.go(T, ANode{xs, ys}, n, k, True{}))) == Array.get.go(T, ANode{xs, ys}, n, k, True{}) : Array<T> & T}},
+                        {(%d : {(Pair.fst(Array<T>, T, Array.get.go(T, Array.set.fin(T, Array.swap.hi(T, xs, _)), n, k, True{})), Pair.snd(Array<T>, T, Array.get.go(T, Array.set.fin(T, Array.swap.hi(T, xs, _)), n, k, True{}))) == Array.get.go(T, Array.set.fin(T, Array.swap.hi(T, xs, _)), n, k, True{}) : Array<T> & T}; %g : {(Pair.fst(Array<T>, T, Array.swap.lo(T, ASet.WH(T, ys, n, j, v), _)), Pair.snd(Array<T>, T, Array.swap.lo(T, ASet.WH(T, ys, n, j, v), _))) == Array.swap.lo(T, ASet.WH(T, ys, n, j, v), _) : Array<T> & T}; {==}) : {(Pair.fst(Array<T>, T, Array.get.go(T, ASet.NA(T, ANode{xs, ys}, n, j, v, False{}), n, k, True{})), Pair.snd(Array<T>, T, Array.get.go(T, ASet.NA(T, ANode{xs, ys}, n, j, v, False{}), n, k, True{}))) == Array.get.go(T, ASet.NA(T, ANode{xs, ys}, n, j, v, False{}), n, k, True{}) : Array<T> & T}},
+                        (h => (%d : {Pair.snd(Array<T>, T, Array.get.go(T, Array.set.fin(T, Array.swap.hi(T, xs, _)), n, k, True{})) == Pair.snd(Array<T>, T, Array.get.go(T, ANode{xs, ys}, n, k, True{})) : T}; %g : {Pair.snd(Array<T>, T, Array.swap.lo(T, ASet.WH(T, ys, n, j, v), _)) == Pair.snd(Array<T>, T, Array.swap.lo(T, ys, _)) : T}; {==})),
+                        Unit{})
+    case False{}:
+      match r:
+        case Tuple{+d, r1}:
+          match r1:
+            case Tuple{+e1, r2}:
+              match r2:
+                case Tuple{+e2, r3}:
+                  match r3:
+                    case Tuple{e3, u}:
+                      ({(%d : {(Array.set.fin(T, Array.swap.hi(T, xs, _)), Pair.snd(Array<T>, T, Array.swap.hi(T, xs, _))) == Array.swap.hi(T, xs, _) : Array<T> & T}; {==}) : {(ASet.NA(T, ANode{xs, ys}, n, j, v, False{}), Pair.snd(Array<T>, T, ASet.G(T, ANode{xs, ys}, n, j, v, False{}))) == ASet.G(T, ANode{xs, ys}, n, j, v, False{}) : Array<T> & T}},
+                        {(%e1 : {(Pair.fst(Array<T>, T, Array.swap.hi(T, xs, _)), Pair.snd(Array<T>, T, Array.swap.hi(T, xs, _))) == Array.swap.hi(T, xs, _) : Array<T> & T}; {==}) : {(Pair.fst(Array<T>, T, Array.get.go(T, ANode{xs, ys}, n, k, False{})), Pair.snd(Array<T>, T, Array.get.go(T, ANode{xs, ys}, n, k, False{}))) == Array.get.go(T, ANode{xs, ys}, n, k, False{}) : Array<T> & T}},
+                        {(%d : {(Pair.fst(Array<T>, T, Array.get.go(T, Array.set.fin(T, Array.swap.hi(T, xs, _)), n, k, False{})), Pair.snd(Array<T>, T, Array.get.go(T, Array.set.fin(T, Array.swap.hi(T, xs, _)), n, k, False{}))) == Array.get.go(T, Array.set.fin(T, Array.swap.hi(T, xs, _)), n, k, False{}) : Array<T> & T}; %e2 : {(Pair.fst(Array<T>, T, Array.swap.hi(T, xs, _)), Pair.snd(Array<T>, T, Array.swap.hi(T, xs, _))) == Array.swap.hi(T, xs, _) : Array<T> & T}; {==}) : {(Pair.fst(Array<T>, T, Array.get.go(T, ASet.NA(T, ANode{xs, ys}, n, j, v, False{}), n, k, False{})), Pair.snd(Array<T>, T, Array.get.go(T, ASet.NA(T, ANode{xs, ys}, n, j, v, False{}), n, k, False{}))) == Array.get.go(T, ASet.NA(T, ANode{xs, ys}, n, j, v, False{}), n, k, False{}) : Array<T> & T}},
+                        (h => (%d : {Pair.snd(Array<T>, T, Array.get.go(T, Array.set.fin(T, Array.swap.hi(T, xs, _)), n, k, False{})) == Pair.snd(Array<T>, T, Array.get.go(T, ANode{xs, ys}, n, k, False{})) : T}; %e2 : {Pair.snd(Array<T>, T, Array.swap.hi(T, xs, _)) == Pair.snd(Array<T>, T, Array.swap.hi(T, xs, ASet.RH(T, ys, n, k))) : T}; %e1 : {Pair.snd(Array<T>, T, ASet.RH(T, ASet.WH(T, ys, n, j, v), n, k)) == Pair.snd(Array<T>, T, Array.swap.hi(T, xs, _)) : T}; e3(h))),
+                        Unit{})
+
+# ASet.Both: the six facts of the first two laws and the four of the third, from one pass
+def ASet.Both(-T: Data, -a: Array<T>, -n: U32, -j: U32, -v: T, -z: Bool, -k: U32, -w: Bool) -> Type:
+  ASet.Facts(T, a, n, j, v, z) & ASet.Reads(T, a, n, j, v, z, k, w)
+
+def ASet.both_t(-T: Data, -xs: Array<T>, -ys: Array<T>, +n: U32, +j: U32, +v: T, +k: U32, +w: Bool, sy: ASet.Side(T, ys, U32.shr(n), U32.sub(k, U32.shr(n)), U32.is_lt(U32.sub(k, U32.shr(n)), U32.shr(U32.shr(n)))), f: ASet.Both(T, xs, U32.shr(n), j, v, U32.is_lt(j, U32.shr(U32.shr(n))), k, U32.is_lt(k, U32.shr(U32.shr(n))))) -> ASet.Both(T, ANode{xs, ys}, n, j, v, True{}, k, w):
+  match sy:
+    case Tuple{+s, r1}:
+      match r1:
+        case Tuple{+g, u}:
+          match f:
+            case Tuple{o, r}:
+              (ASet.node_t(T, xs, ys, n, j, v, o), ASet.reads_t(T, xs, ys, n, j, v, k, w, g, r))
+
+def ASet.both_f(-T: Data, -xs: Array<T>, -ys: Array<T>, +n: U32, +j: U32, +v: T, +k: U32, +w: Bool, sx: ASet.Side(T, xs, U32.shr(n), k, U32.is_lt(k, U32.shr(U32.shr(n)))), f: ASet.Both(T, ys, U32.shr(n), U32.sub(j, U32.shr(n)), v, U32.is_lt(U32.sub(j, U32.shr(n)), U32.shr(U32.shr(n))), U32.sub(k, U32.shr(n)), U32.is_lt(U32.sub(k, U32.shr(n)), U32.shr(U32.shr(n))))) -> ASet.Both(T, ANode{xs, ys}, n, j, v, False{}, k, w):
+  match sx:
+    case Tuple{+s, r1}:
+      match r1:
+        case Tuple{+g, u}:
+          match f:
+            case Tuple{o, r}:
+              (ASet.node_f(T, xs, ys, n, j, v, s, o), ASet.reads_f(T, xs, ys, n, j, v, k, w, g, r))
+
+def ASet.both(-T: Data, a: Array<T>, +n: U32, +j: U32, +v: T, +z: Bool, +k: U32, +w: Bool) -> ASet.Both(T, a, n, j, v, z, k, w):
+  match a z:
+    case ALeaf{x} _:
+      (({==}, {==}, {==}, {==}, {==}, {==}, Unit{}), ({==}, {==}, {==}, (h => ASet.no_leaf(T, x, n, j, v, z, k, w, h)), Unit{}))
+    case ANode{xs, ys} True{}:
+      ASet.both_t(T, xs, ys, n, j, v, k, w, ASet.side(T, ys, U32.shr(n), U32.sub(k, U32.shr(n)), U32.is_lt(U32.sub(k, U32.shr(n)), U32.shr(U32.shr(n)))), ASet.both(T, xs, U32.shr(n), j, v, U32.is_lt(j, U32.shr(U32.shr(n))), k, U32.is_lt(k, U32.shr(U32.shr(n)))))
+    case ANode{xs, ys} False{}:
+      ASet.both_f(T, xs, ys, n, j, v, k, w, ASet.side(T, xs, U32.shr(n), k, U32.is_lt(k, U32.shr(U32.shr(n)))), ASet.both(T, ys, U32.shr(n), U32.sub(j, U32.shr(n)), v, U32.is_lt(U32.sub(j, U32.shr(n)), U32.shr(U32.shr(n))), U32.sub(k, U32.shr(n)), U32.is_lt(U32.sub(k, U32.shr(n)), U32.shr(U32.shr(n)))))
+
+
+def ASet.close_other(-T: Data, -b: Array<T>, +n: U32, +i: U32, +k: U32, +v: T, +q: {n == ASet.sz(T, b) : U32}, f: ASet.Both(T, b, n, ASet.J(i, n), v, ASet.Z(i, n), ASet.J(k, n), ASet.Z(k, n))) -> ASet.Apart(T, b, ASet.sz(T, b), ASet.J(i, ASet.sz(T, b)), ASet.Z(i, ASet.sz(T, b)), ASet.J(k, ASet.sz(T, b)), ASet.Z(k, ASet.sz(T, b))) -> {Pair.snd(Array<T>, T, Array.get(T, Array.set(T, b, i, v), k)) == Pair.snd(Array<T>, T, Array.get(T, b, k)) : T}:
+  match f:
+    case Tuple{o, r}:
+      match o:
+        case Tuple{+c1, o1}:
+          match o1:
+            case Tuple{+c2, o2}:
+              match o2:
+                case Tuple{+c3, o3}:
+                  match o3:
+                    case Tuple{+c4, o4}:
+                      match r:
+                        case Tuple{+d, r1}:
+                          match r1:
+                            case Tuple{+e1, r2}:
+                              match r2:
+                                case Tuple{+e2, r3}:
+                                  match r3:
+                                    case Tuple{e3, u}:
+                                      %c1 : (ASet.Apart(T, b, ASet.sz(T, b), ASet.J(i, ASet.sz(T, b)), ASet.Z(i, ASet.sz(T, b)), ASet.J(k, ASet.sz(T, b)), ASet.Z(k, ASet.sz(T, b))) -> {Pair.snd(Array<T>, T, Array.get.at(T, k, Array.size(T, Array.set.fin(T, Array.swap.at(T, i, v, _))))) == Pair.snd(Array<T>, T, Array.get.at(T, k, _)) : T})
+                                      %q : (ASet.Apart(T, b, _, ASet.J(i, _), ASet.Z(i, _), ASet.J(k, _), ASet.Z(k, _)) -> {Pair.snd(Array<T>, T, Array.get.at(T, k, Array.size(T, Array.set.fin(T, Array.swap.go(T, b, _, ASet.J(i, _), v, ASet.Z(i, _)))))) == Pair.snd(Array<T>, T, Array.get.go(T, b, _, ASet.J(k, _), ASet.Z(k, _))) : T})
+                                      %c3 : (ASet.Apart(T, b, n, ASet.J(i, n), ASet.Z(i, n), ASet.J(k, n), ASet.Z(k, n)) -> {Pair.snd(Array<T>, T, Array.get.at(T, k, _)) == Pair.snd(Array<T>, T, Array.get.go(T, b, n, ASet.J(k, n), ASet.Z(k, n))) : T})
+                                      %Equal.trans(U32, n, ASet.sz(T, b), ASet.sz(T, ASet.NA(T, b, n, ASet.J(i, n), v, ASet.Z(i, n))), q, Equal.sym(U32, ASet.sz(T, ASet.NA(T, b, n, ASet.J(i, n), v, ASet.Z(i, n))), ASet.sz(T, b), c4)) : (ASet.Apart(T, b, n, ASet.J(i, n), ASet.Z(i, n), ASet.J(k, n), ASet.Z(k, n)) -> {Pair.snd(Array<T>, T, Array.get.go(T, ASet.NA(T, b, n, ASet.J(i, n), v, ASet.Z(i, n)), _, ASet.J(k, _), ASet.Z(k, _))) == Pair.snd(Array<T>, T, Array.get.go(T, b, n, ASet.J(k, n), ASet.Z(k, n))) : T})
+                                      e3
+
+
+def ASet.top_other(-T: Data, -a: Array<T>, +i: U32, +k: U32, +v: T, r: ASet.Copy(T, a)) -> ASet.Apart(T, a, ASet.sz(T, a), ASet.J(i, ASet.sz(T, a)), ASet.Z(i, ASet.sz(T, a)), ASet.J(k, ASet.sz(T, a)), ASet.Z(k, ASet.sz(T, a))) -> {Pair.snd(Array<T>, T, Array.get(T, Array.set(T, a, i, v), k)) == Pair.snd(Array<T>, T, Array.get(T, a, k)) : T}:
+  match r:
+    case Tuple{b, r1}:
+      match r1:
+        case Tuple{+n, r2}:
+          match r2:
+            case Tuple{+p, r3}:
+              match r3:
+                case Tuple{+q, r4}:
+                  %p : (ASet.Apart(T, _, ASet.sz(T, _), ASet.J(i, ASet.sz(T, _)), ASet.Z(i, ASet.sz(T, _)), ASet.J(k, ASet.sz(T, _)), ASet.Z(k, ASet.sz(T, _))) -> {Pair.snd(Array<T>, T, Array.get(T, Array.set(T, _, i, v), k)) == Pair.snd(Array<T>, T, Array.get(T, _, k)) : T})
+                  ASet.close_other(T, b, n, i, k, v, q, ASet.both(T, b, n, ASet.J(i, n), v, ASet.Z(i, n), ASet.J(k, n), ASet.Z(k, n)))
+
+# LAW: a write at i leaves alone the cell a read at k reaches, when the two descents part before a leaf
+# (any i and k: both wrap them; h is what makes them different cells, see the top of the file)
+law get_other_set:
+  for -T: Data
+  for a: Array<T>
+  for +i: U32
+  for +k: U32
+  for +v: T
+  for h: ASet.Apart(T, a, ASet.sz(T, a), ASet.J(i, ASet.sz(T, a)), ASet.Z(i, ASet.sz(T, a)), ASet.J(k, ASet.sz(T, a)), ASet.Z(k, ASet.sz(T, a)))
+  {Pair.snd(Array<T>, T, Array.get(T, Array.set(T, a, i, v), k)) == Pair.snd(Array<T>, T, Array.get(T, a, k)) : T}
+
+def get_other_set(T, a, i, k, v, h):
+  ASet.top_other(T, a, i, k, v, ASet.copy(T, a))(h)

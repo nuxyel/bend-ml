@@ -41,6 +41,13 @@ def law_band(-r: Nat, +c: Nat, +rows: Nat, x: Array<F32>, w: Array<F32>) -> {{TA
 def law_tolist(+r: Nat, +c: Nat, m: TA.Mat<r, c>) -> {{TA.ML.len(r, c, TA.Mat.to_list(r, c, m)) == Nat.mul(r, c) : Nat}}:
   TA.to_list_len(r, c, m)
 
+# 0.1.19.0's laws about Base's Array: a write keeps the size, and a read at the written index sees it
+def law_set_size(a: Array<F32>, +i: U32, +v: F32) -> {{TA.ASet.sz(F32, Array.set(F32, a, i, v)) == TA.ASet.sz(F32, a) : U32}}:
+  TA.size_set(F32, a, i, v)
+
+def law_get_set(a: Array<F32>, +i: U32, +v: F32) -> {{Pair.snd(Array<F32>, F32, Array.get(F32, Array.set(F32, a, i, v), i)) == v : F32}}:
+  TA.get_after_set(F32, a, i, v)
+
 def law_ad(+e: AG.NE, +x: Nat) -> {{AG.nbwd(e, x, 1n) == AG.nfwd(e, x) : Nat}}:
   AG.reverse_eq_forward(e, x)
 
@@ -141,8 +148,9 @@ def ta_of(pkg):
     return re.search(r"import (bend-ml-tensor-array@[0-9.]+)/main.bend", src).group(1)
 
 
-# bend-ml-tensor-fork is outside the proofs (no laws): a product at split_depth's threshold split in 4 blocks against tensor-array's in one, and
-# par1 over 4 blocks against one loop, on the C lane at 4 threads
+# bend-ml-tensor-fork is outside the proofs (no laws): a product at split_depth's threshold split in 4 blocks against tensor-array's in one,
+# par1 over 4 blocks against one loop, and softmax_ce (0.1.6.0) with its rows in 4 blocks against tensor-array's (the loss and
+# the gradient's sum), on the C lane at 4 threads
 FORK = """import Base
 import {ta}/main.bend as TA
 import {tf}/main.bend as TF
@@ -172,10 +180,34 @@ def dbl(k: Nat, +i: U32, a: Array<F32>) -> Array<F32>:
 def leaf(+e: Unit, +i0: U32, +k: Nat, a: Array<F32>) -> Array<F32>:
   dbl(k, i0, a)
 
+# 64 x 1000 logits z[i] = i mod 997 / 100, labels i mod 10
+def ramp(k: Nat, +i: U32, a: Array<F32>) -> Array<F32>:
+  match k:
+    case 0n:
+      a
+    case 1n+q:
+      ramp(q, (i + 1 : U32), Array.set(F32, a, i, (U32.to_f32((i % 997 : U32)) / 100.0 : F32)))
+
+def labs(k: Nat, +i: Nat) -> List<&2, Nat>:
+  match k:
+    case 0n:
+      []
+    case 1n+q:
+      Nat.mod(i, 10n) <> labs(q, (i + 1n : Nat))
+
+def logits() -> TA.Mat<64n, 1000n>:
+  TA.Mat{{ramp(64000n, 0, Array.new(F32, TA.cap_depth(64000n), 0.0))}}
+
+def ce(r: TA.MCE<64n, 1000n>) -> String:
+  match r:
+    case TA.MCE{{l, TA.Mat{{g}}}}:
+      F32.show(l) ++ "/" ++ F32.show(tot(64000n, g))
+
 def main() -> IO(Unit):
   do IO<Unit>:
     IO.print(F32.show(tot(16384n, c_of(TF.matmul(128n, 512n, 128n, 2n, TA.Mat.fill(128n, 512n, 0.5), TA.Mat.fill(512n, 128n, 3.0))))) ++ " " ++ F32.show(tot(16384n, c_of(TA.Mat.matmul(128n, 512n, 128n, 0n, TA.Mat.fill(128n, 512n, 0.5), TA.Mat.fill(512n, 128n, 3.0))))))
     IO.print(F32.show(tot(1000n, TF.par1(~Unit, ~F32, ~leaf, Unit{{}}, 2n, 1000n, Array.new(F32, 10n, 0.0)))) ++ " " ++ F32.show(tot(1000n, dbl(1000n, 0, Array.new(F32, 10n, 0.0)))))
+    IO.print(ce(TF.softmax_ce(64n, 1000n, 2n, logits(), labs(64n, 0n))) ++ " " ++ ce(TA.Mat.softmax_ce(64n, 1000n, logits(), labs(64n, 0n))))
 """
 
 
@@ -187,8 +219,8 @@ def check_fork():
         cc = subprocess.run([BEND, f, "-o", os.path.join(d, "fork")], capture_output=True, text=True, env=ENV, cwd=d)
         c = subprocess.run([os.path.join(d, "fork"), "+RTS", "--threads", "4", "-RTS"], capture_output=True, text=True, cwd=d) if cc.returncode == 0 else cc
     lines = [l.split() for l in c.stdout.strip().splitlines()]
-    ok = len(lines) == 2 and all(len(l) == 2 and l[0] == l[1] for l in lines)
-    print(("ok   " if ok else "ERROR ") + f"published {tf.replace('bend-ml-', '')}: a split product and par1 give the one-block bits")
+    ok = len(lines) == 3 and all(len(l) == 2 and l[0] == l[1] for l in lines)
+    print(("ok   " if ok else "ERROR ") + f"published {tf.replace('bend-ml-', '')}: a split product, par1 and softmax_ce give the one-block bits")
     if not ok:
         print(c.stdout[:400], (cc.stderr + c.stderr)[:800])
     return ok

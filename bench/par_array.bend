@@ -49,4 +49,5 @@ def tree(d: Nat, +k: Nat) -> F32:
 
 def main() -> IO(Unit):
   do IO<Unit>:
+    # bend-lint: disable-next bend-lint-rules/performance/gpu_fit -- a CPU fork benchmark not-expected-because: it measures the CPU threads
     IO.print(F32.show(tree(5n, 80000n)))

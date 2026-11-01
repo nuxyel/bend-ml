@@ -1,0 +1,47 @@
+# bench/ce_fork.py 11 (and 11 100,10 64,1000 4096,1000), 2026-11-01, Bend 2.0.39, Core Ultra 7 155H, idle machine
+# (load1 under 1.0, no process over 10% CPU, performance profile, mains); threads=1 pinned to CPU 3
+256 rows of 49152: every variant on 1 and 16 threads gives loss 1094068105 grad sum 2812195590
+  fill  threads= 1  median    22.2 ms  [21.4, 23.6]  par0@1 / this 4.19x
+  fill  threads=16  median    23.0 ms  [21.0, 30.2]  par0@1 / this 4.06x
+  par0  threads= 1  median    93.3 ms  [91.2, 94.1]  par0@1 / this 1.00x
+  par0  threads=16  median    91.9 ms  [90.6, 98.1]  par0@1 / this 1.02x
+  par4  threads= 1  median    93.1 ms  [92.8, 95.2]  par0@1 / this 1.00x
+  par4  threads=16  median    39.3 ms  [36.3, 42.2]  par0@1 / this 2.37x
+  par6  threads= 1  median    93.1 ms  [91.6, 94.1]  par0@1 / this 1.00x
+  par6  threads=16  median    32.6 ms  [31.4, 37.5]  par0@1 / this 2.86x
+1024 rows of 49152: every variant on 1 and 16 threads gives loss 1094078500 grad sum 2971427842
+  fill  threads= 1  median    83.1 ms  [81.8, 83.5]  par0@1 / this 4.42x
+  fill  threads=16  median    83.2 ms  [81.1, 96.9]  par0@1 / this 4.41x
+  par0  threads= 1  median   367.3 ms  [366.0, 370.7]  par0@1 / this 1.00x
+  par0  threads=16  median   366.7 ms  [362.1, 370.2]  par0@1 / this 1.00x
+  par4  threads= 1  median   368.3 ms  [366.9, 374.7]  par0@1 / this 1.00x
+  par4  threads=16  median   143.7 ms  [136.0, 145.9]  par0@1 / this 2.56x
+  par6  threads= 1  median   369.4 ms  [365.9, 374.0]  par0@1 / this 0.99x
+  par6  threads=16  median   125.6 ms  [121.0, 134.9]  par0@1 / this 2.92x
+100 rows of 10: every variant on 1 and 16 threads gives loss 1077253780 grad sum 2663877563
+  fill  threads= 1  median     1.0 ms  [0.8, 1.6]  par0@1 / this 1.04x
+  fill  threads=16  median     1.1 ms  [0.9, 1.2]  par0@1 / this 0.98x
+  par0  threads= 1  median     1.1 ms  [1.0, 2.3]  par0@1 / this 1.00x
+  par0  threads=16  median     1.1 ms  [0.7, 2.2]  par0@1 / this 0.93x
+  par4  threads= 1  median     1.1 ms  [0.9, 1.3]  par0@1 / this 0.99x
+  par4  threads=16  median     1.9 ms  [1.3, 2.1]  par0@1 / this 0.55x
+  par6  threads= 1  median     1.1 ms  [1.0, 1.6]  par0@1 / this 0.94x
+  par6  threads=16  median     1.9 ms  [1.4, 2.2]  par0@1 / this 0.56x
+64 rows of 1000: every variant on 1 and 16 threads gives loss 1091320187 grad sum 1287175941
+  fill  threads= 1  median     1.1 ms  [1.0, 1.5]  par0@1 / this 1.32x
+  fill  threads=16  median     1.2 ms  [0.6, 1.3]  par0@1 / this 1.24x
+  par0  threads= 1  median     1.5 ms  [1.4, 1.6]  par0@1 / this 1.00x
+  par0  threads=16  median     1.4 ms  [1.0, 2.2]  par0@1 / this 1.02x
+  par4  threads= 1  median     1.5 ms  [1.4, 2.5]  par0@1 / this 1.00x
+  par4  threads=16  median     2.0 ms  [1.8, 2.2]  par0@1 / this 0.74x
+  par6  threads= 1  median     1.5 ms  [1.4, 2.9]  par0@1 / this 0.95x
+  par6  threads=16  median     2.2 ms  [1.7, 2.3]  par0@1 / this 0.67x
+4096 rows of 1000: every variant on 1 and 16 threads gives loss 1089470120 grad sum 3042925785
+  fill  threads= 1  median     7.3 ms  [6.5, 10.0]  par0@1 / this 4.21x
+  fill  threads=16  median     7.5 ms  [6.5, 10.0]  par0@1 / this 4.09x
+  par0  threads= 1  median    30.7 ms  [28.9, 31.5]  par0@1 / this 1.00x
+  par0  threads=16  median    30.3 ms  [28.8, 34.1]  par0@1 / this 1.01x
+  par4  threads= 1  median    30.6 ms  [30.0, 42.8]  par0@1 / this 1.00x
+  par4  threads=16  median    15.6 ms  [12.8, 19.7]  par0@1 / this 1.97x
+  par6  threads= 1  median    30.7 ms  [29.8, 31.3]  par0@1 / this 1.00x
+  par6  threads=16  median    12.2 ms  [10.4, 14.5]  par0@1 / this 2.51x

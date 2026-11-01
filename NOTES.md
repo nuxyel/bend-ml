@@ -1552,3 +1552,386 @@ through pull request #14 (CI green).
   to 0.1.18.0. `reference/test_published.py` now applies `to_list_len`, checks that a published 0 x 5 `Mat.to_list` is
   empty (0.1.17.0 gives one number) and that a published `fill_gauss_at` at an odd offset sums like its cells. `make
   check-full` 110/110; `scripts/check_rts.py` passes.
+
+## bend-lint 0.1.1 (2026-10-28)
+
+- `package.json` asks for bend-lint ^0.1.1 and `bend-lint.json` for `bend-lint-rules@0.1.1.0`, which adds
+  `performance/template_value_field` (a value field of a record of functions that reads a template, rebuilt at every
+  use; found in BendTorch). It is on at upstream's severity, `information`. `make lint`: the same 44 findings as with
+  0.1.0 (file, line and rule), none from the new rule, so nothing new to measure.
+
+## tensor-array: three laws about Base's Array (bend-ml #26, 2026-10-29, on devel, not published)
+
+- `size_set`, `get_after_set` and `get_other_set` move from `docs/upstream/array_set_laws.bend` into
+  `tensor-array/main.bend`, with their helpers renamed `ASet.*` (three names, `G`, `K` and `second`, were already taken
+  there). The proofs are unchanged: one pass over the tree proves every fact the step needs at once, because a proof may
+  use an array only once. adeerkhan asked for them in #26; the round trip `Mat.to_list(Mat.of_list(xs)) == xs` on top
+  of them is his next PR. Upstream, bendlang/bend#1934 asks whether Base should state them itself.
+- `get_other_set`'s condition is `ASet.Apart` (the two descents split before a leaf), not "the masked indices differ",
+  which is false on an unbalanced tree. `tensor-array/tests/array_laws.bend` uses the laws on concrete trees and prints
+  `(1.5, 2.5, 9.0)`, the 9.0 being a write at 2 that a read at 3 sees. It runs on the JavaScript lane only: the C runtime
+  stops with `runtime fail-stop` on the hand-built unbalanced tree (the original file does the same).
+- `bend` and `bend --verdict` pass on `tensor-array/main.bend`; changing `size_set`'s right side to 0 makes `bend`
+  refuse it. Every other def is 0.1.18.0's, so no bits change.
+
+## bend-lint 0.2.2 (2026-10-30)
+
+- With 0.1.x in `node_modules` the rules no longer built (a type mismatch on the rule API), so `make lint` stopped
+  before any finding; `package.json` asks for ^0.2.2 and `bend-lint.json` for `bend-lint-rules@0.2.2.0`.
+- 0.2.2 reports 49 findings (0.1.1: 44). New among them: `gpu_fit` on the eight `root1!`..`root4_new!` bangs of
+  tensor-gpu, and `missed_fork` on `ASet.side`, the laws added to tensor-array on 2026-10-29. None is taken: each was measured
+  or explained in the 2026-10-16/17 passes, or sits in a proof, a benchmark (the repetition is what it measures), an
+  upstream repro or a one-shot test. Each now carries a `disable` directive with its reason; tensor-gpu's comes from
+  `scripts/gen_tensor_gpu.py`, which writes the file.
+- `make lint` passes the tracked files without `tensor/` and `autograd/`, frozen since 2026-10-19, so their sources stay
+  as published (their 11 findings are proofs and small scalar trees). Result: 0 findings, 39 suppressed. Comments only:
+  every edited file checks as before.
+
+## tensor-fork 0.1.5.0 on tensor-array 0.1.18.0 (2026-10-30)
+
+- tensor-fork 0.1.4.0 imported tensor-array 0.1.16.0, so a program that used it with tensor-gpu 0.1.5.0 or tensor-array
+  0.1.18.0 held two `Mat` types: BendTorch's bump to 0.1.18.0 failed in the three files that import tensor-fork
+  (`expected ...main.Mat`, `observed TA.Mat`, in `lin_fwd`; reported on #23). Pull request #29 by adeerkhan moved the
+  three imports to 0.1.18.0; merged into `devel` after `make check` 101/101.
+- Published `bend-ml-tensor-fork@0.1.5.0` `0x236efa65086abc5955a9e74563e24668`: the same code and bits as 0.1.4.0.
+  `make check` 101/101 with it; `reference/test_published.py` takes it from the README table.
+
+## tensor-array 0.1.19.0, ready to publish (2026-11-01, not published)
+
+- The three Array laws of 2026-10-29 (`size_set`, `get_after_set`, `get_other_set`) go out as 0.1.19.0 without the
+  round trip `Mat.to_list(Mat.of_list(xs)) == xs`, my decision: that law needs a lemma about `Array.new`'s trees (two
+  different indices reach different leaves) and four `U32` facts Base does not state; `tests/apart.bend` (#28, by
+  adeerkhan) checks the lemma on every pair of indices through depth 7, and #26 stays open for the law.
+- The header and the README say 0.1.19.0; `git diff` against 0.1.18.0's commit adds lines and changes only the version
+  in the header, so every def 0.1.18.0 had keeps its code and bits. `list_laws.py --check-readme`: 33 laws in 5
+  packages, ok. `bend tensor-array/main.bend --verdict`: ALL PROOFS CHECK.
+- The package table, the badge (33 laws), the diagram, the demos, the benchmarks and `reference/test_published.py` stay
+  on 0.1.18.0 until it is on BendHub: `test_published.py` reads the table, so a version there that the hub does not
+  have fails the checks. tensor-fork and tensor-gpu 0.1.5.0 keep importing 0.1.18.0.
+
+## tensor-array: the Array laws on the C lane (2026-11-01)
+
+- `tests/array_laws.bend` runs on the JavaScript lane only: the compiled runtime keeps an `Array` as one flat block and
+  stops with `runtime fail-stop` on its hand-built unbalanced tree (filed upstream by adeerkhan as bendlang/bend#1980).
+  `tests/array_laws_c.bend` uses the same three laws on perfect trees only (an 8-cell literal and a hand-built tree of 4
+  leaves), so both lanes print `(1.5, 2.5, 3.0, 9.0)`: get after set, a write at 13 (wrapped to 5) leaving cell 2
+  alone, and on the 4-leaf tree a write at 2 leaving cell 3 alone and seen by a read at 2. `make check` runs it on both
+  lanes and with `--verdict` (4 checks; 108 in all on this machine with CUDA).
+
+## Peak virtual memory: 10.6 GB against 41 GB, explained (2026-11-01, Bend 2.0.39)
+
+The open question of 2026-10-06 and 2026-10-09 (GPT-2's peak virtual size 41 GB in some runs, 10.6 GB in others).
+It is address space the runtime reserves, and its size follows the thread count, not the model:
+
+- Measured with `scripts/peak_rss.sh`'s method plus a copy of `/proc/<pid>/maps` at the peak, GPT-2 `fast.bend`
+  compiled with 2.0.39, "Hi" + 1 token (busy machine; sizes only, no timings):
+
+  | `+RTS --threads` | peak virtual | peak resident | mappings of 256 MiB or more |
+  |---|---|---|---|
+  | 1 | 10,634 MB | 825 MB | one of 8 GiB, one of 2 GiB |
+  | 2 | 10,634 MB | 825 MB | (same as 1) |
+  | 4 | 16,421 MB | 829-837 MB | one of 8 GiB, four of 2 GiB |
+  | 16 | 41,094 MB | 833-840 MB | one of 8 GiB, sixteen of 2 GiB |
+
+- Where they come from, in the C the compiler emits (`bend X.bend -o x.c`): the heap ("corpus") is one
+  `mmap(MAP_PRIVATE | MAP_ANON | MAP_NORESERVE)` of 8 GiB (`1ull << 33`) at a high fixed address, and it doubles in
+  place when it fills (`corpus_grow`, up to 2^43 bytes). Every thread that runs Bend code gets its own 2 GiB stack
+  (`pool_stack`, `1ull << 31` plus a guard page), the main thread too. `pool_open` starts the `threads - 1` workers at
+  the first parallel split, not at start-up.
+- So peak virtual = 8 GiB x 2^k (k heap doublings; 0 for GPT-2) + 2 GiB x (1 + workers started) + ~0.4 GB of program,
+  libraries and the IO thread. 16 threads: 8 + 32 GiB = 41 GB; 1 thread: 8 + 2 GiB = 10.6 GB. With 2 threads the demo
+  keeps its weights as one block (bands only above 2 threads), never splits, starts no worker and stays at 10.6 GB.
+  That is probably why 2026-10-09's shorter prompt showed 10.6 GB (not re-measured; those runs were on Bend 2.0.3x): a
+  run that ends before its first parallel split never starts the workers. On 22 threads the same arithmetic gives
+  ~52 GB (computed, not measured).
+- None of it is memory in use: the pages are `MAP_NORESERVE` and only touched pages become resident (840 MB at 16
+  threads against 825 at 1, the workers' stacks and heap pages). It matters under a virtual memory limit: with
+  `ulimit -v 20000000` (about 19 GiB) the 16-thread run stops with `bend: reservation failed` (exit 1) after printing
+  the prompt ids, while the 4-thread run finishes. Under `vm.overcommit_memory = 2`, which ignores `MAP_NORESERVE`, the
+  same is likely (not tested; this machine runs mode 0).
+- Nothing to change in bend-ml: the sizes are the runtime's. The GPT-2 README's "reserves ~41 GB of address space,
+  which is not memory in use" stays true for 16 threads.
+
+## The README numbers measured again on an idle machine (2026-11-01, Bend 2.0.39)
+
+Pending since v3: the README charts still showed v1.3.2 (2026-10-16, Bend 2.0.37) and the matrix · vector and
+compile-time results were from 2026-10-11 (Bend 2.0.36).
+
+- Machine: Intel Core Ultra 7 155H, 32 GB, AC power, `performance` profile, nothing else running (idle Claude Code and
+  Codex sessions at ~0.1% CPU). Load1 before each block: 0.32 (`make bench`, 05:43), 1.35 decaying from it
+  (compile times, 05:57), 0.69 (the evidence blocks, 05:58); during the 16-thread runs it rises from the runs themselves.
+- Method: the protocol of 2026-10-11 (black-box marginal cost, t(33 tokens) - t(1) over 32 for GPT-2 and t(600 batches)
+  - t(50) over 550 for MNIST; cases in a seeded random order per round; 1 thread pinned to CPU 3; GPT-2 7 rounds, MNIST
+  and the thread curve 5; peak memory from one extra run). Built with Bend 2.0.39 from tag v1.8.0 (`fast.bend` on
+  tensor-array 0.1.18.0, as published; HEAD differs only in comments), next to v1.3.2 (Bend 2.0.37) as the anchor,
+  PyTorch 2.14.1 and NumPy 2.5.3. Every case gave the same tokens or the same loss.
+- `make bench` stopped at the GPT-2 row of `scripts/compile_times.py`: `bend --check-only` exits 1 on binary-read's
+  foreign-code report although the check passes. Fixed in the script; the compile times were rerun alone.
+
+Medians, ms (IQR in brackets):
+
+| | 1 thread | 16 threads | peak MB (16 t) |
+|---|---|---|---|
+| GPT-2 v1.8.0, per token | 128.9 [126.4-129.9] | 84.7 [83.0-85.9] | 869 |
+| GPT-2 v1.3.2, per token | 138.2 [137.5-139.1] | 105.9 [105.4-107.3] | 880 |
+| GPT-2 PyTorch | 18.8 | 11.0 [10.8-11.2] | 1199 |
+| GPT-2 NumPy | 18.6 | 14.8 [9.7-16.3] | 1007 |
+| MNIST v1.8.0, per batch | 9.49 | 5.69 | 85 |
+| MNIST v1.3.2, per batch | 20.03 | 7.75 | 107 |
+| MNIST PyTorch | 0.49 | 0.42 | 592 |
+| MNIST NumPy | 0.42 | 1.46 | 388 |
+
+GPT-2 v1.8.0 by thread count: 128.9 (1), 129.7 (2), 84.5 (4), 79.4 (8), 83.8 (12), 84.7 (16), 78.8 (22); PyTorch 18.8,
+13.0, 9.7, 10.3, 10.4, 11.0, 12.6. GPT-2 v1.8.0 starts in 0.80 s (v1.3.2 1.02 s), peak 831 MB on one thread.
+
+What moved:
+
+- The anchors held: v1.3.2 within 1% of 2026-10-16 (138.8 / 107.1 ms, 19.97 / 7.67 ms), PyTorch and NumPy within 2% on
+  one thread. On 16 threads PyTorch (11.0 against 9.4) and NumPy (14.8 against 11.2) came out slower with a wide
+  spread; the charts keep every reference system's numbers of 2026-10-11 and add v1.8.0.
+- GPT-2: 138 → 129 ms on one thread, 106 → 85 on 16, as Bend 2.0.39 alone gave on 2026-10-24 (128 / 86).
+  MNIST: 20.0 → 9.5 ms on one thread, 7.8 → 5.7 on 16, peak 107 → 85 MB.
+- A loss in the chart's story: the thread slide said Bend keeps gaining up to 22 threads. v1.8.0 flattens after 4
+  (84.5 ms; 78.8 at best), and so did v1.3.2 (107.8 at 4, 96.7 on 22); the slide now says it levels off.
+- Matrix · vector (`bench/results/mv_bands-2026-11-01.txt` against 2026-10-11): unchanged within noise. The sequential
+  products are 2-8% slower (768 x 768: 0.239 → 0.258 ms), under the 15% between sessions that I do not call a result;
+  the 50257-row rows with 20 products swing both ways at 16 threads (one at 0.99 ms against 3.96) and are not results.
+- Compile times (`bench/results/compile-times-2026-11-01.md` against 2026-10-11): checks 0.12-0.23 s, builds 0.71-3.56 s
+  (GPT-2 4.11 → 3.56 s, its file 588 → 559 lines; the rest within 0.2 s).
+- `numbers.json` holds the run as `rerun_2026_11_01`; `checks_quick`/`checks_full` are 108/119 (99/110 without CUDA).
+  `make_media.sh --capture` refreshed the outputs: `make check-full` 119/119; `law_count.txt` reads 33 laws because the
+  tree has tensor-array 0.1.19.0's source, not published, so the badge stays at 30.
+
+## tensor-fork: softmax_ce with the rows in blocks (2026-11-01, on devel, not published)
+
+- The rows in parallel, the second time. tensor-array's attempt of 2026-10-27 (`Mat.softmax_ce_par`) gave no gain
+  because tensor-array shares no array: each half of its fork tree copied its rows. tensor-fork has `par3`, so
+  `TF.softmax_ce(n, c, par, z, labels)` runs the rows on up to 2^par blocks that share three arrays through
+  `Array.fork`: the logits (each block overwrites its own rows with their gradient), the labels (read; taken from the
+  list into an `Array<U32>` once, a label past the row kept as c) and one loss term per row (each block writes its own
+  cells). The rows are tensor-array's own loops (`cea_max`, `cea_exp`, `cea_p`, `cea_grad`); only the running loss
+  moves out of the row: the term `log(max(p, 1e-12))` goes into its cell, and after the blocks `ce_sum` subtracts the
+  terms from +0.0 in row order, as `cea_rows` does, so the bits are the same at every depth and thread count.
+- Two cases stay sequential. More labels than rows: those rows reach past the matrix and may wrap around onto its first
+  rows, so they run after the blocks through `TA.cea_rows`, in order (the same order as tensor-array's). A matrix with
+  no columns (every row starts at cell 0) and `par = 0` run `TA.Mat.softmax_ce` itself.
+- Bits: `tensor-fork/tests/ce.bend` compares the loss and every gradient cell with `TA.Mat.softmax_ce` at par 0..6 on
+  eleven cases (2 x 3, 100 x 10, 7 x 49,152, 1 x 1, 5 x 10 with 3 and with 7 labels, 33 x 17, 64 x 4,096, 5 x 0, 0 x 10
+  with no labels and with 3), tensor-array's `ce_array` values and labels: 0 differing words, on 1 and 16 threads. Three
+  mutants are caught: a block that starts a row late (295,110 words), a label past the row read as 0 (174), the terms
+  added instead of subtracted (24). It refuses arguments, as `bits.bend`. Not run on the JS lane: the interpreter grew
+  past 26 GB on the wide cases and was stopped.
+- Three more defs outside the proofs, pinned in `check_all.py` (35): `ce_par3` (calls `par3`), `softmax_ce2` and
+  `softmax_ce` (reach it). No package with laws imports tensor-fork.
+- Cost, counted, not timed (the machine was busy): user-mode instructions on CPU 3, one thread, 256 rows of 49,152, the
+  fill included: 1,402.3 M at par 4 against 1,402.2 M at par 0 (tensor-array's loop), so the blocks add no copy. Whether
+  16 threads give anything on a loop this bound by memory is the idle-machine question (Track B); until then the README
+  makes no speed claim.
+- `make check` 111/111 (108 before, with CUDA); `make lint` 0 findings.
+- Not published: it would be `bend-ml-tensor-fork@0.1.6.0` (a new capability; the products' code and bits unchanged).
+
+## tensor-fork: softmax_ce timed on an idle machine (2026-11-01)
+
+- The question left open above: does `TF.softmax_ce` on 16 threads beat tensor-array's one-thread loop, with the same
+  bits. `bench/ce_fork.bend` and `bench/ce_fork.py` (new): the logits filled, then `TF.softmax_ce` at par 0 (that is
+  `TA.Mat.softmax_ce` itself), 4 or 6, or the fill alone; one thread pinned to CPU 3, 16 threads through
+  `+RTS --threads 16 -RTS`; 11 rounds, every pair once a round in a shuffled order, medians and [min, max]. Idle
+  before every round (load1 under 1.0, no process over 10% CPU, performance profile, mains). Results in
+  `bench/results/ce_fork-2026-11-01.txt`.
+- Result in a line: on wide rows, 2.9x at par 6 and 2.6x at par 4 for the whole program, fill included; on MNIST's
+  100 x 10 it is slower, so par 0 there.
+
+  | rows x cols | tensor-array, 1 thread | par 4, 16 threads | par 6, 16 threads | the fill alone |
+  |---|---|---|---|---|
+  | 1,024 x 49,152 | 367.3 ms [366.0, 370.7] | 143.7 ms [136.0, 145.9] (2.56x) | 125.6 ms [121.0, 134.9] (2.92x) | 83.1 ms |
+  | 256 x 49,152 | 93.3 ms [91.2, 94.1] | 39.3 ms [36.3, 42.2] (2.37x) | 32.6 ms [31.4, 37.5] (2.86x) | 22.2 ms |
+  | 4,096 x 1,000 | 30.7 ms [28.9, 31.5] | 15.6 ms [12.8, 19.7] (1.97x) | 12.2 ms [10.4, 14.5] (2.51x) | 7.3 ms |
+  | 64 x 1,000 | 1.5 ms [1.4, 1.6] | 2.0 ms [1.8, 2.2] (0.74x) | 2.2 ms [1.7, 2.3] (0.67x) | 1.1 ms |
+  | 100 x 10 | 1.1 ms [1.0, 2.3] | 1.9 ms [1.3, 2.1] (0.55x) | 1.9 ms [1.4, 2.2] (0.56x) | 1.0 ms |
+
+  The fill is sequential and every variant pays it; without it (median minus median, an estimate) the cross-entropy
+  itself goes from 284 to 43 ms at 1,024 rows, about 6.7x at par 6 (a second, separate run of 11 rounds gave 6.1x).
+- Bits: the loss word and the sum of all gradient words are the same for par 0, 4 and 6 on 1 and 16 threads at every
+  shape (1,024 x 49,152: loss `1094078500`, gradient sum `2971427842`); `tests/ce.bend` stays the word-for-word check.
+- One thread costs nothing: par 4 and 6 within 1% of par 0 at every shape. tensor-array on 16 threads is its one-thread
+  time (366.7 against 367.3 ms), as expected of a loop with no fork.
+- Instructions (`perf stat -e cpu_core/instructions/u`, one thread on CPU 3, medians of 3): 1,024 x 49,152 6,123.3 M at
+  par 0, 6,123.3 M at par 4, 6,130.5 M at par 6; 256 x 49,152 1,539.7, 1,540.4, 1,540.7 M (the fill differs from the
+  1,402 M entry above, so the totals do too). On 16 threads `cpu_core` + `cpu_atom` grow to 8.0-9.4 G at 1,024 rows
+  with runs 3 G apart: the waiting workers' spinning is counted, so it is not a measure of work.
+- Schedule check, though the gap is far over 20%: the 1,024-row par 0 and par 4 programs compiled a second time ran at
+  362.5 and 142.6 ms against 361.1 and 143.3 ms on 16 threads (the first harness run, same protocol).
+- Losses: small matrices lose on 16 threads, 0.8 ms on 100 x 10 and 0.5-0.7 ms on 64 x 1,000, a cost of handing out the
+  blocks; whether it is paid per call or once per run is not separated here, so MNIST-sized callers should keep par 0.
+  Spread on 16 threads is up to 19% of the median (256 rows, par 4) against 2-4% on one thread. Par 6 beats par 4 on
+  every wide shape (64 blocks balance 16 threads better than 16 blocks). MetalBend's preflight reported "busy" for the
+  agent processes alone (claude, codex: present, under 10% CPU); the other checks passed.
+
+## matvec_l's one-band cost, and the dot product unrolled by four (2026-11-01, on devel, not published)
+
+The plan after v1.2 kept "`matvec_l`'s ~25% one-band cost on the 50257-row matrix" open (2026-10-06, measured on a busy
+machine against `Mat.matmul_nt`). I measured what one band costs against the bare kernel it runs, then tried to make the
+kernel cheaper in pure Bend. Results in `bench/results/mv_band_cost-2026-11-01.txt` (`bench/mv_band_cost.py`, two blocks
+of 9 shuffled rounds on an idle machine, one thread pinned with `taskset -c 3`, 16 threads in `+RTS ... -RTS`).
+
+- **The 25% is gone.** On 50,257 x 768, one thread, `Bands.matvec_l` with one band takes 26.7 ms and the bare `gemm` with
+  x and y kept as arrays and reused 26.9-27.1 ms: the list in, the fresh output array and the list out add 4% of the
+  instructions (483 M against 464 M per product) and no time. Exp. 14 (the gemm into an array, read back) had already
+  removed what the 2026-10-06 number measured. So the cost of one band is the cost of the dot product: ~12 instructions
+  per multiply-add.
+- **Change kept:** `dotg` runs `dotr` unrolled by four: a round of four `dstep` (one step each: the pending product
+  into `a0`, the sums rotated, the next pair read), then the last `k mod 4` steps through `dotr` itself. Every product
+  goes to the same partial sum in the same order (four rotations bring the names back), so the bits are `dotr`'s.
+  `dstep` compiles to an inlined helper; the loop runs 16% fewer instructions. Pure Bend, no `@unsafe`, no new law;
+  `dotr` stays as it was (the remainder, `matmul_precise`'s blocks and `tests/blocks.bend` use it).
+- **Bits:** `tensor-array/tests/dot4.bend` (in `make check`) compares `dotg` with `dotr` for every k from 0 to 40 with
+  NaN, infinities and subnormals mixed in, with unit and wider strides, and three long dots: 0 differences; a mutant
+  that drops the rotation gives 22 21 23 3. `bench/mv_band_cost.py bits` hashes every output of `Bands.matvec_l` (1 and
+  2^4 bands) and `Mat.matmul_nt` on 9 shapes, 1 x 1 to 50,257 x 768: the same sha256 before and after. `tests/t8.bend`
+  (cells of 8 against the scalar loop) and `tests/onerow.bend` still pass, and `make check` passes.
+- **Result** (medians over 9 rounds, block A / block B):
+
+| W | setting | before | after | change |
+|---|---|---|---|---|
+| 50,257 x 768 | one band, 1 thread | 26.73 / 26.69 ms | 20.07 / 20.01 ms | -25% / -25% |
+| 50,257 x 768 | bare kernel, 1 thread | 26.95 / 27.09 ms | 18.74 / 18.84 ms | -30% / -30% |
+| 768 x 768 to 3072 x 768 | bare kernel, 1 thread | | | -6% to -8% |
+| 768 x 768 to 3072 x 768 | one band, 1 thread | | | -1% to +1% |
+| all five shapes | 2^4 bands, 16 threads | | | -4% to +9%, inside the spread |
+
+- **Schedule checks.** The rebuilt binaries were byte-identical, so the second block repeats the first with a fresh run
+  order; the 25% held to the tenth of a millisecond. A control with the same `D4`/`dstep` structure but one step a round
+  times like the old loop (26.8 ms, +0.5%), so the gain comes from the four steps a round, not from the rewrite.
+- **Losses and leftovers.** The gain is the big matrix on one thread (154 MB of weights, read from memory); on matrices
+  that fit in the cache the bare kernel gains 6-8% but the one-band call does not move, which I cannot explain yet. On
+  16 threads nothing changes: block A read +2% to +9% on every shape, block B -4% to +4.5%, both inside the run-to-run
+  spread (e.g. 3.15-4.33 ms against 3.43-4.62 at 50,257 rows); I do not count it as a loss or a gain. Eight steps a
+  round were no faster (393 M instructions against 388 M, and a little slower in a quick check). After the change the
+  list conversions show: one band is 20.0 ms against 18.8 for the bare kernel (+6.5%), the next thing to cut on one
+  thread. Not measured: the GPT-2 demo end to end (it imports the published package); llama.bend, tensor-fork and
+  tensor-gpu get the kernel only when they move to a version that has it.
+- **Release:** the change sits in the tree's 0.1.19.0 source, which the README describes as 0.1.18.0's defs plus three
+  laws; whether it ships as 0.1.19.0 or 0.1.20.0 is still open, and the README's version line needs a sentence either
+  way.
+
+## The GPT-2 weights decoded in parallel at the `ANode` halves (negative), and the band tree walked by depth (2026-11-01, on devel)
+
+The v3.1 notes left "loading in parallel: split a band's `Array` by its `ANode` halves and decode each half in a parallel
+let" open (2026-10-06, before binary-read). I tried it on today's loader. Results in
+`bench/results/gpt2_load-2026-11-01.txt` (`bench/gpt2_load.py`, two blocks of 9 shuffled rounds on an idle machine, one
+thread pinned with `taskset -c 3`, 16 threads in `+RTS ... -RTS`, "Hi" + 1 token, the demo's own "weights loaded in"
+line in milliseconds).
+
+- **Nothing is left to decode.** Since binary-read (2026-10-16) every matrix is one `pread` straight into its `Array`,
+  already as F32; only the 0.1 M numbers of the biases and LayerNorms still go through byte lists. A profile of the
+  load on one thread: the `Array.new` fill before each read, a `TA.Bands.zeros` tree filled with zeros, the kernel's
+  copy of the file, and the drop of the zero tree. So the hypothesis became: does handing a band's halves to 16
+  threads pay for itself at all?
+- **It does not: an `ANode` split is a copy.** As the pitfall says, matching an `Array` copies each half into its own
+  block, and building one from two halves copies them back. A 256 MiB probe: `Array.new` 24 ms; built from halves 4
+  levels deep in parallel lets 168 ms on 1 thread and 128 ms on 16; split 4 levels and joined again 233 / 267 ms, with
+  3-7x the memory. In the loader (medians, block A / B):
+
+| variant | 1 thread | 16 threads |
+|---|---|---|
+| base (5a041a7) | 306 / 306 ms | 337 / 331 ms |
+| each band split at its halves and joined, after the read | 770 / 771 ms (+152%) | 695 / 686 ms (+106%) |
+| each band built from its halves instead of `Array.new` | 583 / 581 ms (+90%) | 459 / 458 ms (+38%) |
+| band tree walked by depth (kept) | 218 / 217 ms (-29%) | 238 / 241 ms (-29% / -27%) |
+
+  The parallel variants lose on both thread counts and give the same bits; discarded. A parallel fill or decode of one
+  flat block needs `Array.fork` (`@unsafe`, tensor-fork's terms), and there is no decode left to give it.
+- **Change kept:** `load_tree` in `demos/gpt2/fast.bend` walks the band depth `d` instead of building
+  `TA.Bands.zeros(d, r, c)` and matching it. The zero tree held a zero-filled copy of every banded matrix (about 490 MB
+  before the padding) that the loader dropped unread. The same rows split the same way (`TA.half`), so the bands are the same. Instructions for the
+  whole run 5,404 M → 3,760 M on one thread. Demo only: no package changes.
+- **Bits:** `reference/test_gpt2_load.py` (in `make check` when the split weights are present) builds the demo with its
+  generation replaced by an FNV-1a hash of every loaded weight (every cell of every `Array` with its size, every list
+  number) and compares it with a pinned value for 1 and 16 threads (their band layouts differ). The same hash for base,
+  both `ANode` variants and the kept change; a mutant that reads each node's second half from the first half's
+  offset gives a different 16-thread hash. `reference/test_gpt2.py`: 11 prompts against PyTorch, 0 failures. `make
+  check`: 114/114.
+- **Schedule check:** block B rebuilt every binary (byte-identical to A's) and ran a fresh order; every median moved by
+  under 2%. The kept gap (29%) is above the 15-20% bar anyway.
+- **Leftovers.** 16 threads still load slower than one (238 against 218 ms): 16 bands per matrix are 16 smaller reads,
+  each into its own fresh array. What remains is `Array.new`'s fill (about 45 ms for these 490 MB, scaled from the probe) and the
+  copy from the page cache; neither can be split without `@unsafe` or new C. llama.bend's loaders
+  (`llama/load.bend`, `llama/main.bend`) build the same `TA.Bands.zeros` tree before reading into it; not measured
+  there. MetalBend's preflight reported "busy" for idle agent processes only (claude, codex, under 3% CPU).
+
+## Array's per-element cost against C, and read_l without the reverse (2026-11-01, on devel, not published)
+
+The notes kept "the per-element cost of `Array`" open since 2026-10-11. I measured each operation against a C loop doing
+the same work, then looked at the emitted C and the disassembly for where the instructions go. Results in
+`bench/results/array_cost-2026-11-01.txt` (`bench/array_cost.py`, `.bend` and its C twin `.c`, three blocks of 9, 9 and 7
+shuffled rounds on an idle machine, one thread pinned with `taskset -c 3`, arrays of 2^12 to 2^24 numbers, every Bend
+output equal to C's).
+
+| per element, 2^16 numbers (in cache) / 2^24 (memory) | Bend instr | C instr | Bend ns | C ns |
+|---|---|---|---|---|
+| `get` (a U32 sum) | 4.0 | 0.9 | 0.21 / 0.23 | 0.04 / 0.20 |
+| fold (one F32 sum, tensor-array's loops) | 4.0 | 1.4 | 0.42 / 0.53 | 0.42 / 0.50 |
+| `set` | 5.8 | 1.3 | 0.19 / 0.31 | 0.05 / 0.27 |
+| `Array.new`, literal depth | 0.35 | 0.63 | 0.05 / 0.28 | 0.05 / 0.28 |
+| `Array.new`, depth computed at run time (`cap_depth`, as `Mat.zeros`) | 8.0 | 0.63 | 0.43 / 0.45 | 0.05 / 0.27 |
+| `Mat.to_list` + sum of the list | 43 → 34 | 13.5 | 4.36 → 2.80 / 6.6-7.2 → 4.04 | 1.38 / 5.2-5.7 |
+| `Mat.to_list` + `Mat.fill_at` back | 45 → 36 | 17.5 | 4.2 → 2.7 / 6.5-7.0 → 3.84-3.89 | 1.39 / 2.9-3.1 |
+| Base's `Array.to_list` (+ `Array.new`, sum) | 195-208 | 14 | 11.7 / 15.2 | 1.45 / 5.5-6.2 |
+
+- **Where the instructions go.** `get` and `set` are what the pitfall says: an index mask and a load or store. clang
+  unrolls the loop by four and hoists the mask, so a read is a `lea`, an `and` and a load-add, but the mask keeps the loop
+  from being vectorized; C's loop is vectorized. In memory both wait on the same bytes (1.13-1.17x); in cache the gap is
+  3-6x. The fold is bound by its one F32 addition chain on both sides (1.00-1.07x). That gap is bendlang/bend#1781 and
+  #1936, and `Array.get_unchecked` (#1880, on main) already removes it for reads; nothing to change in Bend here.
+- **`Array.new` with a computed depth is not vectorized on 2.0.39**: `blk_new`'s loop tests `(i >> c) == 0`, which clang
+  cannot count, so it fills one cell at a time (8 instructions a cell, 0.43 ns). With a literal depth it is a vector fill
+  as fast as C. bendlang/bend#1928 (merged for #1890, not in a release) fixes this loop; every `Mat.zeros` and the GPT-2
+  loader's fill get it with the next Bend.
+- **Change kept: `read_l` reads from the last index down.** It used to read up and reverse the list at the end (a second
+  pass over every cell). Consing each number onto the list while stepping down gives the list in order with no reverse.
+  Callers now pass the last index and its read; the seven call sites (`Mat.to_list`, `Mat.read_row`, `Mat.add_row`,
+  `Bands`' leaves, the cross-entropy and count rows) changed accordingly. The two length laws that go through it
+  (`leaf_len`, `read_ml_len` for `to_list_len`) got simpler: their base case holds by the definitions, so `rev_len` is gone.
+  Pure Bend, no `@unsafe`. **Result:** -21% instructions and -35% to -45% time per element on both blocks (2.60 against
+  4.00 ns at 2^12, 4.03 against 6.6-7.2 ns at 2^24). The list path is still 2.5x C's instructions: one cell allocated and
+  freed per number.
+- **Bits:** `tensor-array/tests/tolist.bend` (in `make check`) checks `Mat.to_list` and every `Mat.read_row` against a list
+  built by a forward recursion on 8 shapes (1 x 1 to 5 x 1025, sizes just past a power of two included): 0 differences on
+  both the old and the new code; a mutant that passes the first index instead of the last gives "0 5 12 63 1024 1025 1023
+  5125" (an index mutant in `Mat.to_list` itself is refused by `to_list_len`'s proof). `bench/mv_band_cost.py bits` gives
+  the same hashes for `Bands.matvec_l` (1 and 2^4 bands) and `Mat.matmul_nt` on its 9 shapes before and after. `make
+  check`: 116/116.
+- **Base's `Array.to_list` costs 13-15x a C loop** (195-208 instructions a cell): it walks by `match`, so every `ANode`
+  copies its halves into fresh blocks, plus a block per leaf. tensor-array does not use it (read_l is a `get` loop). JS
+  got a flat walk for the same reason (bendlang/bend#1661); C kept the walk. An issue draft is in my private notes.
+- **Losses and leftovers.** The gain is in the conversion itself; I did not measure a whole program. The users are list
+  APIs: one band of `Bands.matvec_l` reads 50,257 numbers back, about 0.07 ms of its 20 ms by the per-element numbers. The
+  release question of the last two entries (0.1.19.0 or 0.1.20.0, and the README's version line) now covers this change
+  too. Block B's preflight read load1 1.49 just after my own builds; block C waited for load1 under 1.0, rebuilt
+  byte-identical binaries, swapped the order, and moved every median by under 5%. MetalBend's preflight reported "busy"
+  for idle agent processes only.
+
+## Release v1.9.0: tensor-fork 0.1.6.0 and tensor-gpu 0.1.5.1 on tensor-array 0.1.19.0 (2026-11-01)
+
+- Published, in this order: `bend-ml-tensor-array@0.1.19.0` `0x54fd18094240d26f3074e1ee00279d63` (the three Array
+  laws, the unrolled `dotg`, `read_l` without the reverse), `bend-ml-tensor-gpu@0.1.5.1`
+  `0xa7c27951cd583387fb9278576d1236e0` (0.1.5.0's code on 0.1.19.0, regenerated by `scripts/gen_tensor_gpu.py`; the
+  generated file changes only in its two version lines) and `bend-ml-tensor-fork@0.1.6.0`
+  `0x00977eb08bd5a81deaf111443555211b` (`softmax_ce` with the rows in blocks, on 0.1.19.0; the products unchanged). The
+  published sources are byte for byte the tree's. Versions by `docs/VERSIONING.md`'s rules applied to each package:
+  tensor-gpu gains no API, so a fourth-number bump as 0.1.1.1 was; tensor-fork gains `softmax_ce`, so a new third number.
+- Checked from a scratch folder: one program imports all three, passes the same `Mat` to `TF.matmul`, `TG.matmul` and
+  `TF.softmax_ce`, and gets tensor-array's numbers (144 for a 2 x 3 x 4 product of 2s and 3s, ln 5 for a uniform 4 x 5
+  cross-entropy on 4 threads).
+- The demos and the benchmarks moved to 0.1.19.0; the README table lists the three versions and the badge 33 laws
+  (`list_laws.py --check-readme` ok). `reference/test_published.py` now also applies `size_set` and `get_after_set` from
+  the published tensor-array and compares the published `TF.softmax_ce` at par 2 with `TA.Mat.softmax_ce` on 64 x 1,000
+  logits (loss and gradient sum, the same words). `make check-full` 127/127 (GPU included), so the README counts do not
+  move; `test_published.py` passes on every package.
+- Release number: v1.9.0, not the v1.8.1 I had planned. `docs/VERSIONING.md` gives the minor to a new capability and the
+  patch to fixes and speed-ups without new API; tensor-fork's `softmax_ce` and tensor-array's three laws are new API, as
+  `par1`..`par4` were for v1.5.0. The speed-ups (`dotg`, `read_l`, the GPT-2 loader) alone would have been a patch.
+- Not re-measured for this release: GPT-2 and MNIST per token and per epoch on 0.1.19.0. The changes measured are the
+  pieces (one `matvec_l` band -25% on one thread, `read_l` -35% to -45% per number, the GPT-2 demo's load -29%).
+  The law `matvec_l_len` (in progress) stays out: its proof was written against the old `read_l` and does not check on the
+  new one.

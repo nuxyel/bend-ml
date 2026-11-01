@@ -41,6 +41,7 @@ def many(n: Nat, +a: List<&2, List<&2, F32>>, +bt: List<&2, List<&2, F32>>, acc:
     case 0n:
       acc
     case 1n+p:
+      # bend-lint: disable-next bend-lint-rules/performance/loop_invariant_call -- the repetition is the measured work not-expected-because: hoisting it would time one product instead of ten
       many(p, a, bt, (acc + tot(rows(a, bt), 0.0) : F32))
 
 def main() -> IO(Unit):

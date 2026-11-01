@@ -31,4 +31,4 @@ clean:
 	rm -rf reference/__pycache__ .scratch
 
 lint:             ## bend-lint's performance rules over the Bend code: a report, not a gate; measure a finding before taking it
-	bunx bend-lint --jobs max
+	bunx bend-lint --jobs max $$(git ls-files '*.bend' | grep -v -e '^tensor/' -e '^autograd/')   # not the frozen tensor and autograd (2026-10-19)

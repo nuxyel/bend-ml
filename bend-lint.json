@@ -1,6 +1,6 @@
 {
   "packages": {
-    "bend-lint-rules": "0.1.0.0"
+    "bend-lint-rules": "0.2.2.0"
   },
   "rules": {
     "bend-lint-rules/performance/append_in_loop": "warning",
@@ -14,6 +14,7 @@
     "bend-lint-rules/performance/loop_invariant_call": "warning",
     "bend-lint-rules/performance/missed_fork": "warning",
     "bend-lint-rules/performance/repeated_call": "warning",
+    "bend-lint-rules/performance/template_value_field": "information",
     "bend-lint-rules/performance/unused_result": "warning"
   }
 }

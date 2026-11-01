@@ -15,6 +15,7 @@ def dotT(a: Array<F32>, b: Array<F32>) -> R:
     case ALeaf{+x} ALeaf{+y}:
       R{ALeaf{x}, ALeaf{y}, (x * y : F32)}
     case ANode{xa, ya} ANode{xb, yb}:
+      # bend-lint: disable-next bend-lint-rules/performance/missed_fork -- measures the sequential walk of both trees not-expected-because: 100,000 calls over 1k-leaf trees, the case the rule's header measured 3.9x slower with a fork
       dotT2(dotT(xa, xb), dotT(ya, yb))
     case ALeaf{y1} ANode{y2, y3}:
       R{ALeaf{y1}, ANode{y2, y3}, 0.0}

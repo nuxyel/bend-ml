@@ -14,6 +14,7 @@ def upto(k: Nat, acc: U32) -> U32:
 # the smallest d with n <= 2^d, for n >= 2: 2^(d-1) < n <= 2^d
 def tight(+n: Nat) -> U32:
   +d = TA.cap_depth(n)
+  # bend-lint: disable-next bend-lint-rules/performance/eager_branch -- a one-shot test not-expected-because: 4 calls, pow2(21) at most
   Bool.pick(U32, Bool.and(Nat.is_le(n, TA.pow2(d)), Nat.is_lt(TA.pow2(Nat.sub(d, 1n)), n)), 0, 1)
 
 def main() -> U32:

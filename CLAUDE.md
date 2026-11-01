@@ -1,7 +1,7 @@
 # bend-ml
 
 Machine learning in Bend 2 where a shape error is a type error and the structural guarantees are
-laws checked by Bend's kernel. Five packages on BendHub (`bend-ml-*`), an MNIST and a GPT-2 small demo,
+laws checked by Bend's kernel. Eight packages on BendHub (`bend-ml-*`), an MNIST and a GPT-2 small demo,
 both matched against PyTorch. Started from Victor Taelin's wishlist "AI framework / PyTorch /
 llama.bend" (https://x.com/VictorTaelin/status/2104949395770712276). Two goals: packages other people
 use on BendHub, and a portfolio piece for HOC.
@@ -10,8 +10,8 @@ use on BendHub, and a portfolio piece for HOC.
 
 - `NOTES.md`: every finding, measurement and discarded hypothesis, by date and experiment number. Read
   the relevant experiment before changing performance-sensitive code.
-- `docs/v3.1-plan.md`: the current plan and its stop criterion. Earlier plans: `docs/v3-plan.md`,
-  `docs/v2-plan.md`.
+- No plan is current in this repository: `docs/v3.1-plan.md` was the last one (2026-10-06), after
+  `docs/v3-plan.md` and `docs/v2-plan.md`.
 - `docs/AUDIT.md`: the trust base and what is proved, tested or trusted.
 - `docs/upstream/`: the repros of open `bendlang/bend` issues (its README names each one). The issue texts are drafted
   outside this repository; Renan posts them.
@@ -118,4 +118,5 @@ Issues live in GitHub Issues (via the `gh` CLI). See `docs/agents/issue-tracker.
 
 ### Domain docs
 
-Single-context: one `CONTEXT.md` and `docs/adr/` at the repo root. See `docs/agents/domain.md`.
+None yet: there is no `CONTEXT.md` or `docs/adr/`. `docs/agents/domain.md` says how the skills would use them
+if they are written.

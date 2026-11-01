@@ -12,7 +12,7 @@
 # test sees a lane that differs: with F32.sin and F32.cos in rng_sc_x instead of rng_sin and rng_cos, the GPU run gives
 # 1 to 6,410 differing Gaussians a line and 69,913 in the Mat (2026-10-27), the CPU threads 0.
 import Base
-import bend-ml-tensor-array@0.1.18.0/main.bend as TA
+import bend-ml-tensor-array@0.1.19.0/main.bend as TA
 import ../main.bend as TG
 
 def bits(x: F32) -> U32:
@@ -191,6 +191,7 @@ def mo_show(+gauss: Bool, m: Mo) -> String:
 
 @unsafe
 def stats(+gauss: Bool, +s: U32) -> String:
+  # bend-lint: disable-next bend-lint-rules/performance/eager_branch -- a one-shot test not-expected-because: two fills of 1M cells, tens of ms
   mo_show(gauss, mo_go(1024n, 0, Tuple{Bool.pick(Array<F32>, gauss, TG.fill_gauss(s, 1048576n, 20n), TG.fill_uniform(s, 1048576n, 20n)), Mo{0.0, 0.0, 0, 0, 0}}))
 
 @unsafe

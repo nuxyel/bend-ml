@@ -12,6 +12,6 @@ clang -std=c11 -O3 "$T/a.c" -lpthread -lm -o "$T/a"
 clang -std=c11 -O3 "$T/b.c" -lpthread -lm -o "$T/b"
 for r in $(seq 1 "${1:-5}"); do
   for op in 0 1; do
-    echo "round $r op $op  as built: $(taskset -c 3 "$T/a" --threads 1 $op 50257 768 38 0)  BLK_SHR 1: $(taskset -c 3 "$T/b" --threads 1 $op 50257 768 38 0)"
+    echo "round $r op $op  as built: $(taskset -c 3 "$T/a" +RTS --threads 1 -RTS $op 50257 768 38 0)  BLK_SHR 1: $(taskset -c 3 "$T/b" +RTS --threads 1 -RTS $op 50257 768 38 0)"
   done
 done

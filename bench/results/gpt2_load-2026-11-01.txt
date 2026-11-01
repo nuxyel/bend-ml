@@ -1,0 +1,190 @@
+bench/gpt2_load.py on Bend 2.0.39: the GPT-2 demo's weight loading ("weights loaded in", in ms), "Hi" + 1 token.
+Variants: base = demos/gpt2/fast.bend at 5a041a7 (each band read by binary-read 0.2.0.0 into a fresh Array.new, the band
+tree taken from a TA.Bands.zeros tree); split = base with each band's Array split at its ANode halves 4 levels deep in
+parallel lets after the read and joined again (nothing to decode: the read already gives F32); pnew = base with each
+band's Array built from ANode halves 4 levels deep in parallel lets instead of one Array.new; tree = fast.bend after
+a3210a0 (load_tree walks the band depth; no TA.Bands.zeros tree).
+Intel Core Ultra 7 155H, 32 GB, AC power, performance profile, 2026-11-01. metalbend preflight.sh before each block:
+load1 0.47 (A) and 0.73 (B), CPU 3's sibling idle (0-1%); it reported "busy" only for idle Claude Code and Codex
+sessions (top process 2.2% CPU). Timings held the heavy lock. One thread: taskset -c 3. 16 threads: +RTS --threads 16
+-RTS (the demo then uses 2^4 bands per matrix, 2^5 for wte). 9 shuffled rounds per block, every (variant, threads) pair
+once a round. Instructions: perf stat cpu_core/instructions/u for the whole process (loading and one token), median.
+Bits: bench/gpt2_load.py bits (reference/test_gpt2_load.py's FNV-1a hash over every cell of every Array, its size, and
+every list number): 1 thread 2905384170 and 16 threads 138541988 for all four variants. "The capital of France is" 8:
+the same output for base and tree on 1 and 16 threads; reference/test_gpt2.py on tree: 11 prompts, 0 failures.
+Block B rebuilt every binary; the builds were byte-identical to block A's, so B repeats A with a fresh run order.
+
+== Block A
+variant  threads median ms     min-max instr. (M)  vs base
+base           1       306   300-307         5404      +0%
+base          16       337   324-348         5199      +0%
+split          1       770   765-776         6851    +152%
+split         16       695   662-707         8346    +106%
+pnew           1       583   579-589         6134     +91%
+pnew          16       459   449-472         7307     +36%
+tree           1       218   213-221         3760     -29%
+tree          16       238   233-245         3549     -29%
+
+== Block B
+variant  threads median ms     min-max instr. (M)  vs base
+base           1       306   301-308         5404      +0%
+base          16       331   323-376         5247      +0%
+split          1       771   763-778         6853    +152%
+split         16       686   668-699         8797    +107%
+pnew           1       581   573-589         6127     +90%
+pnew          16       458   441-472         7247     +38%
+tree           1       217   213-226         3760     -29%
+tree          16       241   233-254         3556     -27%
+
+== Probe (scratch program, single runs, indicative): one Array<F32> of 2^26 cells (256 MiB), time to build it and read two cells
+Array.new                                   1 thread  24 ms   16 threads  25 ms   peak RSS 262 MiB
+built from ANode halves, 4 levels, par let  1 thread 168 ms   16 threads 128 ms   peak RSS 744 / 1291 MiB
+Array.new, split at the halves and joined   1 thread 233 ms   16 threads 267 ms   peak RSS 744 / 1930 MiB
+
+== Raw rows (round, variant, threads, load_ms, instructions_u)
+-- A
+0	tree	1	214	3759796466
+0	pnew	16	453	7239202474
+0	split	16	696	7917714772
+0	split	1	770	6850686419
+0	tree	16	238	3423772625
+0	base	16	325	5319011347
+0	base	1	303	5404005663
+0	pnew	1	582	6129299606
+1	base	1	307	5404003784
+1	pnew	1	589	6132033157
+1	base	16	337	5210503885
+1	tree	1	218	3766132239
+1	split	1	768	6854048266
+1	pnew	16	453	7307017408
+1	split	16	695	8775591255
+1	tree	16	238	3446638440
+2	pnew	16	459	7388791389
+2	base	16	333	5199385134
+2	tree	16	235	3572840590
+2	split	1	775	6850696404
+2	split	16	669	8689198574
+2	base	1	306	5403996908
+2	pnew	1	584	6133558042
+2	tree	1	214	3760806692
+3	pnew	1	581	6134883192
+3	base	1	300	5416510779
+3	tree	16	235	3439987860
+3	split	16	707	8328659572
+3	pnew	16	449	6887917928
+3	tree	1	219	3759773689
+3	split	1	769	6850692349
+3	base	16	330	5136128355
+4	split	16	698	8345605112
+4	base	1	306	5410983645
+4	pnew	1	585	6136205235
+4	base	16	343	5027465311
+4	pnew	16	472	6827254864
+4	tree	1	221	3759780986
+4	tree	16	239	3421151468
+4	split	1	773	6850702618
+5	base	16	348	5232839513
+5	base	1	307	5403987271
+5	split	1	765	6852896332
+5	pnew	1	580	6137577769
+5	split	16	701	8083173730
+5	pnew	16	463	7054941492
+5	tree	16	245	3629210260
+5	tree	1	218	3759769045
+6	split	16	666	8216761005
+6	pnew	1	579	6127371548
+6	tree	16	233	3549358969
+6	split	1	776	6850693917
+6	base	16	341	5209639775
+6	base	1	302	5403991998
+6	pnew	16	462	7587691196
+6	tree	1	221	3759796528
+7	tree	1	213	3765319284
+7	base	1	303	5410826169
+7	tree	16	238	3702732916
+7	split	16	662	8704120340
+7	pnew	16	449	7376548842
+7	base	16	340	5082628697
+7	pnew	1	583	6127368009
+7	split	1	769	6857180338
+8	base	16	324	5138760308
+8	split	16	680	8661994536
+8	tree	16	241	3730681665
+8	tree	1	215	3759774428
+8	split	1	771	6858642448
+8	pnew	1	586	6134275066
+8	pnew	16	459	7587011022
+8	base	1	307	5404000176
+-- B
+0	pnew	1	578	6127363135
+0	split	16	688	8377555631
+0	base	1	306	5403990965
+0	split	1	763	6856986658
+0	base	16	349	5342900100
+0	pnew	16	472	6266519408
+0	tree	1	218	3759788636
+0	tree	16	241	3673939239
+1	pnew	1	585	6127375349
+1	split	16	699	8833260246
+1	tree	16	235	3258801974
+1	base	16	329	5227984954
+1	tree	1	215	3759776106
+1	split	1	768	6856622676
+1	pnew	16	458	7672124357
+1	base	1	306	5404001484
+2	pnew	16	441	7203003121
+2	tree	1	217	3759775759
+2	tree	16	240	3555775983
+2	base	16	323	5051668589
+2	split	16	682	8796643347
+2	base	1	308	5404005417
+2	pnew	1	589	6134823128
+2	split	1	774	6852694402
+3	tree	16	241	3677065405
+3	base	1	302	5411542369
+3	split	1	769	6859080117
+3	tree	1	214	3772195862
+3	pnew	16	447	7246647944
+3	split	16	686	8835806110
+3	pnew	1	581	6127384346
+3	base	16	327	5247380496
+4	pnew	1	581	6127372070
+4	split	1	772	6857549648
+4	base	16	376	5726214256
+4	tree	1	216	3759796994
+4	base	1	305	5413644081
+4	tree	16	254	3474334034
+4	pnew	16	445	6839506222
+4	split	16	675	8456359627
+5	split	1	778	6850700625
+5	split	16	673	9047634645
+5	pnew	16	454	7576816462
+5	base	16	331	5266935118
+5	base	1	303	5404002784
+5	pnew	1	579	6133034352
+5	tree	1	213	3768802343
+5	tree	16	240	3304089407
+6	split	1	773	6850690293
+6	tree	16	242	3608884635
+6	base	16	323	4883074225
+6	split	16	668	8780427089
+6	base	1	306	5404022909
+6	pnew	1	577	6131124419
+6	tree	1	223	3770975702
+6	pnew	16	465	7397791321
+7	split	1	771	6850683279
+7	pnew	1	573	6133277919
+7	tree	1	226	3768352734
+7	split	16	690	8870403209
+7	base	1	306	5403999461
+7	pnew	16	465	6959583125
+7	base	16	338	5134681484
+7	tree	16	248	3642705159
+8	tree	16	233	3475878428
+8	split	1	768	6850691346
+8	split	16	697	8458453346
+8	pnew	1	587	6127397698
+8	base	16	334	5327630577
+8	pnew	16	467	7584626415
+8	tree	1	224	3759792648
+8	base	1	301	5412745741

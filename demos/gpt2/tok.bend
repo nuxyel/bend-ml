@@ -103,6 +103,7 @@ def ids_ok(ns: List<&2, Nat>, +k: Nat) -> Bool:
         case Nil{}:
           False{}
         case Con{+b, u}:
+          # bend-lint: disable-next bend-lint-rules/performance/eager_branch -- on a valid table the walk reaches the end anyway not-expected-because: a whole encode with GPT-2's 50,000 merges takes 55 ms (2026-10-17, NOTES)
           Bool.and(Bool.and(Nat.is_lt(a, Nat.add(256n, k)), Nat.is_lt(b, Nat.add(256n, k))), ids_ok(u, 1n+k))
 
 def toks_of_ids(ns: List<&2, Nat>) -> List<&2, BPE.Tk>:
@@ -318,6 +319,7 @@ def ws3(+run: List<&2, U32>, +rest: List<&2, U32>, ends: Bool, +n: Nat) -> List<
     case True{}:
       (run, rest)
     case False{}:
+      # bend-lint: disable-next bend-lint-rules/performance/repeated_call -- lcl walks one whitespace run, a few bytes not-expected-because: binding it once measured no change in llama.bend's copy (2026-10-16)
       ws4(Nat.is_lt(lcl(run, 0n), n), run, rest, n, lcl(run, 0n))
 
 def ws2(p: List<&2, U32> & List<&2, U32>) -> List<&2, U32> & List<&2, U32>:

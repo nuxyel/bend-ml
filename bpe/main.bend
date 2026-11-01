@@ -107,6 +107,7 @@ def exp.go(table: List<&2, Rule>, hit: Bool, tk: Tk) -> List<&2, Nat>:
     case Con{r, rest} _ B{n}:
       n <> Nil{}
     case Con{Rule{i, +a, +b}, +rest} True{} M{j}:
+      # bend-lint: disable-next bend-lint-rules/performance/missed_fork -- one token's expansion, a few merges deep, under dec's loop over the ids not-expected-because: its cost is hits walking the table, not the order of the two calls (NOTES 2026-10-17)
       List.append(&2, Nat, exp.go(rest, hits(rest, a), a), exp.go(rest, hits(rest, b), b))
     case Con{r, +rest} False{} M{+j}:
       exp.go(rest, hits(rest, M{j}), M{j})
@@ -133,6 +134,7 @@ def lift(bs: List<&2, Nat>) -> List<&2, Tk>:
     case Con{n, t}:
       B{n} <> lift(t)
 
+# bend-lint: disable-begin bend-lint-rules/performance/eager_branch -- has, knl and wf.go are the predicates the laws are stated in; a match changes the laws' terms not-expected-because: the lint's own fix gained 18% on BPE.wf and was not taken; the CLI no longer runs wf (NOTES 2026-10-17)
 # ---- predicates used in the laws (all computable) ----
 
 # does some rule in the table have the id i?
@@ -168,6 +170,7 @@ def wf.go(todo: List<&2, Rule>, +done: List<&2, Rule>) -> Bool:
 
 def wf(table: List<&2, Rule>) -> Bool:
   wf.go(table, Nil{})
+# bend-lint: disable-end bend-lint-rules/performance/eager_branch
 
 # =====================================================================
 # Training (needs no proof: it generates tables; a table is valid if wf(table))
@@ -433,6 +436,7 @@ def mp_hit(+D: List<&2, Rule>, +i: Nat, +a: Tk, +b: Tk, +x: Tk, +y: Tk, +t: List
   mp_core(D, i, a, b, t, m, kn_sub(D, x, a, ex, kxx), kn_sub(D, y, b, ey, kyy), nf, ihm)
 
 # merge.go does not change what decode returns (with the new rule on top of the table)
+# bend-lint: disable-begin bend-lint-rules/performance/eager_branch -- proof terms checked by the kernel not-expected-because: mp and kp are never run by encode or decode
 def mp(+D: List<&2, Rule>, +i: Nat, +a: Tk, +b: Tk, xs: List<&2, Tk>, hit: Bool, +eh: {hit == peek(a, b, xs) : Bool}, +kx: {True{} == knl(D, xs) : Bool}, +nf: {True{} == Bool.not(has(D, i)) : Bool}) -> {dec(Rule{i, a, b} <> D, merge.go(xs, hit, a, b, M{i})) == dec(Rule{i, a, b} <> D, xs) : List<&2, Nat>}:
   match xs hit:
     case Nil{} _:
@@ -470,6 +474,7 @@ def kp(+D: List<&2, Rule>, +i: Nat, +a: Tk, +b: Tk, xs: List<&2, Tk>, hit: Bool,
       and_intro(kn(Rule{i, a, b} <> D, M{i}), knl(Rule{i, a, b} <> D, merge.go(t, peek(a, b, t), a, b, M{i})), kn_new(D, i, a, b), kp(D, i, a, b, t, peek(a, b, t), {==}, and_true_r(kn(D, y), knl(D, t), and_true_r(kn(D, x), Bool.and(kn(D, y), knl(D, t)), kx))))
     case Con{+x, +t} False{}:
       and_intro(kn(Rule{i, a, b} <> D, x), knl(Rule{i, a, b} <> D, merge.go(t, peek(a, b, t), a, b, M{i})), kn_mono(D, i, a, b, x, and_true_l(kn(D, x), knl(D, t), kx)), kp(D, i, a, b, t, peek(a, b, t), {==}, and_true_r(kn(D, x), knl(D, t), kx)))
+# bend-lint: disable-end bend-lint-rules/performance/eager_branch
 
 # ---- induction over the rules ----
 
@@ -600,6 +605,7 @@ def below(D: List<&2, Rule>, +i: Nat) -> Bool:
     case Nil{}:
       True{}
     case Con{Rule{+j, a, b}, t}:
+      # bend-lint: disable-next bend-lint-rules/performance/eager_branch -- a predicate of the laws, read only by proofs not-expected-because: never called by encode or decode
       Bool.and(Nat.is_lt(j, i), below(t, i))
 
 def below_has(D: List<&2, Rule>, +i: Nat, +e: {True{} == below(D, i) : Bool}) -> {False{} == has(D, i) : Bool}:

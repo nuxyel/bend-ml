@@ -29,6 +29,7 @@ def cells(k: Nat, r: Array<F32> & F32, +i: U32, acc: String) -> String:
     case 0n Tuple{a, x}:
       acc ++ " " ++ F32.show(x)
     case 1n+p Tuple{a, x}:
+      # bend-lint: disable-next bend-lint-rules/performance/append_in_loop -- a one-shot test not-expected-because: k <= 3 cells
       cells(p, Array.get(F32, a, (i + 1 : U32)), (i + 1 : U32), acc ++ " " ++ F32.show(x))
 
 def show(p: File & (Array<F32> & Result<&1, &1, U32 & String, U32>), +k: Nat, name: String) -> IO(Unit):

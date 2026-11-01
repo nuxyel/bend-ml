@@ -17,7 +17,9 @@ def timed(cmd):
         t0 = time.perf_counter()
         r = subprocess.run(cmd, capture_output=True, text=True, cwd=ROOT, env=ENV)
         ts.append(time.perf_counter() - t0)
-        if r.returncode != 0:
+        # the GPT-2 demo imports binary-read (foreign code): its check passes and still exits 1 on that report
+        foreign_only = "rely on unsafe or foreign code" in r.stdout + r.stderr and "error" not in (r.stdout + r.stderr).replace("Error: ", "", 1).lower()
+        if r.returncode != 0 and not ("--check-only" in cmd and foreign_only):
             sys.exit(f"failed: {' '.join(cmd)}\n{r.stdout}{r.stderr}")
     return statistics.median(ts)
 
