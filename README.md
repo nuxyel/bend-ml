@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/nuxyel/bend-ml/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/nuxyel/bend-ml/ci.yml?branch=main&style=flat-square&label=ci&labelColor=4d4a44&color=7e9a5e" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8b83b5?style=flat-square&labelColor=4d4a44" alt="MIT license"></a>
-  <a href="https://bend-lang.com"><img src="https://img.shields.io/badge/Bend-2.0.39-8b83b5?style=flat-square&labelColor=4d4a44" alt="Bend 2.0.39"></a>
+  <a href="https://bend-lang.com"><img src="https://img.shields.io/badge/Bend-2.0.40-8b83b5?style=flat-square&labelColor=4d4a44" alt="Bend 2.0.40"></a>
   <img src="https://img.shields.io/badge/laws%20proved-33-7e9a5e?style=flat-square&labelColor=4d4a44" alt="33 laws proved">
 </p>
 
@@ -39,8 +39,8 @@ only compiles with a proof that the number of elements does not change, even whe
 | [`bend-ml-tensor`](tensor) | 0.1.2.0 | `Vec<n>` and `Mat<r,c>` with the shape in the type, over lists. **Frozen** (2026-10-19): no new versions; superseded by tensor-array | `reshape_swap`, `reshape_flat` |
 | [`bend-ml-tensor-array`](tensor-array) | 0.1.19.0 | the same guarantees over a flat `Array<F32>`; `Bands<r,c>` for a parallel matrix · vector | `cap_ok`, `to_list_len`, `half_cover`, `leaf_len`, `band_len`, `size_set`, `get_after_set`, `get_other_set`; typed `matmul`, `matmul_nt`, `matmul_tn` (and their accumulating forms), `Bands.matvec` |
 | [`bend-ml-autograd`](autograd) | 0.1.1.0 | Automatic differentiation and layers with typed backward. **Frozen** (2026-10-19): no new versions; training moves to [BendTorch](https://github.com/nuxyel/bendtorch) | **`reverse_eq_forward`** |
-| [`bend-ml-binary-read`](binary-read) | 0.2.0.0 | F32 and BF16 weights read from a file straight into an `Array<F32>`, at offsets past 4 GiB; foreign code (C and JavaScript), kept out of the packages with laws | none: an effect, tested on both lanes |
-| [`bend-ml-tensor-fork`](tensor-fork) | 0.1.6.0 | tensor-array's six products with the parallel blocks sharing A, B and C (`Array.fork`, `@unsafe` in Base) instead of copying them: an MNIST epoch 12.0 → 6.2 s on one thread, 4.4 → 3.0 s on 16; `par1`..`par4`, any kernel over blocks of shared arrays; `softmax_ce` with the rows in blocks, 2.9x the one-thread tensor-array on 16 threads for wide rows, slower on small matrices | none: the same bits as tensor-array, tested on 14,835 products and 11 cross-entropy cases; kept out of the packages with laws |
+| [`bend-ml-binary-read`](binary-read) | 0.2.0.1 | F32 and BF16 weights read from a file straight into an `Array<F32>`, at offsets past 4 GiB; foreign code (C and JavaScript), kept out of the packages with laws | none: an effect, tested on both lanes |
+| [`bend-ml-tensor-fork`](tensor-fork) | 0.1.7.0 | tensor-array's six products with the parallel blocks sharing A, B and C (`Array.fork`, `@unsafe` in Base) instead of copying them: an MNIST epoch 12.0 → 6.2 s on one thread, 4.4 → 3.0 s on 16; `par1`..`par4`, any kernel over blocks of shared arrays; `softmax_ce` with the rows in blocks, 2.9x the one-thread tensor-array on 16 threads for wide rows, slower on small matrices; since 0.1.7.0 (Bend 2.0.40) its products' cells read with `Array.get_unchecked`, 8.7% fewer instructions | none: the same bits as tensor-array, tested on 14,835 products and 11 cross-entropy cases; kept out of the packages with laws |
 | [`bend-ml-tensor-gpu`](tensor-gpu) | 0.1.5.1 | tensor-array's six products as one `!` call each, so they run on the GPU (`Array.fork`, `@unsafe` in Base); at SmolLM2-135M's sizes 1.6-2.8x faster than tensor-fork on 16 threads, 512 x 4096 x 512 4.5x; `run1`..`run4`, bangs over any leaf code written in plain Bend; uniform and Gaussian fills of a counter (`fill_gauss`, `gauss_mat`, and `_at` forms for a slice), made on the device | none: the same bits as tensor-array on the GPU and the CPU, tested on 2,967 products; the fills' words the same on every lane and in a NumPy twin; kept out of the packages with laws |
 
 ```python
@@ -48,7 +48,7 @@ import bend-ml-tensor-array@0.1.19.0/main.bend as TA
 import bend-ml-bpe-tokenizer@0.1.3.0/main.bend as BPE
 ```
 
-`bend-ml-tensor-gpu` 0.1.5.1 and `bend-ml-tensor-fork` 0.1.6.0 import tensor-array 0.1.19.0, so their products take
+`bend-ml-tensor-gpu` 0.1.5.1 and `bend-ml-tensor-fork` 0.1.7.0 import tensor-array 0.1.19.0, so their products take
 these `Mat` values (Bend treats each version's `Mat` as its own type).
 
 <p align="center"><img src="docs/media/shots/law-roundtrip.png" alt="The roundtrip law as Bend states it, and ALL PROOFS CHECK" width="80%"></p>
@@ -123,6 +123,7 @@ sums changed on purpose):
 | v1.7.1 | `tensor-array` 0.1.17.0: `Mat.softmax_ce` walks its rows over the array, with the same bits | the cross-entropy of 64 rows of 49,152 3.7x faster on 16 threads; MNIST unchanged |
 | v1.8.0 | `tensor-gpu` 0.1.5.0: uniform and Gaussian fills of a counter made on the device, with offset forms for slices (asked in #23); `tensor-array` 0.1.18.0: the law `to_list_len` and an empty `Mat.to_list` that gives `Nil` (#22, by @adeerkhan) | the fills' words the same on the GPU, the CPU threads, the JS lane and a NumPy twin; 6.0-7.6 ms a 256 x 3072 Gaussian fill on every lane; the products' bits unchanged |
 | v1.9.0 | `tensor-fork` 0.1.6.0: `softmax_ce` with the rows in blocks; `tensor-array` 0.1.19.0: three laws about Base's `Array` (#26), the dot product unrolled by four, `Mat.to_list` without a reverse; `tensor-gpu` 0.1.5.1 on it; the GPT-2 demo loads without a zero tree | the cross-entropy of 1,024 rows of 49,152 2.9x faster on 16 threads than tensor-array's one-thread loop (slower on small matrices); one band of `matvec_l` 25% faster on one thread; the GPT-2 weights load 29% faster; the bits unchanged |
+| v1.9.1 | Bend 2.0.40; `binary-read` 0.2.0.1: its JavaScript lane reads through `fs` (2.0.40 removed the runtime binding 0.2.0.0 called); `tensor-fork` 0.1.7.0: the products' cells read with `Array.get_unchecked` | a gemm 8.7% fewer instructions at par 0 and 3.0% at par 3, the same bits; GPT-2's tokenizer runs 9% more instructions on 2.0.40, the same tokens (upstream: bendlang/bend#1978, #2036) |
 
 Versions are numbered as in [`docs/VERSIONING.md`](docs/VERSIONING.md); each release has its notes on GitHub.
 
@@ -132,7 +133,7 @@ Linux x86_64 (or WSL), clang ≥ 14, Python ≥ 3.12, `curl`, ~3 GB of disk, 8 G
 
 ```bash
 git clone https://github.com/nuxyel/bend-ml.git && cd bend-ml
-make setup          # Bend 2.0.39 (SHA256-checked), Lean 4.34.0, Python venv, data; no sudo
+make setup          # Bend 2.0.40 (SHA256-checked), Lean 4.34.0, Python venv, data; no sudo
 make check          # 116 checks (107 without a CUDA toolkit)
 make check-full     # 127: the same plus GPT-2, MNIST, and tensor-fork and tensor-gpu on the JS lane
 make media          # regenerate the figures on this page (needs node, ffmpeg, Brave)

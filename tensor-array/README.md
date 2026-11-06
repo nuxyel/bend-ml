@@ -2,7 +2,7 @@
 
 Tensors in Bend 2 over a flat `Array<F32>`, **with the shape in the type**: the same guarantee as [`bend-ml-tensor`](../tensor) (a product with wrong dimensions does not compile), but **~50x faster** than the list-based `bend-ml-tensor`, because it reads and writes by index and runs products in parallel blocks of rows.
 
-- Bend: **2.0.39** · License: MIT.
+- Bend: **2.0.40** · License: MIT.
 - `bend tensor-array/main.bend` and `--verdict` → `ALL PROOFS CHECK` (no `@unsafe`, no `?TODO`).
 - Tests against PyTorch and NumPy: `reference/test_tensor_array.py` (280 checks, maximum error ≈ 1.4e-6; `Bands.matvec` equal to `Mat.matmul_nt` bit for bit).
 
@@ -78,6 +78,7 @@ Ultra 7 155H (`bench/mv_bands.py`, `bench/results/`):
 | `half_cover` | the two bands of a node, `half(r)` rows and `r - half(r)` rows, add up to exactly `r` rows: no row is lost and none is counted twice |
 | `leaf_len` | reading a band's results back from its `Array` (`read_l`, then `bv_g2`) gives exactly one number per row read |
 | `band_len` | the product of one band with `rows` rows gives exactly `rows` numbers |
+| `matvec_l_len` | `Bands.matvec_l` gives exactly `r` numbers, one per row, whatever the depth of the bands: the whole tree, not one band |
 | `size_set` | writing any value at any index keeps an `Array`'s size (Base's `Array.set` and `Array.size`, for any element type) |
 | `get_after_set` | reading at `i` right after writing `v` at `i` gives back `v` |
 | `get_other_set` | a write at `i` leaves alone the cell a read at `k` reaches, when the two walks down the tree split before a leaf (`ASet.Apart`); on a concrete tree that condition computes to true and `Unit{}` proves it |
@@ -88,10 +89,13 @@ the mask": on a tree that is not perfectly balanced two different indices can re
 (`tests/array_laws.bend` shows one). On the perfect trees `Array.new` and literals build, the two coincide, but that is
 not proved here.
 
-Not proved yet: that the whole tree (`Bands.matvec_l`) gives exactly `r` numbers. The proof would apply the
-join lemma (`join_len`, proved) to the two recursive results and to the induction hypotheses about the same
-calls, which uses each band's `Array` twice; Bend's affine rules refuse that. `reference/test_tensor_array.py`
-checks the length (and every number) on 20 shapes and all depths.
+`matvec_l_len` was open from 0.1.5.0 on. The direct proof applies the join lemma (`join_len`) to the two recursive
+results and to the induction hypotheses about the same calls, which uses each band's `Array` twice; Bend's affine
+rules refuse that. The proof that went through makes each step return a witness instead of a bare count: the list of
+results itself (plain data, which may be used freely), an equation saying the result is that list in its constructor
+(the arrays appear only in types, which never run) and the list's length. Then each array is used once, and in a node
+the two equations unfold the join. `reference/test_tensor_array.py` still checks every number on 20 shapes and all
+depths.
 
 Inside `Bands`, every function that walks the tree carries an erased proof that the row count it computes
 with at run time equals the one in the type.
@@ -129,13 +133,16 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 
 ## Versions
 
+- Next (on `devel`, not published): the law `matvec_l_len`, `Bands.matvec_l`'s length over the whole tree, with its
+  helpers (`al_c`, `bl_b`, `WAL`, `WBL`, `read_w` .. `bmv_w`, `w_len`). Only lines added: every def keeps its code and
+  bits.
 - `0.1.19.0`: the laws `size_set`, `get_after_set` and `get_other_set` about Base's `Array` (helpers `ASet.*`), asked for
   in bend-ml #26. Two defs get faster with the same bits: the dot product under `matvec_l` and `matmul_nt` takes four
   steps a turn (one band of the 50257x768 product 25% faster on one thread, no change on 16), and `Mat.to_list` reads
   from the last index down instead of reversing a list (35-45% less time per number). Every other def is 0.1.18.0's,
   with its bits. The round trip `Mat.to_list(Mat.of_list(xs)) == xs` is
   still tested, not proved: it needs a lemma about `Array.new`'s trees that `tests/apart.bend` checks on every pair of
-  indices through depth 7 (by @adeerkhan, bend-ml #28). `tensor-fork` 0.1.6.0 and `tensor-gpu` 0.1.5.1 import
+  indices through depth 7 (by @adeerkhan, bend-ml #28). `tensor-fork` 0.1.7.0 and `tensor-gpu` 0.1.5.1 import
   0.1.19.0 (hash `0x54fd18094240d26f3074e1ee00279d63`).
 - `0.1.18.0`: the law `to_list_len` (`Mat.to_list` reads exactly `r*c` numbers) and a fix: `Mat.to_list` of a matrix
   with no numbers (0 rows or 0 columns) now gives `Nil`, where it gave a one-element list before. `tests/roundtrip.bend`

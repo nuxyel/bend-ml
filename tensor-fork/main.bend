@@ -2,22 +2,23 @@
 # any kernel over blocks of a range sharing up to four arrays.
 #
 #   import bend-ml-tensor-array@0.1.19.0/main.bend as TA
-#   import bend-ml-tensor-fork@0.1.6.0/main.bend as TF
+#   import bend-ml-tensor-fork@0.1.7.0/main.bend as TF
 #   TF.matmul(n, k, m, par, a, b)      # the same arguments, result type and bits as TA.Mat.matmul
 #
 # The six products (matmul, matmul_nt, matmul_tn and their accumulating forms) take tensor-array's Mat values and
 # return its result types. A product that splits (tensor-array's split_depth, two or more rows) packs A and B once into
 # cells of 8, as the sequential path does (in blocks of lines when an operand holds 16384 cells or more), and every
 # node of the fork tree shares the two packed operands and C through Base's Array.fork: two handles to one block, no
-# copy. Each leaf runs tensor-array's cells (t8_rows, t8_cols) straight
-# into its own rows (or columns) of C. tensor-array's parallel path instead clones an operand at every node and hands
-# each block's cells back as a list that is then written into C. A product that does not split, and a product with one
-# row, runs tensor-array's sequential code. The bits are those of tensor-array at depth 0, at every depth and thread
-# count (tests/bits.bend).
+# copy. Each leaf runs tensor-array's cells (t8_rows, t8_cols) straight into its own rows (or columns) of C, as copies
+# here whose inner loop reads with Base's @unsafe Array.get_unchecked (bendlang/bend#1880, Bend 2.0.40), the
+# indices inside the operands by construction (u8_dot). tensor-array's parallel path instead clones an operand at every
+# node and hands each block's cells back as a list that is then written into C. A product that does not split runs the
+# same cells in one block, and a product with one row runs tensor-array's sequential code. The bits are those of
+# tensor-array at depth 0, at every depth and thread count (tests/bits.bend).
 #
 # Not proved, and marked so: Array.fork and Array.join are @unsafe in Base (two handles to one array break the single
-# owner that the proofs rely on), so the defs below that call them are @unsafe, and `bend main.bend` names every def
-# that relies on them. Nothing checks that a leaf never writes A or B, or that two leaves' blocks of C are disjoint;
+# owner that the proofs rely on), and so is Array.get_unchecked (an index the caller promises is below the capacity),
+# so the defs below that call them are @unsafe, and `bend main.bend` names every def that relies on them. Nothing checks that a leaf never writes A or B, or that two leaves' blocks of C are disjoint;
 # the blocks are the halves of the fork tree, as in tensor-array's own split. tests/bits.bend checks both by sampling.
 # All of it is Bend: no foreign code.
 import Base
@@ -153,26 +154,85 @@ def pk_d(big: Bool, d: Nat) -> Nat:
     case False{}:
       0n
 
+# cnt lines of tk cells, in an array of 2^d' >= cnt * tk + 1 cells: one more than tensor-array's pk_pack gives when
+# cnt * tk is a power of two (it then doubles), so that the cells' last read past a line stays inside it (u8_dot)
 @unsafe
 def pk_par(d: Nat, +cnt: Nat, +tk: Nat, +k: Nat, +lstep: U32, +st: U32, a: Array<F32>) -> TA.PK:
-  pk_of(par2(~PE, ~F32, ~TA.T8, ~pk_leaf, PE{tk, U32.from_nat(tk), U32.from_nat(k), lstep, st}, pk_d(Nat.is_le(16384n, Nat.mul(cnt, tk)), d), cnt, a, Array.new(TA.T8, depth(Nat.mul(cnt, tk)), TA.t8_zero())))
+  pk_of(par2(~PE, ~F32, ~TA.T8, ~pk_leaf, PE{tk, U32.from_nat(tk), U32.from_nat(k), lstep, st}, pk_d(Nat.is_le(16384n, Nat.mul(cnt, tk)), d), cnt, a, Array.new(TA.T8, depth(Nat.add(Nat.mul(cnt, tk), 1n)), TA.t8_zero())))
 
 def tg_c(g: TA.TG) -> Array<F32>:
   match g:
     case TA.TG{a, b, c}:
       c
 
+# ---- tensor-array's cells (t8_dot, t8_cell, t8_cols, t8_rows) with Base's Array.get_unchecked (bendlang/bend#1880) ----
+# The same loops as tensor-array's, the same additions in the same order, so the same bits; only the reads change.
+# Array.get masks every index with the block's capacity (it wraps); get_unchecked skips the mask and is @unsafe: the
+# caller promises the index is below the capacity. The cells read here are those of pk_par's packed operands: line i
+# (a row of A or a column of B) is cells i * tk .. i * tk + tk - 1, and every line read is one of the operand's (i < its
+# lines). As in tensor-array, t8_dot reads the next cell of both lines at every step, so its last step reads the cell
+# just past each line: for the last line that is lines * tk. pk_par gives every packed operand at least lines * tk + 1
+# cells, so that read too is below the capacity (tensor-array's pk_pack gives 2^d >= lines * tk, where lines * tk is
+# the capacity itself whenever it is a power of two). A loop that stops one read earlier keeps the reads inside the
+# lines with no extra cell, but its last step then uses the cell it read, and clang no longer vectorizes the loop: about
+# 5 times the instructions (NOTES.md, 2026-11-06).
+
+# TA.t8_dot: tk cells from ia (in a) and ib (in b); ra, rb hold the arrays and the cells at ia, ib, already read
+@unsafe
+def u8_dot(tk: Nat, +ia: U32, +ib: U32, s0: F32, s1: F32, s2: F32, s3: F32, ra: Array<TA.T8> & TA.T8, rb: Array<TA.T8> & TA.T8) -> TA.TD:
+  match tk ra rb:
+    case 0n Tuple{a, x} Tuple{b, y}:
+      TA.TD{a, b, s0, s1, s2, s3}
+    case 1n+p Tuple{a, TA.T8{x0, x1, x2, x3, x4, x5, x6, x7}} Tuple{b, TA.T8{y0, y1, y2, y3, y4, y5, y6, y7}}:
+      # ia + 1 and ib + 1: a cell of the same lines, or the one just past them, at most lines * tk (above)
+      u8_dot(p, (ia + 1 : U32), (ib + 1 : U32), ((s0 + (x0 * y0 : F32) : F32) + (x4 * y4 : F32) : F32), ((s1 + (x1 * y1 : F32) : F32) + (x5 * y5 : F32) : F32), ((s2 + (x2 * y2 : F32) : F32) + (x6 * y6 : F32) : F32), ((s3 + (x3 * y3 : F32) : F32) + (x7 * y7 : F32) : F32), Array.get_unchecked(TA.T8, a, (ia + 1 : U32)), Array.get_unchecked(TA.T8, b, (ib + 1 : U32)))
+
+# TA.t8_cell: cell (i, j) of C. Its two first reads stay checked, though i * tk and j * tk are inside the operands: once
+# per cell they cost nothing, and the masked index is what tells clang the loop's cells never wrap past 2^32, so it
+# reads each cell with two vector loads; unchecked there, the loop's 16 loads stay scalar, and three products of 226.5 M
+# multiply-adds ran 2.7 times the instructions (9.20 G against 3.45 G, NOTES.md, 2026-11-06)
+@unsafe
+def u8_cell(+tk: Nat, +tku: U32, +rot: Nat, +i: U32, +j: U32, a: Array<TA.T8>, b: Array<TA.T8>) -> TA.TR:
+  TA.t8_fin(rot, u8_dot(tk, (i * tku : U32), (j * tku : U32), 0.0, 0.0, 0.0, 0.0, Array.get(TA.T8, a, (i * tku : U32)), Array.get(TA.T8, b, (j * tku : U32))))
+
+# TA.t8_cols: cells j.. of row i, mleft of them, into C from cidx
+@unsafe
+def u8_cols(+ac: Bool, mleft: Nat, +tk: Nat, +tku: U32, +rot: Nat, +i: U32, +j: U32, +cidx: U32, g: TA.TG) -> TA.TG:
+  match mleft g:
+    case 0n g:
+      g
+    case 1n+p TA.TG{a, b, c}:
+      u8_cols(ac, p, tk, tku, rot, i, (j + 1 : U32), (cidx + 1 : U32), TA.t8_set(ac, cidx, c, u8_cell(tk, tku, rot, i, j, a, b)))
+
+# TA.t8_rows: rows i.., nleft of them, every column
+@unsafe
+def u8_rows(+ac: Bool, nleft: Nat, +m: Nat, +tk: Nat, +tku: U32, +rot: Nat, +i: U32, +mu: U32, g: TA.TG) -> TA.TG:
+  match nleft:
+    case 0n:
+      g
+    case 1n+p:
+      u8_rows(ac, p, m, tk, tku, rot, (i + 1 : U32), mu, u8_cols(ac, m, tk, tku, rot, i, 0, (i * mu : U32), g))
+
+# TA.gemm_t8b's sequential path (d = 0) with these cells: A and B packed by pk_par in one block, C written in order
+@unsafe
+def u8_seq(+ac: Bool, +n: Nat, +m: Nat, +tk: Nat, +tku: U32, +rot: Nat, c: Array<F32>, p: TA.PKK) -> TA.G:
+  match p:
+    case TA.PKK{a, b, ta, tb}:
+      TA.t8_g(a, b, u8_rows(ac, n, m, tk, tku, rot, 0, U32.from_nat(m), TA.TG{ta, tb, c}))
+
 # rows i0 .. i0+cnt-1 of C, every column
+@unsafe
 def rblock(+ac: Bool, cnt: Nat, +m: Nat, +tk: Nat, +tku: U32, +rot: Nat, +i0: U32, +mu: U32, a: Array<TA.T8>, b: Array<TA.T8>, c: Array<F32>) -> Array<F32>:
-  tg_c(TA.t8_rows(ac, cnt, m, tk, tku, rot, i0, mu, TA.TG{a, b, c}))
+  tg_c(u8_rows(ac, cnt, m, tk, tku, rot, i0, mu, TA.TG{a, b, c}))
 
 # columns j0 .. j0+cnt-1 of C, rows i.. (n more)
+@unsafe
 def cbrows(+ac: Bool, n: Nat, +cnt: Nat, +tk: Nat, +tku: U32, +rot: Nat, +i: U32, +j0: U32, +mu: U32, g: TA.TG) -> TA.TG:
   match n:
     case 0n:
       g
     case 1n+p:
-      cbrows(ac, p, cnt, tk, tku, rot, (i + 1 : U32), j0, mu, TA.t8_cols(ac, cnt, tk, tku, rot, i, j0, ((i * mu : U32) + j0 : U32), g))
+      cbrows(ac, p, cnt, tk, tku, rot, (i + 1 : U32), j0, mu, u8_cols(ac, cnt, tk, tku, rot, i, j0, ((i * mu : U32) + j0 : U32), g))
 
 # 2^d blocks of rows of C, halved at each node; each pair holds two handles to one block
 @unsafe
@@ -216,11 +276,11 @@ def t8_go(+ac: Bool, d: Nat, +n: Nat, +m: Nat, +tk: Nat, +tku: U32, +rot: Nat, c
 def gemm_fork(+ac: Bool, +d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> TA.G:
   t8_go(ac, d, n, m, Nat.div(Nat.add(k, 7n), 8n), U32.from_nat(Nat.div(Nat.add(k, 7n), 8n)), Nat.mod(k, 4n), c, TA.t8_pk2(pk_par(d, n, Nat.div(Nat.add(k, 7n), 8n), k, arow, sa, a), pk_par(d, m, Nat.div(Nat.add(k, 7n), 8n), k, bcol, sb, b)))
 
-# two or more rows: the shared tree when d > 0, tensor-array's sequential cells at d = 0
+# two or more rows: the shared tree when d > 0, the same cells in one block at d = 0
 def gemm_rows(+ac: Bool, d: Nat, +n: Nat, +m: Nat, +k: Nat, +arow: U32, +sa: U32, +sb: U32, +bcol: U32, a: Array<F32>, b: Array<F32>, c: Array<F32>) -> TA.G:
   match d:
     case 0n:
-      TA.gemm_t8_ac(ac, 0n, n, m, k, arow, sa, sb, bcol, a, b, c)
+      u8_seq(ac, n, m, Nat.div(Nat.add(k, 7n), 8n), U32.from_nat(Nat.div(Nat.add(k, 7n), 8n)), Nat.mod(k, 4n), c, TA.t8_pk2(pk_par(0n, n, Nat.div(Nat.add(k, 7n), 8n), k, arow, sa, a), pk_par(0n, m, Nat.div(Nat.add(k, 7n), 8n), k, bcol, sb, b)))
     case 1n+q:
       gemm_fork(ac, 1n+q, n, m, k, arow, sa, sb, bcol, a, b, c)
 

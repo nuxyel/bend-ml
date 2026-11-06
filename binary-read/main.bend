@@ -1,6 +1,6 @@
 # bend-ml-binary-read: little-endian F32 numbers from a file, read straight into an Array<F32>.
 #
-#   import bend-ml-binary-read@0.2.0.0/main.bend as R
+#   import bend-ml-binary-read@0.2.0.1/main.bend as R
 #
 # Since 0.2.0.0 it also reads at 64-bit byte offsets, reads BF16 files (each number widened exactly to F32), reads into
 # a cell offset of an existing array, and gives a file's size past 4 GiB. Bend has no 64-bit integer (Base's numbers

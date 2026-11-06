@@ -1935,3 +1935,127 @@ output equal to C's).
   pieces (one `matvec_l` band -25% on one thread, `read_l` -35% to -45% per number, the GPT-2 demo's load -29%).
   The law `matvec_l_len` (in progress) stays out: its proof was written against the old `read_l` and does not check on the
   new one.
+
+## tensor-array: matvec_l_len, the whole-tree length law (2026-11-01, on devel, not published)
+
+- The open law of v3.1 ("`Bands.matvec_l` gives exactly r numbers"), proved: `law matvec_l_len`,
+  `{bl_len(r, c, Bands.matvec_l(r, c, b, x)) == r}` for every `b : Bands<r, c>` and `x`, whatever the depth. It ships
+  in the next tensor-array after 0.1.19.0; it adds no API.
+- Why the direct induction failed: in a node it calls `join_len` on the two recursive results and on the induction
+  hypotheses about the same calls, so each band's `Array` (and each copy of x) is used twice at run-time positions
+  (`x2 (consumed more than once)`). `join_len` has to take the results at run time because it matches them to unfold
+  `bv_join`.
+- What works: each lemma returns a witness instead of a bare count. In plain words, instead of proving "this call gives
+  n numbers" and then needing the call again to say anything else about it, each step hands back a receipt: the list it
+  produced, a note saying "the result is exactly this list in its box", and the list's length. The list is plain data
+  and can be reused; the arrays appear only in the note's type, which never runs. `WBL<r, c, s, n>` holds the list `y`
+  (a `List<&2, F32>`), an equation `BL{bl_b(s), y} == s` (the result in its constructor, its bands written as a
+  projection of `s`) and `length(y) == n`; `WAL` is the same for `read_l`'s `AL`. Each array is then used once, by the
+  call that builds the receipt: `read_w` follows `read_l`'s recursion, `g_w` opens the gemm's `G`, `node_w` rewrites
+  both halves into constructors with the two equations, after which `bv_join` unfolds and `app_len` plus `half_cover`
+  count `y1 ++ y2`. `w_len` turns the receipt into the count.
+- First written against the old `read_l` (build the list, then reverse it), it no longer checked once `read_l` read from
+  the last index down (earlier today): `read_w` expected `List.reverse.go(...)` where the new code gives `v <> acc`.
+  Redone on the new `read_l`, the proof got shorter, the same way `leaf_len` and `read_ml_len` did: with no reverse, a
+  read of one number gives `v <> acc`, whose length is `1 + length(acc)` by the definitions alone, so `read_w`'s last
+  step is `{==}` and needs neither `rev_len` (gone) nor `zero_out`; the recursion walks `idx - 1` instead of `idx + 1`,
+  and `g_w` starts the read at index `p` (the band's last row) as `bv_g` does.
+- 18 new defs, all added lines (`git diff` removes only `join_len`'s comment that called the law open); every existing
+  def keeps its code. The 16 tensor-array test programs that compile give byte-identical C before and after.
+  `bend tensor-array/main.bend` and `--verdict`: ALL PROOFS CHECK, no `@unsafe`, `?TODO` or axiom. Three mutants are
+  refused: the claim `== 1n+r`, a node that appends the halves the other way round, and a one-number read that drops the
+  number from its receipt. `list_laws.py --check-readme`: 34 laws in 5 packages, ok (the main README's badge stays at 33,
+  the published count). `make check` 116/116; `make lint` 0 findings (bmv_w's two recursive calls carry a `disable`
+  directive: a proof, never run).
+- The same move should open other laws blocked the same way (a statement about a function applied to results that
+  hold arrays): return the data part as a witness with an equation, instead of proving facts about the call twice.
+
+## binary-read's JS lane on Bend 2.0.40 (2026-11-06, on devel, not published)
+
+- On Bend 2.0.40 (2026-11-06) the JS lane of binary-read failed with `TypeError: sys.pread is not a function`, the
+  published 0.2.0.0 included: its six reads called the runtime's internal `io_sys().pread`, and bendlang/bend#2063
+  ("drop a dead pread binding") removed it, since Base itself had stopped using it when #1881 moved `File.read_at` and
+  its twins to `fs`. The C lane was not touched. I found it running `make check` with 2.0.40 in place of the pin:
+  113/116, all three failures binary-read's JS lane.
+- The fix reads the same way Base does: `fs.readvSync(file, [chunk], position)` in place of `sys.pread`, with EINTR
+  retried (libuv does not retry it for read) and the errno taken from the exception. Both files, the same loop
+  otherwise; no change to the defs or the C lane.
+- Checked on 2.0.39 and 2.0.40: `binary-read/tests/read_f32.bend` prints its expected lines on the JS lane, and
+  `test_read_at.py --js` passes (the sparse 8 GiB file, capacity, `_into` and the 10,019 PyTorch BF16 numbers). A read of
+  a file opened for writing fails with "Bad file descriptor" on both lanes and both versions, as the old code did on
+  2.0.39. `make check`: 116/116 on 2.0.39; 115/116 on 2.0.40, the one left being the published 0.2.0.0, which keeps the
+  old code until a new version is published. The pin stays at 2.0.39 until then.
+- **Published** as `bend-ml-binary-read@0.2.0.1`, hash `0x9b2f1e30b64f7bfec4ec8990700827d7` (6 files, 18,455 bytes),
+  with Bend 2.0.39. The package table, the GPT-2 demo and `reference/test_published.py` (through the table) use it:
+  `make check` 116/116 on 2.0.39 and on 2.0.40.
+
+## Bend 2.0.40 (2026-11-06, on devel)
+
+- The pin moves from 2.0.39 to 2.0.40 (released 2026-11-06 02:06 UTC): `scripts/setup.sh` (the version and both
+  Linux SHA256, the same as the release's asset digests), the CI step, `check_all.py`'s default `BEND_PIN`, the
+  READMEs and CLAUDE.md. Lean stays 4.34.0. Dated numbers in the README stay as measured, on 2.0.39, until the next
+  run on an idle machine.
+- One break, fixed before the bump: binary-read's JS lane (two entries above, 0.2.0.1 published).
+- On 2.0.40: `make check` 116/116 and `make check-full` 127/127, so the same bits for GPT-2, MNIST and tensor-fork
+  and tensor-gpu on the JS lane. The release notes fix none of CLAUDE.md's pitfalls.
+- What it changes for these packages, from MetalBend's corpus on 2.0.40 (a diagnosis run with other work on the
+  machine, so instruction counts only): fewer instructions on most workloads, rmsnorm 29% and the BF16 read 40%
+  fewer; Base's `Array.get_unchecked` (bendlang/bend#1880) for tensor-fork's next version. One regression: GPT-2's
+  tokenizer (bpe-tokenizer 0.1.3.0, the same output) runs 194.2 G instructions on 2.0.40 against 177.7 G on 2.0.39
+  (+9.3%), and about 28% more cycles. Two upstream changes, each confirmed by building 2.0.40 with it undone:
+  bendlang/bend#1978 made every take of a shared node a call on the host (the instructions), and #2036 raised the L1
+  misses from 0.23 G to 1.24 G (most of the cycles). `docs/upstream/bpe_encode.sh` reproduces both counts; I am
+  reporting them upstream. The tokenizer is a small part of a GPT-2 run, so I took the bump.
+
+## tensor-fork: the products' cells read with Array.get_unchecked (2026-11-06, on devel, not published)
+
+- bendlang/bend#1781 asked for a read without the mask Base puts on every array index; #1880 added
+  `Array.get_unchecked` (`@unsafe`: the caller promises the index is below the capacity), released in Bend 2.0.40.
+  tensor-array keeps its checked reads (it has laws, so no `@unsafe`); tensor-fork now has its own copies of
+  tensor-array's cells, `u8_dot`, `u8_cell`, `u8_cols` and `u8_rows` (`t8_dot`, `t8_cell`, `t8_cols`, `t8_rows` with
+  the same additions in the same order), whose inner loop reads with `get_unchecked`. The leaves (`rblock`, `cbrows`)
+  run them, and a product that does not split (depth 0) now runs them too, in one block (`u8_seq`, packed by `pk_par` at
+  depth 0), instead of `TA.gemm_t8_ac`. One-row products still run tensor-array's scalar loop.
+- Why every unchecked index is below the capacity: line i of a packed operand is cells `i * tk .. i * tk + tk - 1`, and
+  only the operand's lines are read. As in tensor-array, the loop's last step reads the cell just past each line, which
+  for the last line is `lines * tk`; tensor-array's `pk_pack` gives 2^d >= `lines * tk` cells, so that index is the
+  capacity itself whenever `lines * tk` is a power of two. `pk_par` now gives `lines * tk + 1` (one block twice the size
+  in that case, a packed copy dropped after the product).
+- Two shapes that ran more instructions, not less (the three products of 226.5 M multiply-adds below, depth 0):
+  - a loop that stops one read early (the shape the MetalBend #1781 probe gave `dotr`), so that no read leaves a line
+    and no extra cell is needed: 16,633 M with unchecked first reads and 17,094 M with checked ones, against 3,777 M. Its
+    last step uses the cell it read, and clang then keeps the 16 loads of each step scalar instead of two vector loads
+    of a cell each.
+  - tensor-array's shape with every read unchecked, the two first reads of each cell included: 9,196 M. In the emitted
+    C an unchecked index is `(u32)i << 3`, which clang turns into a 32-bit counter stepping by 8, and it cannot show
+    that adding 0..7 to it never wraps, so the loads stay scalar again; the first read's masked index
+    (`((u32)i & mask) << 3`) is what gives it that bound. Those two reads stay checked (once per cell).
+- Instructions (user mode, one thread pinned to CPU 3, 3 rounds each, every round within 300 of the others), the
+  three products of MetalBend's gemm-fork workload (nt 256 x 576 x 1536, tn 1536 x 256 x 576, nn 256 x 1536 x 576, each
+  accumulated twice into C) on tensor-array 0.1.19.0, the same three hashes before and after, Bend 2.0.40:
+
+  | depth | tensor-fork 0.1.6.0 | with the unchecked cells | |
+  |---|---:|---:|---:|
+  | 0 (par 0) | 3,776.57 M | 3,448.59 M | -8.7% |
+  | 3 (par 3, 8 blocks) | 3,554.61 M | 3,449.47 M | -3.0% |
+
+  Depth 0 gains more because it now also skips `TA.gemm_t8_ac`'s own path. The machine was busy (load 3-5), so no
+  time is claimed here. The MetalBend probe measured a larger cut on tensor-array 0.1.16.0's gemm-tile8 with an
+  earlier main (13,769 M to 10,520 M); I have not looked at why the checked loop costs less on 2.0.40.
+- Checks: `tests/bits.bend` prints `0 0 14832` and every other count 0 on 1 and 16 threads and on the JS lane (its
+  (64, 64, 64) product has `lines * tk` = 512, a power of two); `tests/precise.bend` `0 21`; `tests/ce.bend` eleven 0s
+  and 77. `make check` 116/116 (with `BEND_PIN=2.0.40`: the package now needs 2.0.40, the first release with
+  `get_unchecked`). `bend tensor-fork/main.bend` names 42 defs outside the proofs instead of 35: the five copies and
+  `u8_seq`'s path (`u8_dot`, `u8_cell`, `u8_cols`, `u8_rows`, `u8_seq`) and the two leaves that now call them (`rblock`,
+  `cbrows`); `make check` pins the new list.
+- tensor-gpu is unchanged: its tile kernel reads A and B directly, and its edge tiles (rows past n, columns past m) and
+  its last turn (the steps past k, read one turn ahead) read outside the matrices by design, their products dropped by
+  `pk` and `wr`. The matrices are the caller's arrays, with no spare cell, and on the device a read past a block can
+  fault. An unchecked version needs the generator to split interior tiles from edge ones and keep the turn past k
+  checked; not done.
+- Proposed version: `bend-ml-tensor-fork` 0.1.7.0 (faster products, the same API and bits, Bend 2.0.40 required). Not
+  published.
+- **Published** as `bend-ml-tensor-fork@0.1.7.0`, hash `0x2e68de891a5072b4394ecc43af36e8dd` (3 files: Bend 2.0.40's
+  `--publish` also sends the README beside the entry), with Bend 2.0.40, which it needs. The package table and
+  `reference/test_published.py` (through the table) use it: a split product, `par1` and `softmax_ce` from BendHub give
+  the one-block bits; `make check` 116/116.

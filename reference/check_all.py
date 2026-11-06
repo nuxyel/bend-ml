@@ -9,7 +9,7 @@ ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 PY = os.path.join(ROOT, "reference/.venv/bin/python")
 BEND = os.environ.get("BEND_BIN") or os.path.expanduser("~/.bend/bin/bend")
 # BEND_BIN and BEND_PIN run the checks on another Bend (for example a newer release before a bump)
-BEND_PIN = os.environ.get("BEND_PIN") or "2.0.39"
+BEND_PIN = os.environ.get("BEND_PIN") or "2.0.40"
 ENV = dict(os.environ, BEND_NO_TELEMETRY="1", PATH=os.path.expanduser("~/.elan/bin") + ":" + os.environ["PATH"])
 FULL = "--full" in sys.argv
 results = []
@@ -80,9 +80,10 @@ def main():
         lambda o, c: c == 0 and o.strip().endswith("PASS (JavaScript)"))
 
     # 1c. tensor-fork: the one package whose parallel blocks share arrays through Base's @unsafe Array.fork; its unsafe
-    # defs are exactly the blocks, the fork tree and what reaches them, no package with laws imports it, and it gives tensor-array's bits
-    fork_defs = ["blocks1", "join2", "blocks2", "join3", "blocks3", "join4", "blocks4", "par1", "par2", "par3", "par4", "pk_par", "rpar", "cpar", "t8_tree", "t8_go", "gemm_fork", "gemm_rows", "gemm_any2", "gemm_any", "matmul", "matmul_acc", "matmul_nt", "matmul_nt_acc", "matmul_tn", "matmul_tn_acc", "mp_s3", "mp_s2", "mp_step", "mp_go", "mm_precise2", "matmul_precise", "ce_par3", "softmax_ce2", "softmax_ce"]
-    run("tensor-fork/main.bend: its @unsafe defs are the fork tree and what reaches it", [BEND, "tensor-fork/main.bend"],
+    # defs are exactly the blocks, the fork tree, the cells that read with Array.get_unchecked and what reaches them, no
+    # package with laws imports it, and it gives tensor-array's bits
+    fork_defs = ["blocks1", "join2", "blocks2", "join3", "blocks3", "join4", "blocks4", "par1", "par2", "par3", "par4", "pk_par", "u8_dot", "u8_cell", "u8_cols", "u8_rows", "u8_seq", "rblock", "cbrows", "rpar", "cpar", "t8_tree", "t8_go", "gemm_fork", "gemm_rows", "gemm_any2", "gemm_any", "matmul", "matmul_acc", "matmul_nt", "matmul_nt_acc", "matmul_tn", "matmul_tn_acc", "mp_s3", "mp_s2", "mp_step", "mp_go", "mm_precise2", "matmul_precise", "ce_par3", "softmax_ce2", "softmax_ce"]
+    run("tensor-fork/main.bend: its @unsafe defs are the fork tree, the unchecked cells and what reaches them", [BEND, "tensor-fork/main.bend"],
         lambda o, c: f"{len(fork_defs)} defs rely on unsafe or foreign code" in o and outside_proofs(o) == fork_defs)
     clean = not any("tensor-fork" in open(os.path.join(ROOT, f)).read() for f in laws)
     results.append(clean)
