@@ -14,7 +14,7 @@ It is faster wherever the work splits into blocks; it is **not proved**, and say
 ```python
 import Base
 import bend-ml-tensor-array@0.1.19.0/main.bend as TA
-import bend-ml-tensor-fork@0.1.6.0/main.bend as TF
+import bend-ml-tensor-fork@0.1.7.0/main.bend as TF
 
 def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 128n>:
   TF.matmul(100n, 784n, 128n, 3n, a, w)   # instead of TA.Mat.matmul(100n, 784n, 128n, 3n, a, w)
@@ -171,3 +171,5 @@ first rows, so they run after the blocks, in order, as in tensor-array.
 - `0.1.6.0` (2026-11-01): `softmax_ce` with its rows in blocks, `TA.Mat.softmax_ce`'s bits (`tests/ce.bend`), on
   tensor-array 0.1.19.0, so a program that also uses tensor-gpu 0.1.5.1 or tensor-array 0.1.19.0 passes the same `Mat`
   to all of them. The products' code and bits unchanged (hash `0x00977eb08bd5a81deaf111443555211b`).
+- `0.1.7.0` (2026-11-06): the products' cells read with `Array.get_unchecked` (bendlang/bend#1880), so it needs Bend
+  2.0.40; 8.7% fewer instructions on a gemm at par 0 and 3.0% at par 3, the same bits (`tests/bits.bend`).
