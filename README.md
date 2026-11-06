@@ -5,7 +5,7 @@
 <p align="center">
   <a href="https://github.com/nuxyel/bend-ml/actions/workflows/ci.yml"><img src="https://img.shields.io/github/actions/workflow/status/nuxyel/bend-ml/ci.yml?branch=main&style=flat-square&label=ci&labelColor=4d4a44&color=7e9a5e" alt="CI"></a>
   <a href="LICENSE"><img src="https://img.shields.io/badge/license-MIT-8b83b5?style=flat-square&labelColor=4d4a44" alt="MIT license"></a>
-  <a href="https://bend-lang.com"><img src="https://img.shields.io/badge/Bend-2.0.39-8b83b5?style=flat-square&labelColor=4d4a44" alt="Bend 2.0.39"></a>
+  <a href="https://bend-lang.com"><img src="https://img.shields.io/badge/Bend-2.0.40-8b83b5?style=flat-square&labelColor=4d4a44" alt="Bend 2.0.40"></a>
   <img src="https://img.shields.io/badge/laws%20proved-33-7e9a5e?style=flat-square&labelColor=4d4a44" alt="33 laws proved">
 </p>
 
@@ -132,7 +132,7 @@ Linux x86_64 (or WSL), clang ≥ 14, Python ≥ 3.12, `curl`, ~3 GB of disk, 8 G
 
 ```bash
 git clone https://github.com/nuxyel/bend-ml.git && cd bend-ml
-make setup          # Bend 2.0.39 (SHA256-checked), Lean 4.34.0, Python venv, data; no sudo
+make setup          # Bend 2.0.40 (SHA256-checked), Lean 4.34.0, Python venv, data; no sudo
 make check          # 116 checks (107 without a CUDA toolkit)
 make check-full     # 127: the same plus GPT-2, MNIST, and tensor-fork and tensor-gpu on the JS lane
 make media          # regenerate the figures on this page (needs node, ffmpeg, Brave)

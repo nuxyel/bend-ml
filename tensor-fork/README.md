@@ -6,7 +6,7 @@ of copying them, `par1`..`par4`, which run any kernel of yours over blocks of a 
 `softmax_ce`, tensor-array's cross-entropy with its rows in blocks (since 0.1.6.0).
 It is faster wherever the work splits into blocks; it is **not proved**, and says so.
 
-- Bend: **2.0.39** · License: MIT · Depends on `bend-ml-tensor-array@0.1.19.0`.
+- Bend: **2.0.40** · License: MIT · Depends on `bend-ml-tensor-array@0.1.19.0`.
 - `bend tensor-fork/main.bend` → `SOME PROOFS FAIL`, naming the 35 defs that rely on `@unsafe` code (below). All of it is
   Bend: no foreign code.
 - Tests: `tests/bits.bend`, `tests/precise.bend` and `tests/ce.bend`, against tensor-array, bit for bit (below).
