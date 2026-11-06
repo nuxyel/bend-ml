@@ -2055,3 +2055,7 @@ output equal to C's).
   checked; not done.
 - Proposed version: `bend-ml-tensor-fork` 0.1.7.0 (faster products, the same API and bits, Bend 2.0.40 required). Not
   published.
+- **Published** as `bend-ml-tensor-fork@0.1.7.0`, hash `0x2e68de891a5072b4394ecc43af36e8dd` (3 files: Bend 2.0.40's
+  `--publish` also sends the README beside the entry), with Bend 2.0.40, which it needs. The package table and
+  `reference/test_published.py` (through the table) use it: a split product, `par1` and `softmax_ce` from BendHub give
+  the one-block bits; `make check` 116/116.
