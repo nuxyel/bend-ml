@@ -40,7 +40,7 @@ only compiles with a proof that the number of elements does not change, even whe
 | [`bend-ml-tensor-array`](tensor-array) | 0.1.19.0 | the same guarantees over a flat `Array<F32>`; `Bands<r,c>` for a parallel matrix · vector | `cap_ok`, `to_list_len`, `half_cover`, `leaf_len`, `band_len`, `size_set`, `get_after_set`, `get_other_set`; typed `matmul`, `matmul_nt`, `matmul_tn` (and their accumulating forms), `Bands.matvec` |
 | [`bend-ml-autograd`](autograd) | 0.1.1.0 | Automatic differentiation and layers with typed backward. **Frozen** (2026-10-19): no new versions; training moves to [BendTorch](https://github.com/nuxyel/bendtorch) | **`reverse_eq_forward`** |
 | [`bend-ml-binary-read`](binary-read) | 0.2.0.1 | F32 and BF16 weights read from a file straight into an `Array<F32>`, at offsets past 4 GiB; foreign code (C and JavaScript), kept out of the packages with laws | none: an effect, tested on both lanes |
-| [`bend-ml-tensor-fork`](tensor-fork) | 0.1.6.0 | tensor-array's six products with the parallel blocks sharing A, B and C (`Array.fork`, `@unsafe` in Base) instead of copying them: an MNIST epoch 12.0 → 6.2 s on one thread, 4.4 → 3.0 s on 16; `par1`..`par4`, any kernel over blocks of shared arrays; `softmax_ce` with the rows in blocks, 2.9x the one-thread tensor-array on 16 threads for wide rows, slower on small matrices | none: the same bits as tensor-array, tested on 14,835 products and 11 cross-entropy cases; kept out of the packages with laws |
+| [`bend-ml-tensor-fork`](tensor-fork) | 0.1.7.0 | tensor-array's six products with the parallel blocks sharing A, B and C (`Array.fork`, `@unsafe` in Base) instead of copying them: an MNIST epoch 12.0 → 6.2 s on one thread, 4.4 → 3.0 s on 16; `par1`..`par4`, any kernel over blocks of shared arrays; `softmax_ce` with the rows in blocks, 2.9x the one-thread tensor-array on 16 threads for wide rows, slower on small matrices; since 0.1.7.0 (Bend 2.0.40) its products' cells read with `Array.get_unchecked`, 8.7% fewer instructions | none: the same bits as tensor-array, tested on 14,835 products and 11 cross-entropy cases; kept out of the packages with laws |
 | [`bend-ml-tensor-gpu`](tensor-gpu) | 0.1.5.1 | tensor-array's six products as one `!` call each, so they run on the GPU (`Array.fork`, `@unsafe` in Base); at SmolLM2-135M's sizes 1.6-2.8x faster than tensor-fork on 16 threads, 512 x 4096 x 512 4.5x; `run1`..`run4`, bangs over any leaf code written in plain Bend; uniform and Gaussian fills of a counter (`fill_gauss`, `gauss_mat`, and `_at` forms for a slice), made on the device | none: the same bits as tensor-array on the GPU and the CPU, tested on 2,967 products; the fills' words the same on every lane and in a NumPy twin; kept out of the packages with laws |
 
 ```python
@@ -48,7 +48,7 @@ import bend-ml-tensor-array@0.1.19.0/main.bend as TA
 import bend-ml-bpe-tokenizer@0.1.3.0/main.bend as BPE
 ```
 
-`bend-ml-tensor-gpu` 0.1.5.1 and `bend-ml-tensor-fork` 0.1.6.0 import tensor-array 0.1.19.0, so their products take
+`bend-ml-tensor-gpu` 0.1.5.1 and `bend-ml-tensor-fork` 0.1.7.0 import tensor-array 0.1.19.0, so their products take
 these `Mat` values (Bend treats each version's `Mat` as its own type).
 
 <p align="center"><img src="docs/media/shots/law-roundtrip.png" alt="The roundtrip law as Bend states it, and ALL PROOFS CHECK" width="80%"></p>
