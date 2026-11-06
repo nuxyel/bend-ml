@@ -2006,3 +2006,52 @@ output equal to C's).
   bendlang/bend#1978 made every take of a shared node a call on the host (the instructions), and #2036 raised the L1
   misses from 0.23 G to 1.24 G (most of the cycles). `docs/upstream/bpe_encode.sh` reproduces both counts; I am
   reporting them upstream. The tokenizer is a small part of a GPT-2 run, so I took the bump.
+
+## tensor-fork: the products' cells read with Array.get_unchecked (2026-11-06, on devel, not published)
+
+- bendlang/bend#1781 asked for a read without the mask Base puts on every array index; #1880 added
+  `Array.get_unchecked` (`@unsafe`: the caller promises the index is below the capacity), released in Bend 2.0.40.
+  tensor-array keeps its checked reads (it has laws, so no `@unsafe`); tensor-fork now has its own copies of
+  tensor-array's cells, `u8_dot`, `u8_cell`, `u8_cols` and `u8_rows` (`t8_dot`, `t8_cell`, `t8_cols`, `t8_rows` with
+  the same additions in the same order), whose inner loop reads with `get_unchecked`. The leaves (`rblock`, `cbrows`)
+  run them, and a product that does not split (depth 0) now runs them too, in one block (`u8_seq`, packed by `pk_par` at
+  depth 0), instead of `TA.gemm_t8_ac`. One-row products still run tensor-array's scalar loop.
+- Why every unchecked index is below the capacity: line i of a packed operand is cells `i * tk .. i * tk + tk - 1`, and
+  only the operand's lines are read. As in tensor-array, the loop's last step reads the cell just past each line, which
+  for the last line is `lines * tk`; tensor-array's `pk_pack` gives 2^d >= `lines * tk` cells, so that index is the
+  capacity itself whenever `lines * tk` is a power of two. `pk_par` now gives `lines * tk + 1` (one block twice the size
+  in that case, a packed copy dropped after the product).
+- Two shapes that ran more instructions, not less (the three products of 226.5 M multiply-adds below, depth 0):
+  - a loop that stops one read early (the shape the MetalBend #1781 probe gave `dotr`), so that no read leaves a line
+    and no extra cell is needed: 16,633 M with unchecked first reads and 17,094 M with checked ones, against 3,777 M. Its
+    last step uses the cell it read, and clang then keeps the 16 loads of each step scalar instead of two vector loads
+    of a cell each.
+  - tensor-array's shape with every read unchecked, the two first reads of each cell included: 9,196 M. In the emitted
+    C an unchecked index is `(u32)i << 3`, which clang turns into a 32-bit counter stepping by 8, and it cannot show
+    that adding 0..7 to it never wraps, so the loads stay scalar again; the first read's masked index
+    (`((u32)i & mask) << 3`) is what gives it that bound. Those two reads stay checked (once per cell).
+- Instructions (user mode, one thread pinned to CPU 3, 3 rounds each, every round within 300 of the others), the
+  three products of MetalBend's gemm-fork workload (nt 256 x 576 x 1536, tn 1536 x 256 x 576, nn 256 x 1536 x 576, each
+  accumulated twice into C) on tensor-array 0.1.19.0, the same three hashes before and after, Bend 2.0.40:
+
+  | depth | tensor-fork 0.1.6.0 | with the unchecked cells | |
+  |---|---:|---:|---:|
+  | 0 (par 0) | 3,776.57 M | 3,448.59 M | -8.7% |
+  | 3 (par 3, 8 blocks) | 3,554.61 M | 3,449.47 M | -3.0% |
+
+  Depth 0 gains more because it now also skips `TA.gemm_t8_ac`'s own path. The machine was busy (load 3-5), so no
+  time is claimed here. The MetalBend probe measured a larger cut on tensor-array 0.1.16.0's gemm-tile8 with an
+  earlier main (13,769 M to 10,520 M); I have not looked at why the checked loop costs less on 2.0.40.
+- Checks: `tests/bits.bend` prints `0 0 14832` and every other count 0 on 1 and 16 threads and on the JS lane (its
+  (64, 64, 64) product has `lines * tk` = 512, a power of two); `tests/precise.bend` `0 21`; `tests/ce.bend` eleven 0s
+  and 77. `make check` 116/116 (with `BEND_PIN=2.0.40`: the package now needs 2.0.40, the first release with
+  `get_unchecked`). `bend tensor-fork/main.bend` names 42 defs outside the proofs instead of 35: the five copies and
+  `u8_seq`'s path (`u8_dot`, `u8_cell`, `u8_cols`, `u8_rows`, `u8_seq`) and the two leaves that now call them (`rblock`,
+  `cbrows`); `make check` pins the new list.
+- tensor-gpu is unchanged: its tile kernel reads A and B directly, and its edge tiles (rows past n, columns past m) and
+  its last turn (the steps past k, read one turn ahead) read outside the matrices by design, their products dropped by
+  `pk` and `wr`. The matrices are the caller's arrays, with no spare cell, and on the device a read past a block can
+  fault. An unchecked version needs the generator to split interior tiles from edge ones and keep the turn past k
+  checked; not done.
+- Proposed version: `bend-ml-tensor-fork` 0.1.7.0 (faster products, the same API and bits, Bend 2.0.40 required). Not
+  published.
