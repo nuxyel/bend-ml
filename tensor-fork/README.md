@@ -7,7 +7,7 @@ of copying them, `par1`..`par4`, which run any kernel of yours over blocks of a 
 It is faster wherever the work splits into blocks; it is **not proved**, and says so.
 
 - Bend: **2.0.40** · License: MIT · Depends on `bend-ml-tensor-array@0.1.19.0`.
-- `bend tensor-fork/main.bend` → `SOME PROOFS FAIL`, naming the 35 defs that rely on `@unsafe` code (below). All of it is
+- `bend tensor-fork/main.bend` → `SOME PROOFS FAIL`, naming the 42 defs that rely on `@unsafe` code (below). All of it is
   Bend: no foreign code.
 - Tests: `tests/bits.bend`, `tests/precise.bend` and `tests/ce.bend`, against tensor-array, bit for bit (below).
 
@@ -44,7 +44,9 @@ def loss(z: TA.Mat<64n, 49152n>, labels: List<&2, Nat>) -> TA.MCE<64n, 49152n>:
 An `Array` in Bend has one owner, which is what lets a product write into it in place, and what the proofs of
 bend-ml's other packages rely on. Base's `Array.fork` gives two handles to one array, so two parallel blocks can read A
 and B and write their own parts of C without a copy. Base marks it `@unsafe`: the checker cannot prove that two blocks
-never write the same cell. Every def that reaches it is reported, and the package's check fails. So it lives here, next
+never write the same cell. The products' inner loop also reads with Base's `Array.get_unchecked` (bendlang/bend#1880,
+in Bend 2.0.40), an `@unsafe` read that skips the mask Base puts on every index. Every def that reaches either is
+reported, and the package's check fails. So it lives here, next
 to [`bend-ml-binary-read`](../binary-read) (the other package outside the proofs, for foreign code), and no package with
 laws imports it. Use tensor-array when you want every product proved; use this one where the speed matters and the
 bit tests are enough for you.
@@ -53,10 +55,20 @@ bit tests are enough for you.
 
 A product that splits (tensor-array's `split_depth`, two or more rows) packs A and B once into cells of 8, as
 tensor-array's sequential path does. Every node of the fork tree shares the two packed operands and C, and each leaf
-runs tensor-array's own cells (`t8_rows`, `t8_cols`) straight into its rows (or columns) of C. tensor-array's parallel
+runs tensor-array's cells (`t8_rows`, `t8_cols`) straight into its rows (or columns) of C. tensor-array's parallel
 path instead copies an operand at every node and hands each block's cells back as a list that is then written into C.
-A product that does not split, or that has one row, runs tensor-array's sequential code. The sums are the same sums in
-the same order, so the bits are tensor-array's at depth 0, at any depth and thread count.
+A product that does not split runs the same cells in one block; a product with one row runs tensor-array's sequential
+code. The sums are the same sums in the same order, so the bits are tensor-array's at depth 0, at any depth and thread
+count.
+
+The cells are copies of tensor-array's (`u8_dot`, `u8_cell`, `u8_cols`, `u8_rows`) whose inner loop reads with
+`Array.get_unchecked`. An unchecked read must stay below the array's capacity, and every one here does by construction:
+line i of a packed operand is cells `i * tk .. i * tk + tk - 1` and only the operand's lines are read, while the loop's
+last step reads the cell just past each line, as tensor-array's does; for the last line that is `lines * tk`, so the
+packed operands get `lines * tk + 1` cells (one block of twice the size when `lines * tk` is a power of two). Each
+cell's first two reads stay checked: there the mask is what lets clang load each cell of 8 numbers with two vector
+loads. On three products of 226.5 M multiply-adds each (one thread), the instructions go from 3,777 M to 3,449 M at
+depth 0 and from 3,555 M to 3,449 M at depth 3, with the same output (`NOTES.md`, 2026-11-06).
 
 ## Speed
 
@@ -130,7 +142,8 @@ Not proved: that no leaf writes A or B, and that the leaves' blocks of C are dis
 fork tree, as in tensor-array's own split, and the test samples both. `make check` also pins the list of `@unsafe`
 defs, so a new one cannot slip in unnoticed:
 
-`blocks1`..`blocks4`, `join2`..`join4`, `par1`..`par4` (the blocks), `pk_par` (packing in blocks), `rpar`, `cpar`,
+`blocks1`..`blocks4`, `join2`..`join4`, `par1`..`par4` (the blocks), `pk_par` (packing in blocks), `u8_dot`,
+`u8_cell`, `u8_cols`, `u8_rows`, `u8_seq`, `rblock`, `cbrows` (the cells, with the unchecked reads), `rpar`, `cpar`,
 `t8_tree`, `t8_go`, `gemm_fork` (the product's fork tree), and `gemm_rows`, `gemm_any2`, `gemm_any`, `matmul`,
 `matmul_acc`, `matmul_nt`, `matmul_nt_acc`, `matmul_tn`, `matmul_tn_acc` (what reaches it); `mp_s3`, `mp_s2`, `mp_step`,
 `mp_go`, `mm_precise2`, `matmul_precise` (the precise product); `ce_par3`, `softmax_ce2`, `softmax_ce` (the
