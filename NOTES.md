@@ -1988,3 +1988,21 @@ output equal to C's).
 - **Published** as `bend-ml-binary-read@0.2.0.1`, hash `0x9b2f1e30b64f7bfec4ec8990700827d7` (6 files, 18,455 bytes),
   with Bend 2.0.39. The package table, the GPT-2 demo and `reference/test_published.py` (through the table) use it:
   `make check` 116/116 on 2.0.39 and on 2.0.40.
+
+## Bend 2.0.40 (2026-11-06, on devel)
+
+- The pin moves from 2.0.39 to 2.0.40 (released 2026-11-06 02:06 UTC): `scripts/setup.sh` (the version and both
+  Linux SHA256, the same as the release's asset digests), the CI step, `check_all.py`'s default `BEND_PIN`, the
+  READMEs and CLAUDE.md. Lean stays 4.34.0. Dated numbers in the README stay as measured, on 2.0.39, until the next
+  run on an idle machine.
+- One break, fixed before the bump: binary-read's JS lane (two entries above, 0.2.0.1 published).
+- On 2.0.40: `make check` 116/116 and `make check-full` 127/127, so the same bits for GPT-2, MNIST and tensor-fork
+  and tensor-gpu on the JS lane. The release notes fix none of CLAUDE.md's pitfalls.
+- What it changes for these packages, from MetalBend's corpus on 2.0.40 (a diagnosis run with other work on the
+  machine, so instruction counts only): fewer instructions on most workloads, rmsnorm 29% and the BF16 read 40%
+  fewer; Base's `Array.get_unchecked` (bendlang/bend#1880) for tensor-fork's next version. One regression: GPT-2's
+  tokenizer (bpe-tokenizer 0.1.3.0, the same output) runs 194.2 G instructions on 2.0.40 against 177.7 G on 2.0.39
+  (+9.3%), and about 28% more cycles. Two upstream changes, each confirmed by building 2.0.40 with it undone:
+  bendlang/bend#1978 made every take of a shared node a call on the host (the instructions), and #2036 raised the L1
+  misses from 0.23 G to 1.24 G (most of the cycles). `docs/upstream/bpe_encode.sh` reproduces both counts; I am
+  reporting them upstream. The tokenizer is a small part of a GPT-2 run, so I took the bump.
