@@ -61,7 +61,9 @@ Besides laws, **types** carry guarantees that no law restates: `Mat.matmul : Mat
   (tensor-array's products and `par1`..`par4` over Base's `@unsafe` `Array.fork`): its bits against tensor-array's on
   14,835 products, with A and B checked intact, and `par1`..`par4` against one loop at depths 0-6, on 1 and 16 threads
   (and the JS lane in `make check-full`). That its parallel blocks never write the shared operands or each other's cells
-  is sampled, not proved; `make check` pins its list of `@unsafe` defs.
+  is sampled, not proved, and so is that its products' unchecked reads (Base's `@unsafe` `Array.get_unchecked`) stay
+  below the packed operands' capacity (by construction, argued in `tensor-fork/main.bend`); `make check` pins its list of
+  `@unsafe` defs.
 - Everything above runs in CI on every push (`.github/workflows/ci.yml`).
 
 ## 5. Known gaps (also listed in the READMEs and `NOTES.md`)
