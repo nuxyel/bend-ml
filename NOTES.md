@@ -1985,3 +1985,6 @@ output equal to C's).
   a file opened for writing fails with "Bad file descriptor" on both lanes and both versions, as the old code did on
   2.0.39. `make check`: 116/116 on 2.0.39; 115/116 on 2.0.40, the one left being the published 0.2.0.0, which keeps the
   old code until a new version is published. The pin stays at 2.0.39 until then.
+- **Published** as `bend-ml-binary-read@0.2.0.1`, hash `0x9b2f1e30b64f7bfec4ec8990700827d7` (6 files, 18,455 bytes),
+  with Bend 2.0.39. The package table, the GPT-2 demo and `reference/test_published.py` (through the table) use it:
+  `make check` 116/116 on 2.0.39 and on 2.0.40.
