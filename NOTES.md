@@ -1969,3 +1969,19 @@ output equal to C's).
   directive: a proof, never run).
 - The same move should open other laws blocked the same way (a statement about a function applied to results that
   hold arrays): return the data part as a witness with an equation, instead of proving facts about the call twice.
+
+## binary-read's JS lane on Bend 2.0.40 (2026-11-06, on devel, not published)
+
+- On Bend 2.0.40 (2026-11-06) the JS lane of binary-read failed with `TypeError: sys.pread is not a function`, the
+  published 0.2.0.0 included: its six reads called the runtime's internal `io_sys().pread`, and bendlang/bend#2063
+  ("drop a dead pread binding") removed it, since Base itself had stopped using it when #1881 moved `File.read_at` and
+  its twins to `fs`. The C lane was not touched. I found it running `make check` with 2.0.40 in place of the pin:
+  113/116, all three failures binary-read's JS lane.
+- The fix reads the same way Base does: `fs.readvSync(file, [chunk], position)` in place of `sys.pread`, with EINTR
+  retried (libuv does not retry it for read) and the errno taken from the exception. Both files, the same loop
+  otherwise; no change to the defs or the C lane.
+- Checked on 2.0.39 and 2.0.40: `binary-read/tests/read_f32.bend` prints its expected lines on the JS lane, and
+  `test_read_at.py --js` passes (the sparse 8 GiB file, capacity, `_into` and the 10,019 PyTorch BF16 numbers). A read of
+  a file opened for writing fails with "Bad file descriptor" on both lanes and both versions, as the old code did on
+  2.0.39. `make check`: 116/116 on 2.0.39; 115/116 on 2.0.40, the one left being the published 0.2.0.0, which keeps the
+  old code until a new version is published. The pin stays at 2.0.39 until then.
