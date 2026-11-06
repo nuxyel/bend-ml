@@ -14,7 +14,7 @@ use on BendHub, and a portfolio piece for HOC.
   `docs/v3-plan.md` and `docs/v2-plan.md`.
 - `docs/AUDIT.md`: the trust base and what is proved, tested or trusted.
 - `docs/upstream/`: the repros of open `bendlang/bend` issues (its README names each one). The issue texts are drafted
-  outside this repository; Renan posts them.
+  outside this repository; Renan posts them, or an agent once he approves the text.
 - Plans after v3 (llama.bend, a training framework) live in Renan's private notes, outside this repository.
 - `make check` / `make check-full` (`reference/check_all.py`) is the gate before a commit; CI runs the full
   one on every push to `devel` and `main` and on pull requests.
