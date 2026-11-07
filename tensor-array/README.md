@@ -8,7 +8,7 @@ Tensors in Bend 2 over a flat `Array<F32>`, **with the shape in the type**: the 
 
 ```python
 import Base
-import bend-ml-tensor-array@0.1.19.0/main.bend as TA
+import bend-ml-tensor-array@0.1.20.0/main.bend as TA
 
 def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 128n>:
   TA.Mat.matmul(100n, 784n, 128n, 3n, a, w)   # 3n = 2^3 = 8 parallel blocks
@@ -133,7 +133,7 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 
 ## Versions
 
-- Next (on `devel`, not published): the law `matvec_l_len`, `Bands.matvec_l`'s length over the whole tree, with its
+- `0.1.20.0` (2026-11-06): the law `matvec_l_len`, `Bands.matvec_l`'s length over the whole tree, with its
   helpers (`al_c`, `bl_b`, `WAL`, `WBL`, `read_w` .. `bmv_w`, `w_len`). Only lines added: every def keeps its code and
   bits.
 - `0.1.19.0`: the laws `size_set`, `get_after_set` and `get_other_set` about Base's `Array` (helpers `ASet.*`), asked for
