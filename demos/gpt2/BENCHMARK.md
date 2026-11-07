@@ -4,6 +4,22 @@ Versions follow [`docs/VERSIONING.md`](../../docs/VERSIONING.md) (renumbered on 
 
 **Summary (v0.3):** GPT-2 small with 124 M parameters runs in Bend and **generates exactly the same tokens as PyTorch**, with logits equal to within 6e-4 over 11 prompts (2e-4 on the first 3). In v0.2 it took ~3 s per token (~150x PyTorch); in v0.3 (matrix · vector products over `Array`) it takes **~0.1 s per token**: ~5x PyTorch with 16 threads (21 ms per forward pass of 11 tokens) and ~2x PyTorch with 1 thread (55 ms). What still weighs is loading the weights (9 s against ~1 s), because the 124 M numbers become trees of nodes (~1.5 GB of resident memory at the peak).
 
+## v1.10.0 on Bend 2.0.39 and 2.0.40 (2026-11-07)
+
+v1.10.0's `fast.bend` (commit 33ba7b2) built with Bend 2.0.39 and with 2.0.40, so the difference is the compiler's.
+Idle machine, "The capital of France is" + 32 tokens, the marginal cost (t(33 tokens) - t(1) over 32), 7 alternated
+rounds, one thread pinned to a performance core. The same 33 ids on both versions.
+
+| | per token, 1 thread | per token, 16 threads | load and first token, 1 thread | peak resident, 1 / 16 threads |
+|---|---|---|---|---|
+| Bend 2.0.39 | 119.4 ms (118.0-121.5) | 86.0 ms (84.9-88.3) | 0.67 s | 831 / 867 MB |
+| **Bend 2.0.40** | **106.8 ms** (103.6-108.9), -10.5% | **83.0 ms** (80.6-83.4), -3.5% | 0.56 s | 830 / 869 MB |
+
+The ranges do not overlap on either thread count. Hardware counters on one thread, whole program (medians of 3): 7.1%
+fewer instructions and 11.9% fewer cycles on 2.0.40, 2.9% more cache misses. The one-thread token on 2.0.39 (119 ms)
+is also below v1.8.0's 128.9 of 2026-11-01, most likely from v1.9.0's dot product unrolled by four; that compares two
+sessions. On 16 threads nothing moved between them (86.0 against 84.7).
+
 ## v1.3.0 to v1.3.2: loading with binary-read (2026-10-16)
 
 The bands are read straight into their arrays by `bend-ml-binary-read` instead of 1 MB blocks returned as lists of
