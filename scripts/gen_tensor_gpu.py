@@ -34,7 +34,7 @@ p = o.append
 p(f"""# bend-ml-tensor-gpu: tensor-array's products on the GPU, with tensor-array's bits.
 #
 #   import ../tensor-array/main.bend as TA
-#   import bend-ml-tensor-gpu@0.1.5.1/main.bend as TG
+#   import bend-ml-tensor-gpu@0.1.5.2/main.bend as TG
 #   TG.matmul(n, k, m, par, a, b)      # the same arguments, result type and bits as TA.Mat.matmul
 #
 # The six products (matmul, matmul_nt, matmul_tn and their accumulating forms) take tensor-array's Mat values and return
@@ -60,7 +60,7 @@ p(f"""# bend-ml-tensor-gpu: tensor-array's products on the GPU, with tensor-arra
 # All of it is Bend: no foreign code. Written by bend-ml's scripts/gen_tensor_gpu.py ({TM} x {TN} tiles).
 # bend-lint: disable-file bend-lint-rules/performance/gpu_fit -- the bangs carry the arrays to the device by design; that is the package not-expected-because: products timed on the GPU against 16 CPU threads (8.4 against 12.2 ms, 11-13 against 55-56 ms, NOTES 2026-10-18); a caller whose kernel does not win runs the same bang on the CPU threads
 import Base
-import bend-ml-tensor-array@0.1.19.0/main.bend as TA
+import bend-ml-tensor-array@0.1.20.0/main.bend as TA
 
 # the sizes and strides of one product: C[i][j] = sum_p A[oa + i*arow + p*sa] * B[ob + p*sb + j*bcol], n x m, k steps
 # (oa, ob: 0 except for matmul_precise's blocks)
