@@ -2072,6 +2072,25 @@ output equal to C's).
   tensor-gpu and tensor-fork change only their import, so a fourth-number bump.
 - The demos, the tests and the README move to 0.1.20.0; the badge says 34 laws (`list_laws.py --check-readme` ok).
 
+## tensor-gpu: interior tiles read unchecked (2026-11-06, on a branch, not published)
+
+- The products' tile loop reads 16 values of A and 16 of B a turn with `Array.get`. A tile whose rows and columns are
+  all inside C (`i0 + 4 <= n`, `j0 + 4 <= m`) now reads its full turns with `Array.get_unchecked` (bendlang/bend#1880):
+  rows below n, columns below m and steps below k are cells of the operands, below their capacity. The last turn (the
+  steps past the last full one, which also reads past k) and every edge tile stay checked, as before. The generator
+  copies the checked getter chain as `gu_*`, with `turn_u`, `mmu`, `loop_in` and `loop_of` choosing between them; the
+  additions are the same and in the same order.
+- Bits: `tests/bits.bend` (2,958 products, n and m 1..9 with k 0, 1, 3, 8, 9, 17, the big shapes, the six public
+  products) gives `0 0 2958` and zeros on the GPU, on 1 and 16 CPU threads and on the JS lane; `tests/precise.bend` 0 of
+  21 on the GPU and the CPU threads; `make check` 116/116. The defs outside the proofs go from 62 to 98.
+- It doesn't pay on the CPU: a 512 x 576 x 1536 `matmul_nt` with `+RTS --gpu off --threads 1 -RTS` on CPU 3 runs
+  3,888-3,900 M instructions against 3,837-3,847 M before (+1.4%), cycles within the noise (923-1,124 M against 941-944
+  M), the same output hash. The mask is one `and` a read, and each turn is a chain of 32 nested calls that copy 34
+  values back; the extra functions cost more than the masks saved. On the GPU, under nsys on a busy machine, the same
+  product's `bend_dev` kernels took 9.40-10.03 ms against 9.61-11.76 ms (3 alternated rounds): the ranges overlap.
+- So it stays off devel unless an idle GPU timing shows a gain that a 36-def larger trust surface is worth. If it is
+  ever published, as a speed change with no API change it would be a fourth-number version on top of the current one.
+
 ## GPT-2 and MNIST on Bend 2.0.40, measured on an idle machine (2026-11-07)
 
 - v1.10.0's demos (commit 33ba7b2, `fast.bend` of each) built with Bend 2.0.39 and 2.0.40 at that one commit, the
