@@ -2072,7 +2072,7 @@ output equal to C's).
   tensor-gpu and tensor-fork change only their import, so a fourth-number bump.
 - The demos, the tests and the README move to 0.1.20.0; the badge says 34 laws (`list_laws.py --check-readme` ok).
 
-## tensor-gpu: interior tiles read unchecked (2026-11-06, on a branch, not published)
+## tensor-gpu: interior tiles read unchecked (2026-11-06/07, measured, not merged)
 
 - The products' tile loop reads 16 values of A and 16 of B a turn with `Array.get`. A tile whose rows and columns are
   all inside C (`i0 + 4 <= n`, `j0 + 4 <= m`) now reads its full turns with `Array.get_unchecked` (bendlang/bend#1880):
@@ -2086,10 +2086,11 @@ output equal to C's).
 - It doesn't pay on the CPU: a 512 x 576 x 1536 `matmul_nt` with `+RTS --gpu off --threads 1 -RTS` on CPU 3 runs
   3,888-3,900 M instructions against 3,837-3,847 M before (+1.4%), cycles within the noise (923-1,124 M against 941-944
   M), the same output hash. The mask is one `and` a read, and each turn is a chain of 32 nested calls that copy 34
-  values back; the extra functions cost more than the masks saved. On the GPU, under nsys on a busy machine, the same
-  product's `bend_dev` kernels took 9.40-10.03 ms against 9.61-11.76 ms (3 alternated rounds): the ranges overlap.
-- So it stays off devel unless an idle GPU timing shows a gain that a 36-def larger trust surface is worth. If it is
-  ever published, as a speed change with no API change it would be a fourth-number version on top of the current one.
+  values back; the extra functions cost more than the masks saved. On the GPU, the same product under nsys on an idle
+  machine, 5 alternated rounds (2026-11-07), gave the same output hash (3347185853) and `bend_dev` medians of 9.55 ms
+  as published against 9.34 ms unchecked, ranges 9.20-10.24 and 8.69-11.54: within noise.
+- Dropped: no gain on the GPU, 1.4% more instructions on the CPU, and 36 more defs outside the proofs. The branch is
+  deleted; this entry is its record.
 
 ## GPT-2 and MNIST on Bend 2.0.40, measured on an idle machine (2026-11-07)
 
