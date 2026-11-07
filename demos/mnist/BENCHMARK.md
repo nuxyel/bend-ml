@@ -4,6 +4,21 @@ Versions follow [`docs/VERSIONING.md`](../../docs/VERSIONING.md) (renumbered on 
 
 **Summary (v0.3):** the results are **identical** (same loss, same accuracy after 1 and after 3 epochs). In v0.2 Bend took **544 s per epoch** (~1800x PyTorch); in v0.3, with matrices in a flat `Array` and parallel products, it takes **6.6 s** (~33x PyTorch with 16 threads, ~22x with 1). The difference between v0.2 and v0.3 is the data structure, not the language; what is left is scalar code against BLAS/SIMD. Re-measured on 2026-10-04 on an idle machine: 7.0, 7.0 and 7.2 s per epoch for Bend (the 6.6 s of the tables below are the original runs) and 0.18 to 0.20 s for PyTorch, i.e. ~35x.
 
+## v1.10.0 on Bend 2.0.39 and 2.0.40 (2026-11-07)
+
+v1.10.0's `fast.bend` (commit 33ba7b2) built with Bend 2.0.39 and with 2.0.40, so the difference is the compiler's.
+Idle machine, SGD at lr 0.1, the marginal cost (t(600 batches) - t(50) over 550), 5 alternated rounds, one thread pinned
+to a performance core. The same loss on both versions.
+
+| | per batch, 1 thread | per batch, 16 threads | peak resident, 16 threads |
+|---|---|---|---|
+| Bend 2.0.39 | 9.47 ms (9.32-9.60) | 5.65 ms (5.37-5.77) | 85 MB |
+| Bend 2.0.40 | 9.32 ms (9.28-9.77) | 5.37 ms (5.04-5.49) | 78 MB |
+
+Both ranges overlap, so the -1.6% and -5.0% are within noise: no claim for 2.0.40 here. Hardware counters on one
+thread, whole program (medians of 3): 2.1% fewer instructions and 1.5% fewer cycles. On 2.0.39 the numbers are within
+0.5% of v1.8.0's of 2026-11-01 (9.49 and 5.69 ms).
+
 ## v1.3.2: the demo on `bend-ml-tensor-array@0.1.11.0` (2026-10-16)
 
 The demo had stayed on 0.1.3.0 since v0.3. On 0.1.11.0 (products in cells of 8, parallel blocks without per-block

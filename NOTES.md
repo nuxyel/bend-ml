@@ -4,7 +4,7 @@ Date: 2026-10-03. Everything below was verified on the machine or in a primary s
 
 ## Pinned version
 
-- **Bend 2.0.39** (`bend version`), since 2026-10-24 (2.0.38 from 2026-10-23, 2.0.37 from 2026-10-13, 2.0.36 from 2026-10-10, 2.0.35 before). Pin this version until further notice.
+- **Bend 2.0.40** (`bend version`), since 2026-11-06 (2.0.39 from 2026-10-24, 2.0.38 from 2026-10-23, 2.0.37 from 2026-10-13, 2.0.36 from 2026-10-10, 2.0.35 before). Pin this version until further notice.
 - Official repository: `github.com/bendlang/bend` (not `HigherOrderCO/Bend`, which is Bend 1).
 - Installed with `curl -fsSL https://bend-lang.com/install.sh | sh` (script read before running: it downloads the GitHub release, checks the SHA256, installs only into `~/.bend`, no sudo).
 - Update: `bend update` (runs the installer again). Do not update without recording it here, since Bend 2 changes fast.
@@ -2071,3 +2071,44 @@ output equal to C's).
 - Versions by `docs/VERSIONING.md`: a new law is new API, so tensor-array's third number and the release's minor;
   tensor-gpu and tensor-fork change only their import, so a fourth-number bump.
 - The demos, the tests and the README move to 0.1.20.0; the badge says 34 laws (`list_laws.py --check-readme` ok).
+
+## tensor-gpu: interior tiles read unchecked (2026-11-06/07, measured, not merged)
+
+- The products' tile loop reads 16 values of A and 16 of B a turn with `Array.get`. A tile whose rows and columns are
+  all inside C (`i0 + 4 <= n`, `j0 + 4 <= m`) now reads its full turns with `Array.get_unchecked` (bendlang/bend#1880):
+  rows below n, columns below m and steps below k are cells of the operands, below their capacity. The last turn (the
+  steps past the last full one, which also reads past k) and every edge tile stay checked, as before. The generator
+  copies the checked getter chain as `gu_*`, with `turn_u`, `mmu`, `loop_in` and `loop_of` choosing between them; the
+  additions are the same and in the same order.
+- Bits: `tests/bits.bend` (2,958 products, n and m 1..9 with k 0, 1, 3, 8, 9, 17, the big shapes, the six public
+  products) gives `0 0 2958` and zeros on the GPU, on 1 and 16 CPU threads and on the JS lane; `tests/precise.bend` 0 of
+  21 on the GPU and the CPU threads; `make check` 116/116. The defs outside the proofs go from 62 to 98.
+- It doesn't pay on the CPU: a 512 x 576 x 1536 `matmul_nt` with `+RTS --gpu off --threads 1 -RTS` on CPU 3 runs
+  3,888-3,900 M instructions against 3,837-3,847 M before (+1.4%), cycles within the noise (923-1,124 M against 941-944
+  M), the same output hash. The mask is one `and` a read, and each turn is a chain of 32 nested calls that copy 34
+  values back; the extra functions cost more than the masks saved. On the GPU, the same product under nsys on an idle
+  machine, 5 alternated rounds (2026-11-07), gave the same output hash (3347185853) and `bend_dev` medians of 9.55 ms
+  as published against 9.34 ms unchecked, ranges 9.20-10.24 and 8.69-11.54: within noise.
+- Dropped: no gain on the GPU, 1.4% more instructions on the CPU, and 36 more defs outside the proofs. The branch is
+  deleted; this entry is its record.
+
+## GPT-2 and MNIST on Bend 2.0.40, measured on an idle machine (2026-11-07)
+
+- v1.10.0's demos (commit 33ba7b2, `fast.bend` of each) built with Bend 2.0.39 and 2.0.40 at that one commit, the
+  protocol of 2026-11-01 (marginal cost; GPT-2 7 rounds, MNIST 5; one thread pinned to CPU 3; idle machine, mains
+  power, `performance`). Same tokens and loss on both versions. Medians, ms (range in brackets):
+
+  | | 2.0.39, 1 thread | 2.0.40, 1 thread | 2.0.39, 16 | 2.0.40, 16 |
+  |---|---|---|---|---|
+  | GPT-2, per token | 119.4 [118.0-121.5] | 106.8 [103.6-108.9] | 86.0 [84.9-88.3] | 83.0 [80.6-83.4] |
+  | MNIST, per batch | 9.47 [9.32-9.60] | 9.32 [9.28-9.77] | 5.65 [5.37-5.77] | 5.37 [5.04-5.49] |
+
+- GPT-2 gains 10.5% on one thread and 3.5% on 16, ranges apart; load and first token 0.67 → 0.56 s; peak memory the
+  same (830 / 869 MB). MNIST's -1.6% and -5.0% are inside overlapping ranges: within noise. Counters on one thread,
+  whole program, medians of 3: GPT-2 7.1% fewer instructions and 11.9% fewer cycles (IPC 3.36 → 3.54), MNIST 2.1% and
+  1.5%. The tokenizer's regression on 2.0.40 (+9.3% instructions, entry of 2026-11-06) does not show in a whole GPT-2
+  run, which got faster.
+- Against v1.8.0 on 2026-11-01 (Bend 2.0.39, another session): GPT-2 129 → 119 ms on one thread at 2.0.39, most likely
+  v1.9.0's dot product unrolled by four (measured then only on one `matvec_l` band, -25%); 85 → 86 on 16, unchanged.
+  MNIST within 0.5% (9.49 / 5.69). The README and both demo benchmarks now give these numbers; the charts still show
+  v1.8.0 on 2026-11-01.
