@@ -68,7 +68,7 @@ Numbers are a different matter: `F32` is not a real number, so the numerics are 
 
 | Demo | What it does | Checked against |
 |---|---|---|
-| [GPT-2 small](demos/gpt2), 124 M | greedy generation with a key/value cache, the weights in parallel row bands, loaded in 0.8 s | PyTorch on 11 prompts: the same tokens, logits within 3.2e-4; the tokenizer matches `tiktoken` on 79 texts |
+| [GPT-2 small](demos/gpt2), 124 M | greedy generation with a key/value cache, the weights in parallel row bands, loaded and the first token out in 0.6 s | PyTorch on 11 prompts: the same tokens, logits within 3.2e-4; the tokenizer matches `tiktoken` on 79 texts |
 | [MNIST](demos/mnist), 784-128-10 MLP | SGD training with every shape typed | PyTorch with the same initial weights and batches: the same loss and hits |
 
 Built on bend-ml: [llama.bend](https://github.com/nuxyel/llama.bend) runs SmolLM2-135M, 360M and 1.7B in Bend with the
@@ -93,6 +93,15 @@ to 9.5 ms on one thread and from 7.8 to 5.7 on 16, at 85 MB instead of 107. GPT-
 did not move: PyTorch is still 7x ahead on one thread and 9x on 16 for GPT-2; for MNIST NumPy and PyTorch are 20x
 ahead on one thread and 6-14x on 16; and the thread curve still flattens after 4 threads (85 ms at 4, 79 at best, on 8
 and 22), as v1.3.2's did (108 at 4, 97 on 22).
+
+On 2026-11-07 I measured v1.10.0's two demos (commit 33ba7b2) again on an idle machine, the same way, built with Bend
+2.0.39 and with 2.0.40 at that one commit, so the difference is the compiler's. A GPT-2 token went from 119 to 107 ms on
+one thread and from 86 to 83 on 16, the load and the first token from 0.67 to 0.56 s, with the same tokens and peak
+memory (830 MB on one thread, 869 on 16). An MNIST batch went from 9.5 to 9.3 ms on one thread and from 5.7 to 5.4 on
+16, with the same loss; those two moves are within noise (the rounds' ranges overlap), so 2.0.40 gives MNIST nothing I
+can claim. With 2.0.39, the one-thread GPT-2 token (119 ms) is faster than v1.8.0's 129 of 2026-11-01, most likely from
+v1.9.0's dot product unrolled by four, but that compares two sessions; on 16 threads it did not move (86 against 85),
+and MNIST came out within 0.5% of v1.8.0's. The charts below still show v1.8.0 on 2026-11-01.
 
 <p align="center"><img src="docs/media/deck/frames/04-vs-references.webp" alt="GPT-2 small, ms per token: PyTorch 18.5 and 9.4, NumPy 18.5 and 11.2, llama.cpp 22.2 and 9.8, bend-ml v1.8.0 129 and 85, llm.c without a key/value cache 529 and 142, on 1 and 16 threads" width="90%"></p>
 
