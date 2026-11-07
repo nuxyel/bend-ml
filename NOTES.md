@@ -2112,3 +2112,8 @@ output equal to C's).
   v1.9.0's dot product unrolled by four (measured then only on one `matvec_l` band, -25%); 85 → 86 on 16, unchanged.
   MNIST within 0.5% (9.49 / 5.69). The README and both demo benchmarks now give these numbers; the charts still show
   v1.8.0 on 2026-11-01.
+
+## Release v1.10.1: the timings on Bend 2.0.40 (2026-11-07)
+
+- A documentation patch: the two entries above (the README, the demos' BENCHMARK, the unchecked tiles dropped). No
+  package or code change, nothing published. PR #33, CI green, merged as d6d9bf7, tag `v1.10.1`, GitHub release.
