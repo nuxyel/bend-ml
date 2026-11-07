@@ -2071,3 +2071,24 @@ output equal to C's).
 - Versions by `docs/VERSIONING.md`: a new law is new API, so tensor-array's third number and the release's minor;
   tensor-gpu and tensor-fork change only their import, so a fourth-number bump.
 - The demos, the tests and the README move to 0.1.20.0; the badge says 34 laws (`list_laws.py --check-readme` ok).
+
+## GPT-2 and MNIST on Bend 2.0.40, measured on an idle machine (2026-11-07)
+
+- v1.10.0's demos (commit 33ba7b2, `fast.bend` of each) built with Bend 2.0.39 and 2.0.40 at that one commit, the
+  protocol of 2026-11-01 (marginal cost; GPT-2 7 rounds, MNIST 5; one thread pinned to CPU 3; idle machine, mains
+  power, `performance`). Same tokens and loss on both versions. Medians, ms (range in brackets):
+
+  | | 2.0.39, 1 thread | 2.0.40, 1 thread | 2.0.39, 16 | 2.0.40, 16 |
+  |---|---|---|---|---|
+  | GPT-2, per token | 119.4 [118.0-121.5] | 106.8 [103.6-108.9] | 86.0 [84.9-88.3] | 83.0 [80.6-83.4] |
+  | MNIST, per batch | 9.47 [9.32-9.60] | 9.32 [9.28-9.77] | 5.65 [5.37-5.77] | 5.37 [5.04-5.49] |
+
+- GPT-2 gains 10.5% on one thread and 3.5% on 16, ranges apart; load and first token 0.67 → 0.56 s; peak memory the
+  same (830 / 869 MB). MNIST's -1.6% and -5.0% are inside overlapping ranges: within noise. Counters on one thread,
+  whole program, medians of 3: GPT-2 7.1% fewer instructions and 11.9% fewer cycles (IPC 3.36 → 3.54), MNIST 2.1% and
+  1.5%. The tokenizer's regression on 2.0.40 (+9.3% instructions, entry of 2026-11-06) does not show in a whole GPT-2
+  run, which got faster.
+- Against v1.8.0 on 2026-11-01 (Bend 2.0.39, another session): GPT-2 129 → 119 ms on one thread at 2.0.39, most likely
+  v1.9.0's dot product unrolled by four (measured then only on one `matvec_l` band, -25%); 85 → 86 on 16, unchanged.
+  MNIST within 0.5% (9.49 / 5.69). The README and both demo benchmarks now give these numbers; the charts still show
+  v1.8.0 on 2026-11-01.
