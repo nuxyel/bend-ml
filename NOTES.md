@@ -2129,3 +2129,9 @@ output equal to C's).
 - The package diagram said 30 laws and 5 in tensor-array; it is 34 and 9 since v1.10.0 (`list_laws.py`). The README's
   laws table lacked `matvec_l_len`, and its first paragraph named v1.8.0 as the current release; it now links the newest
   release instead of naming it.
+
+## Release v1.10.2: the README's figures on Bend 2.0.40 (2026-11-08)
+
+- A documentation patch: the entry above (the figures redrawn with v1.10.0's numbers on 2.0.40, the release line, the
+  diagram at 34 laws). No package or code change, nothing published. PR #34, CI green, merged as 8af6052, tag
+  `v1.10.2`, GitHub release.
