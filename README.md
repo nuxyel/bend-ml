@@ -13,7 +13,7 @@
 product of mismatched matrices does not compile, and the structural guarantees (a tokenizer that never loses a byte, a
 reverse mode that agrees with the forward mode, a parallel product that covers every row) are laws that Bend's kernel
 checks. Eight packages are on BendHub, and two demos run on them: an MNIST classifier that trains, and GPT-2 small, which
-generates the same tokens as PyTorch. The current release is [v1.8.0](https://github.com/nuxyel/bend-ml/releases/tag/v1.8.0).
+generates the same tokens as PyTorch. The newest release and its notes are [on GitHub](https://github.com/nuxyel/bend-ml/releases/latest).
 
 ## 01 · A shape error is a type error
 
@@ -37,7 +37,7 @@ only compiles with a proof that the number of elements does not change, even whe
 | [`bend-ml-nat-lemmas`](nat-lemmas) | 0.1.2.0 | `Nat` and `List` lemmas that Base does not have | `add_comm`, `add_assoc`, `mul_comm`, `mul_assoc`, `mul_dist`, `append_assoc`, `length_append`, `product_append`, `add4`, `mul_dist_l`... (17) |
 | [`bend-ml-bpe-tokenizer`](bpe) | 0.1.3.0 | Byte-level BPE tokenizer (GPT-2 style) | **roundtrip** `decode(encode(s)) = s`, `vocab_bound`, `dec_append`, `train_wf`, `roundtrip_trained` |
 | [`bend-ml-tensor`](tensor) | 0.1.2.0 | `Vec<n>` and `Mat<r,c>` with the shape in the type, over lists. **Frozen** (2026-10-19): no new versions; superseded by tensor-array | `reshape_swap`, `reshape_flat` |
-| [`bend-ml-tensor-array`](tensor-array) | 0.1.20.0 | the same guarantees over a flat `Array<F32>`; `Bands<r,c>` for a parallel matrix · vector | `cap_ok`, `to_list_len`, `half_cover`, `leaf_len`, `band_len`, `size_set`, `get_after_set`, `get_other_set`; typed `matmul`, `matmul_nt`, `matmul_tn` (and their accumulating forms), `Bands.matvec` |
+| [`bend-ml-tensor-array`](tensor-array) | 0.1.20.0 | the same guarantees over a flat `Array<F32>`; `Bands<r,c>` for a parallel matrix · vector | `cap_ok`, `to_list_len`, `half_cover`, `leaf_len`, `band_len`, `matvec_l_len`, `size_set`, `get_after_set`, `get_other_set`; typed `matmul`, `matmul_nt`, `matmul_tn` (and their accumulating forms), `Bands.matvec` |
 | [`bend-ml-autograd`](autograd) | 0.1.1.0 | Automatic differentiation and layers with typed backward. **Frozen** (2026-10-19): no new versions; training moves to [BendTorch](https://github.com/nuxyel/bendtorch) | **`reverse_eq_forward`** |
 | [`bend-ml-binary-read`](binary-read) | 0.2.0.1 | F32 and BF16 weights read from a file straight into an `Array<F32>`, at offsets past 4 GiB; foreign code (C and JavaScript), kept out of the packages with laws | none: an effect, tested on both lanes |
 | [`bend-ml-tensor-fork`](tensor-fork) | 0.1.7.1 | tensor-array's six products with the parallel blocks sharing A, B and C (`Array.fork`, `@unsafe` in Base) instead of copying them: an MNIST epoch 12.0 → 6.2 s on one thread, 4.4 → 3.0 s on 16; `par1`..`par4`, any kernel over blocks of shared arrays; `softmax_ce` with the rows in blocks, 2.9x the one-thread tensor-array on 16 threads for wide rows, slower on small matrices; since 0.1.7.0 (Bend 2.0.40) its products' cells read with `Array.get_unchecked`, 8.7% fewer instructions | none: the same bits as tensor-array, tested on 14,835 products and 11 cross-entropy cases; kept out of the packages with laws |
@@ -101,17 +101,21 @@ memory (830 MB on one thread, 869 on 16). An MNIST batch went from 9.5 to 9.3 ms
 16, with the same loss; those two moves are within noise (the rounds' ranges overlap), so 2.0.40 gives MNIST nothing I
 can claim. With 2.0.39, the one-thread GPT-2 token (119 ms) is faster than v1.8.0's 129 of 2026-11-01, most likely from
 v1.9.0's dot product unrolled by four, but that compares two sessions; on 16 threads it did not move (86 against 85),
-and MNIST came out within 0.5% of v1.8.0's. The charts below still show v1.8.0 on 2026-11-01.
+and MNIST came out within 0.5% of v1.8.0's. The charts below show v1.10.0 built with 2.0.40 next to the reference
+systems' numbers of 2026-10-11: for GPT-2, PyTorch is 5.8x ahead on one thread and 8.8x on 16; for MNIST, NumPy and
+PyTorch are 19-22x ahead on one thread and 5-13x on 16. MNIST's peak memory on 16 threads was 78 MB with 2.0.40
+against 85 with 2.0.39, one run each, so I do not claim that one either. That round measured 1 and 16 threads only,
+so the thread curve is still v1.8.0's of 2026-11-01.
 
-<p align="center"><img src="docs/media/deck/frames/04-vs-references.webp" alt="GPT-2 small, ms per token: PyTorch 18.5 and 9.4, NumPy 18.5 and 11.2, llama.cpp 22.2 and 9.8, bend-ml v1.8.0 129 and 85, llm.c without a key/value cache 529 and 142, on 1 and 16 threads" width="90%"></p>
+<p align="center"><img src="docs/media/deck/frames/04-vs-references.webp" alt="GPT-2 small, ms per token: PyTorch 18.5 and 9.4, NumPy 18.5 and 11.2, llama.cpp 22.2 and 9.8, bend-ml v1.10.0 with Bend 2.0.40 107 and 83, llm.c without a key/value cache 529 and 142, on 1 and 16 threads" width="90%"></p>
 
-<p align="center"><img src="docs/media/deck/frames/05-threads.webp" alt="ms per token by thread count: bend-ml v1.8.0 129 ms on one thread, 85 on 4, 79 at best" width="90%"></p>
+<p align="center"><img src="docs/media/deck/frames/05-threads.webp" alt="ms per token by thread count: bend-ml v1.8.0, measured on 2026-11-01, 129 ms on one thread, 85 on 4, 79 at best" width="90%"></p>
 
-<p align="center"><img src="docs/media/deck/frames/06-mnist.webp" alt="MNIST, ms per batch at 16 threads and peak memory: bend-ml v1.8.0 5.7 ms, slower than the others, with the smallest footprint (85 MB)" width="90%"></p>
+<p align="center"><img src="docs/media/deck/frames/06-mnist.webp" alt="MNIST, ms per batch at 16 threads and peak memory: bend-ml v1.10.0 with Bend 2.0.40 5.37 ms, slower than the others, with the smallest footprint (78 MB)" width="90%"></p>
 
 ## 05 · Every release
 
-<p align="center"><img src="docs/media/deck/frames/03-history.webp" alt="GPT-2 ms per token by release, from v0.2 to v1.8.0, on 1 and 16 threads" width="90%"></p>
+<p align="center"><img src="docs/media/deck/frames/03-history.webp" alt="GPT-2 ms per token by release, from v0.2 to v1.10.0, on 1 and 16 threads" width="90%"></p>
 
 Since v1.2.2, each change keeps the output bits it had (checked word by word, or against PyTorch where the order of
 sums changed on purpose):
@@ -135,6 +139,7 @@ sums changed on purpose):
 | v1.9.1 | Bend 2.0.40; `binary-read` 0.2.0.1: its JavaScript lane reads through `fs` (2.0.40 removed the runtime binding 0.2.0.0 called); `tensor-fork` 0.1.7.0: the products' cells read with `Array.get_unchecked` | a gemm 8.7% fewer instructions at par 0 and 3.0% at par 3, the same bits; GPT-2's tokenizer runs 9% more instructions on 2.0.40, the same tokens (upstream: bendlang/bend#1978, #2036) |
 | v1.10.0 | `tensor-array` 0.1.20.0: the law `matvec_l_len` (`Bands.matvec_l` gives exactly r numbers over the whole tree); `tensor-gpu` 0.1.5.2 and `tensor-fork` 0.1.7.1 on it | the products' code and bits unchanged; 34 laws |
 | v1.10.1 | the README and the demos' BENCHMARK on Bend 2.0.40: GPT-2 and MNIST measured against 2.0.39 at v1.10.0's commit (2026-11-07); NOTES records tensor-gpu's unchecked tiles, tried and dropped | no package or code change; GPT-2 per token 119.4 -> 106.8 ms on one thread, 86.0 -> 83.0 on 16; MNIST within noise |
+| v1.10.2 | the README's figures on Bend 2.0.40: the release history, GPT-2 against the reference systems and MNIST redrawn with v1.10.0's numbers of 2026-11-07 (the thread curve stays v1.8.0's); the package diagram at 34 laws | no package or code change; for GPT-2, PyTorch 5.8x ahead on one thread and 8.8x on 16 |
 
 Versions are numbered as in [`docs/VERSIONING.md`](docs/VERSIONING.md); each release has its notes on GitHub.
 

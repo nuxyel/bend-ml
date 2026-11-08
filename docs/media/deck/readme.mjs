@@ -1,24 +1,30 @@
 // The README deck: every release of bend-ml up to v1.2.2, measured on 2026-10-11 next to PyTorch, NumPy, llama.cpp,
 // llm.c, candle and dfdx; v1.3.2, measured on 2026-10-16 next to v1.2.2, PyTorch and NumPy again (the anchors agree
-// within 2%); and v1.8.0 (Bend 2.0.39), measured on 2026-11-01 next to v1.3.2, PyTorch and NumPy again. Every number
+// within 2%); v1.8.0 (Bend 2.0.39), measured on 2026-11-01 next to v1.3.2, PyTorch and NumPy again; and v1.10.0 built with
+// Bend 2.0.39 and 2.0.40, measured on 2026-11-07 on 1 and 16 threads only (the thread curve stays v1.8.0's). Every number
 // comes from numbers.json ("evidence").
 //   node docs/media/deck.mjs docs/media/deck/readme.mjs docs/media/deck/frames
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
-export const title = "bend-ml v1.8.0 · evidence of 2026-10-11, 2026-10-16 and 2026-11-01";
+export const title = "bend-ml v1.10.0 · evidence of 2026-10-11, 2026-10-16, 2026-11-01 and 2026-11-07";
 const here = path.dirname(fileURLToPath(import.meta.url));
 const N = JSON.parse(fs.readFileSync(path.join(here, "..", "numbers.json"), "utf8"));
 const E = N.evidence;
-const CUR = "v1.8.0";
-const FOOT = "Intel Core Ultra 7 155H, 32 GB · v1.8.0 measured on 2026-11-01, v1.3.2 on 2026-10-16, the rest on 2026-10-11";
+const CUR = "v1.10.0", CUR_BEND = "2.0.40";
+const THR = "v1.8.0"; // the last thread curve measured (2026-11-01)
+const FOOT = "Intel Core Ultra 7 155H, 32 GB · v1.10.0 measured on 2026-11-07, v1.8.0 on 2026-11-01, v1.3.2 on 2026-10-16, the rest on 2026-10-11";
+const WORDS = ["zero", "one", "two", "three", "four", "five", "six", "seven", "eight", "nine", "ten", "eleven", "twelve"];
 
 export default ({ frame, hbars, vbars, lines, stats, table, C }) => {
   const H = E.gpt2_ms_per_token_history, P = E.gpt2_ms_per_token_peers, M = E.mnist_ms_per_batch, TC = E.gpt2_thread_curve;
   const ms = (v) => (v >= 100 ? `${Math.round(v)} ms` : v >= 10 ? `${v.toFixed(1)} ms` : `${v.toFixed(2)} ms`);
   const x = (a, b) => `${(a / b).toFixed(1)}×`;
   const b22 = H["v1.2.2 (Bend 2.0.36)"];
+  const R7 = E.rerun_2026_11_07;
+  const rels = ["v0.3.0", "v1.0.0", "v1.1.0", "v1.2.0", "v1.2.1", "v1.2.2", "v1.3.2", "v1.8.0", CUR];
+  const nrel = rels.length + 1; // and v0.2
   const slides = [];
 
   slides.push({ name: "title", html: frame({
@@ -26,7 +32,7 @@ export default ({ frame, hbars, vbars, lines, stats, table, C }) => {
     title: `machine learning in Bend 2, <span class="v">measured</span>`,
     body: `<div style="height:40px"></div>` + stats([
       { big: `${N.project.laws}`, label: "laws proved", sub: "checked again by the Lean kernel" },
-      { big: "9", label: "releases measured", sub: `v0.2 to ${CUR}` },
+      { big: `${nrel}`, label: "releases measured", sub: `v0.2 to ${CUR}` },
       { big: "6", label: "reference systems", sub: "PyTorch · NumPy · llama.cpp · llm.c · candle · dfdx" },
     ], 110) + `<div class="p" style="text-align:center;margin-top:60px">Every release of bend-ml, next to the systems people use, on the same work.</div>`,
     foot: FOOT,
@@ -45,24 +51,23 @@ export default ({ frame, hbars, vbars, lines, stats, table, C }) => {
     foot: "logits are of order 100 · " + FOOT,
   }) });
 
-  const rels = ["v0.3.0", "v1.0.0", "v1.1.0", "v1.2.0", "v1.2.1", "v1.2.2", "v1.3.2", CUR];
-  const subs = { "v0.3.0": "flat Array", "v1.0.0": "first stable", "v1.1.0": "row bands", "v1.2.0": "faster loading", "v1.2.1": "one-thread fix", "v1.2.2": "4 partial sums", "v1.3.2": "load 1 s", [CUR]: "Bend 2.0.39" };
+  const subs = { "v0.3.0": "flat Array", "v1.0.0": "first stable", "v1.1.0": "row bands", "v1.2.0": "faster loading", "v1.2.1": "one-thread fix", "v1.2.2": "4 partial sums", "v1.3.2": "load 1 s", "v1.8.0": "Bend 2.0.39", [CUR]: `Bend ${CUR_BEND}` };
   slides.push({ name: "history", html: frame({
     kicker: "GPT-2 small · ms per generated token, every release",
-    title: `nine releases, <span class="v">one protocol</span>`,
+    title: `${WORDS[nrel]} releases, <span class="v">one protocol</span>`,
     body: vbars({ w: 1580, h: 520, max: 200, fmt: (v) => `${Math.round(v)}`,
       legend: [["1 thread", "bend"], ["16 threads", "bend2"]],
       groups: [{ label: "v0.2", sub: "lists", bars: [{ v: H["v0.2.0"][1], kind: "bend" }, { v: H["v0.2.0"][16], kind: "bend2" }] },
         ...rels.map((r) => ({ label: r.replace(/\.0$/, ""), sub: subs[r], bend: r === CUR, bars: [{ v: H[r][1], kind: "bend" }, { v: H[r][16], kind: "bend2" }] }))] }),
     takeaway: `lists → Array: ${x(H["v0.2.0"][1], H["v0.3.0"][1])} · since then ${Math.round(H["v0.3.0"][1])} → ${Math.round(H[CUR][1])} ms on one thread, ${Math.round(H["v0.3.0"][16])} → ${Math.round(H[CUR][16])} on 16`,
-    foot: `v0.2 is off the chart (hatched): ${H["v0.2.0"][1]} ms · ${CUR} starts in 0.8 s (v1.2.2: 5.4 s) · ` + FOOT,
+    foot: `v0.2 is off the chart (hatched): ${H["v0.2.0"][1]} ms · ${CUR} with Bend 2.0.39: ${Math.round(R7.gpt2_b39[1])} and ${Math.round(R7.gpt2_b39[16])} ms · ${CUR} starts in ${R7.gpt2_small_run_s.b40.toFixed(1)} s (v1.2.2: 5.4 s) · ` + FOOT,
   }) });
 
   const prow = (t) => [
     { label: "PyTorch 2.14", sub: "eager, KV cache", v: P.PyTorch[t] },
     { label: "NumPy 2.5", sub: "OpenBLAS, KV cache", v: P.NumPy[t] },
     { label: "llama.cpp", sub: "F32", v: P["llama.cpp"][t] },
-    { label: `bend-ml ${CUR}`, sub: "Bend 2.0.39", v: P[`bend-ml ${CUR}`][t], kind: "bend" },
+    { label: `bend-ml ${CUR}`, sub: `Bend ${CUR_BEND}`, v: P[`bend-ml ${CUR}`][t], kind: "bend" },
     { label: "llm.c", sub: "no KV cache", v: P["llm.c"][t], note: t === 1 ? "reruns the whole window" : "" },
   ];
   slides.push({ name: "vs-references", html: frame({
@@ -80,11 +85,11 @@ export default ({ frame, hbars, vbars, lines, stats, table, C }) => {
     title: `more cores: <span class="v">Bend levels off at 4</span>`,
     body: `<div style="display:flex;gap:30px">` +
       lines({ w: 820, h: 500, xs: th, xlog: true, ymax: 600, yfmt: (v) => `${v}`, xlabel: "threads", ylabel: "ms", series: [
-        { name: "bend-ml", kind: "bend", ys: TC[`bend-ml ${CUR}`] }, { name: "llm.c", kind: "dark", ys: TC["llm.c (no KV cache)"] }] }) +
+        { name: `bend-ml ${THR}`, kind: "bend", ys: TC[`bend-ml ${THR}`] }, { name: "llm.c", kind: "dark", ys: TC["llm.c (no KV cache)"] }] }) +
       lines({ w: 820, h: 500, xs: th, xlog: true, ymax: 48, yfmt: (v) => `${v}`, xlabel: "threads", ylabel: "ms", series: [
         { name: "PyTorch", kind: "dark", ys: TC.PyTorch }, { name: "llama.cpp", kind: "other", ys: TC["llama.cpp"] }] }) + `</div>`,
-    takeaway: `Bend: ${Math.round(TC[`bend-ml ${CUR}`][0])} ms on one thread, ${Math.round(TC[`bend-ml ${CUR}`][2])} on 4, ${Math.round(Math.min(...TC[`bend-ml ${CUR}`]))} at best (8 and 22 threads)`,
-    foot: "two scales, two charts · " + FOOT,
+    takeaway: `Bend ${THR}: ${Math.round(TC[`bend-ml ${THR}`][0])} ms on one thread, ${Math.round(TC[`bend-ml ${THR}`][2])} on 4, ${Math.round(Math.min(...TC[`bend-ml ${THR}`]))} at best (8 and 22 threads)`,
+    foot: `two scales, two charts · bend-ml ${THR} measured on 2026-11-01; ${CUR} on Bend ${CUR_BEND} only on 1 and 16 threads (${Math.round(P[`bend-ml ${CUR}`][1])} and ${Math.round(P[`bend-ml ${CUR}`][16])} ms) · the rest on 2026-10-11`,
   }) });
 
   slides.push({ name: "mnist", html: frame({
@@ -100,7 +105,7 @@ export default ({ frame, hbars, vbars, lines, stats, table, C }) => {
         { label: "PyTorch", v: E.mnist_peak_mb_16t.PyTorch }, { label: "candle", sub: "Rust", v: E.mnist_peak_mb_16t.candle },
         { label: `bend-ml ${CUR}`, v: E.mnist_peak_mb_16t[`bend-ml ${CUR}`], kind: "bend" }] }) + `</div>`,
     takeaway: `behind on speed, the smallest footprint of all`,
-    foot: `one thread: Bend ${M[`bend-ml ${CUR}`][1]} ms (v1.3.2: ${M["bend-ml v1.3.2"][1]}), NumPy ${M.NumPy[1]} ms · ` + FOOT,
+    foot: `one thread: Bend ${M[`bend-ml ${CUR}`][1]} ms (v1.3.2: ${M["bend-ml v1.3.2"][1]}), NumPy ${M.NumPy[1]} ms · with Bend 2.0.39: ${R7.mnist_b39[16]} ms and ${R7.mnist_peak_mb.b39[16]} MB, memory one run each · ` + FOOT,
   }) });
 
   return slides;

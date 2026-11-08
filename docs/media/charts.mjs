@@ -75,7 +75,7 @@ function bars(x0, y0, w, h, title, max, items) {
   b += box("bpe", "bpe-tokenizer", "byte-level BPE, GPT-2 style", [["5 laws", C.grn], ["fuzzed", C.b00]]);
   b += box("ten", "tensor", "Mat<r,c> over lists", [["2 laws", C.grn], ["vs PyTorch", C.b00]]);
   b += box("aut", "autograd", "reverse mode = forward mode", [["1 law", C.grn], ["gradcheck", C.b00]]);
-  b += box("arr", "tensor-array", "Mat<r,c> and Bands over a flat Array", [["5 laws", C.grn], ["vs PyTorch", C.b00], ["Array.new", C.ora]]);
+  b += box("arr", "tensor-array", "Mat<r,c> and Bands over a flat Array", [["9 laws", C.grn], ["vs PyTorch", C.b00], ["Array.new", C.ora]]);
   b += box("brd", "binary-read", "F32 and BF16 weights into an Array", [["foreign code", C.ora], ["C and JS lanes", C.b00]]);
   b += box("frk", "tensor-fork", "products on shared arrays", [["@unsafe fork", C.ora], ["same bits", C.b00]]);
   b += box("gpu", "tensor-gpu", "products as GPU calls", [["@unsafe fork", C.ora], ["same bits", C.b00]]);
