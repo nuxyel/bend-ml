@@ -1,5 +1,5 @@
 {
- "_note": "Every number shown in the README charts and the video. Measured on an Intel Core Ultra 7 155H, 32 GB, Bend 2.0.35 (the project moved to 2.0.36 on 2026-10-10; per-token times unchanged), PyTorch 2.14.1 (CPU, 16 threads). The evidence block's v1.8.0 numbers: Bend 2.0.39, 2026-11-01.",
+ "_note": "Every number shown in the README charts and the video. Measured on an Intel Core Ultra 7 155H, 32 GB, Bend 2.0.35 (the project moved to 2.0.36 on 2026-10-10; per-token times unchanged), PyTorch 2.14.1 (CPU, 16 threads). The evidence block's v1.8.0 numbers: Bend 2.0.39, 2026-11-01. v1.10.0's: Bend 2.0.39 and 2.0.40 at one commit, 2026-11-07.",
  "mnist_epoch_seconds": {
   "bend_v1_lists": 544,
   "bend_v2_array": 7.0,
@@ -34,12 +34,12 @@
  },
  "project": {
   "packages": 8,
-  "laws": 30,
+  "laws": 34,
   "checks_quick": 108,
   "checks_full": 119,
   "checks_quick_without_cuda": 99,
   "checks_full_without_cuda": 110,
-  "bend": "2.0.39",
+  "bend": "2.0.40",
   "lean": "4.34.0"
  },
  "ratios": {
@@ -49,7 +49,7 @@
   "gpt2_pytorch_ahead_max": 5
  },
  "evidence": {
-  "source": "measured on 2026-10-11 on an Intel Core Ultra 7 155H; medians; v1.3.2 on 2026-10-16, v1.8.0 on 2026-11-01 (rerun_2026_10_16, rerun_2026_11_01)",
+  "source": "measured on 2026-10-11 on an Intel Core Ultra 7 155H; medians; v1.3.2 on 2026-10-16, v1.8.0 on 2026-11-01, v1.10.0 on 2026-11-07 (rerun_2026_10_16, rerun_2026_11_01, rerun_2026_11_07)",
   "date": "2026-10-11",
   "gpt2_ms_per_token_history": {
    "v0.2.0": {
@@ -91,6 +91,10 @@
    "v1.8.0": {
     "1": 128.9,
     "16": 84.7
+   },
+   "v1.10.0": {
+    "1": 106.8,
+    "16": 83.0
    }
   },
   "gpt2_peak_mb_16t": {
@@ -102,7 +106,8 @@
    "v1.2.1": 928,
    "v1.2.2": 933,
    "v1.3.2": 880,
-   "v1.8.0": 869
+   "v1.8.0": 869,
+   "v1.10.0": 869
   },
   "gpt2_ms_per_token_peers": {
    "PyTorch": {
@@ -132,6 +137,10 @@
    "bend-ml v1.8.0": {
     "1": 128.9,
     "16": 84.7
+   },
+   "bend-ml v1.10.0": {
+    "1": 106.8,
+    "16": 83.0
    }
   },
   "gpt2_thread_curve": {
@@ -231,6 +240,10 @@
    "bend-ml v1.8.0": {
     "1": 9.49,
     "16": 5.69
+   },
+   "bend-ml v1.10.0": {
+    "1": 9.32,
+    "16": 5.37
    }
   },
   "mnist_peak_mb_16t": {
@@ -240,7 +253,8 @@
    "candle": 452,
    "bend-ml v1.2.2": 119,
    "bend-ml v1.3.2": 107,
-   "bend-ml v1.8.0": 85
+   "bend-ml v1.8.0": 85,
+   "bend-ml v1.10.0": 78
   },
   "laws_by_release": {
    "v0.2.0": 21,
@@ -251,7 +265,8 @@
    "v1.2.1": 27,
    "v1.2.2": 27,
    "v1.3.2": 27,
-   "v1.8.0": 30
+   "v1.8.0": 30,
+   "v1.10.0": 34
   },
   "gpt2_worst_logit_diff_by_release": {
    "v0.3.0": 0.000582,
@@ -318,6 +333,89 @@
    "mnist_peak_mb_1t": {
     "v1.3.2": 50,
     "v1.8.0": 38
+   }
+  },
+  "rerun_2026_11_07": {
+   "source": "my measurements of 2026-11-07 on an idle machine: v1.10.0's commit (33ba7b2) built with Bend 2.0.39 and with 2.0.40, alternated (gpt2 7 rounds, mnist 5), 1 and 16 threads only: no reference system and no thread curve this time. The outputs are the same on both compilers: GPT-2's 33 tokens, MNIST's loss 0.52047706 and 9,129 hits. Only GPT-2's ranges do not overlap; MNIST's moves are within noise. Peak memory is one run each. The charts show the 2.0.40 build as v1.10.0.",
+   "gpt2_b39": {
+    "1": 119.4,
+    "16": 86.0
+   },
+   "gpt2_b40": {
+    "1": 106.8,
+    "16": 83.0
+   },
+   "gpt2_b39_range": {
+    "1": [
+     118.0,
+     121.5
+    ],
+    "16": [
+     84.9,
+     88.3
+    ]
+   },
+   "gpt2_b40_range": {
+    "1": [
+     103.6,
+     108.9
+    ],
+    "16": [
+     80.6,
+     83.4
+    ]
+   },
+   "mnist_b39": {
+    "1": 9.47,
+    "16": 5.65
+   },
+   "mnist_b40": {
+    "1": 9.32,
+    "16": 5.37
+   },
+   "mnist_b39_range": {
+    "1": [
+     9.32,
+     9.6
+    ],
+    "16": [
+     5.37,
+     5.77
+    ]
+   },
+   "mnist_b40_range": {
+    "1": [
+     9.28,
+     9.77
+    ],
+    "16": [
+     5.04,
+     5.49
+    ]
+   },
+   "gpt2_small_run_s": {
+    "b39": 0.67,
+    "b40": 0.56
+   },
+   "gpt2_peak_mb": {
+    "b39": {
+     "1": 831,
+     "16": 867
+    },
+    "b40": {
+     "1": 830,
+     "16": 869
+    }
+   },
+   "mnist_peak_mb": {
+    "b39": {
+     "1": 38,
+     "16": 85
+    },
+    "b40": {
+     "1": 38,
+     "16": 78
+    }
    }
   }
  }
