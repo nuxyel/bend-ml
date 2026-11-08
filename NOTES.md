@@ -2117,3 +2117,15 @@ output equal to C's).
 
 - A documentation patch: the two entries above (the README, the demos' BENCHMARK, the unchecked tiles dropped). No
   package or code change, nothing published. PR #33, CI green, merged as d6d9bf7, tag `v1.10.1`, GitHub release.
+
+## The README's figures on v1.10.0 with Bend 2.0.40 (2026-11-08)
+
+- `docs/media/numbers.json` takes the 2026-11-07 round (`rerun_2026_11_07`: both builds, ranges, peak memory, the load
+  and first token), and `deck/readme.mjs` draws v1.10.0 built with 2.0.40 where v1.8.0 was: the release history (ten
+  releases), GPT-2 against the reference systems (PyTorch 5.8x ahead on one thread, 8.8x on 16) and MNIST (5.37 ms a
+  batch on 16 threads, 78 MB). The thread curve stays v1.8.0's of 2026-11-01, labelled so: the round measured 1 and 16
+  threads only. MNIST's 78 MB against 85 with 2.0.39 is one run each, so it is not claimed. No number was measured for
+  this change; the frames were redrawn with `node deck.mjs deck/readme.mjs deck/frames`.
+- The package diagram said 30 laws and 5 in tensor-array; it is 34 and 9 since v1.10.0 (`list_laws.py`). The README's
+  laws table lacked `matvec_l_len`, and its first paragraph named v1.8.0 as the current release; it now links the newest
+  release instead of naming it.
