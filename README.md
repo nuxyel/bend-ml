@@ -139,6 +139,7 @@ sums changed on purpose):
 | v1.9.1 | Bend 2.0.40; `binary-read` 0.2.0.1: its JavaScript lane reads through `fs` (2.0.40 removed the runtime binding 0.2.0.0 called); `tensor-fork` 0.1.7.0: the products' cells read with `Array.get_unchecked` | a gemm 8.7% fewer instructions at par 0 and 3.0% at par 3, the same bits; GPT-2's tokenizer runs 9% more instructions on 2.0.40, the same tokens (upstream: bendlang/bend#1978, #2036) |
 | v1.10.0 | `tensor-array` 0.1.20.0: the law `matvec_l_len` (`Bands.matvec_l` gives exactly r numbers over the whole tree); `tensor-gpu` 0.1.5.2 and `tensor-fork` 0.1.7.1 on it | the products' code and bits unchanged; 34 laws |
 | v1.10.1 | the README and the demos' BENCHMARK on Bend 2.0.40: GPT-2 and MNIST measured against 2.0.39 at v1.10.0's commit (2026-11-07); NOTES records tensor-gpu's unchecked tiles, tried and dropped | no package or code change; GPT-2 per token 119.4 -> 106.8 ms on one thread, 86.0 -> 83.0 on 16; MNIST within noise |
+| v1.10.2 | the README's figures on Bend 2.0.40: the release history, GPT-2 against the reference systems and MNIST redrawn with v1.10.0's numbers of 2026-11-07 (the thread curve stays v1.8.0's); the package diagram at 34 laws | no package or code change; for GPT-2, PyTorch 5.8x ahead on one thread and 8.8x on 16 |
 
 Versions are numbered as in [`docs/VERSIONING.md`](docs/VERSIONING.md); each release has its notes on GitHub.
 
