@@ -101,17 +101,21 @@ memory (830 MB on one thread, 869 on 16). An MNIST batch went from 9.5 to 9.3 ms
 16, with the same loss; those two moves are within noise (the rounds' ranges overlap), so 2.0.40 gives MNIST nothing I
 can claim. With 2.0.39, the one-thread GPT-2 token (119 ms) is faster than v1.8.0's 129 of 2026-11-01, most likely from
 v1.9.0's dot product unrolled by four, but that compares two sessions; on 16 threads it did not move (86 against 85),
-and MNIST came out within 0.5% of v1.8.0's. The charts below still show v1.8.0 on 2026-11-01.
+and MNIST came out within 0.5% of v1.8.0's. The charts below show v1.10.0 built with 2.0.40 next to the reference
+systems' numbers of 2026-10-11: for GPT-2, PyTorch is 5.8x ahead on one thread and 8.8x on 16; for MNIST, NumPy and
+PyTorch are 19-22x ahead on one thread and 5-13x on 16. MNIST's peak memory on 16 threads was 78 MB with 2.0.40
+against 85 with 2.0.39, one run each, so I do not claim that one either. That round measured 1 and 16 threads only,
+so the thread curve is still v1.8.0's of 2026-11-01.
 
-<p align="center"><img src="docs/media/deck/frames/04-vs-references.webp" alt="GPT-2 small, ms per token: PyTorch 18.5 and 9.4, NumPy 18.5 and 11.2, llama.cpp 22.2 and 9.8, bend-ml v1.8.0 129 and 85, llm.c without a key/value cache 529 and 142, on 1 and 16 threads" width="90%"></p>
+<p align="center"><img src="docs/media/deck/frames/04-vs-references.webp" alt="GPT-2 small, ms per token: PyTorch 18.5 and 9.4, NumPy 18.5 and 11.2, llama.cpp 22.2 and 9.8, bend-ml v1.10.0 with Bend 2.0.40 107 and 83, llm.c without a key/value cache 529 and 142, on 1 and 16 threads" width="90%"></p>
 
-<p align="center"><img src="docs/media/deck/frames/05-threads.webp" alt="ms per token by thread count: bend-ml v1.8.0 129 ms on one thread, 85 on 4, 79 at best" width="90%"></p>
+<p align="center"><img src="docs/media/deck/frames/05-threads.webp" alt="ms per token by thread count: bend-ml v1.8.0, measured on 2026-11-01, 129 ms on one thread, 85 on 4, 79 at best" width="90%"></p>
 
-<p align="center"><img src="docs/media/deck/frames/06-mnist.webp" alt="MNIST, ms per batch at 16 threads and peak memory: bend-ml v1.8.0 5.7 ms, slower than the others, with the smallest footprint (85 MB)" width="90%"></p>
+<p align="center"><img src="docs/media/deck/frames/06-mnist.webp" alt="MNIST, ms per batch at 16 threads and peak memory: bend-ml v1.10.0 with Bend 2.0.40 5.37 ms, slower than the others, with the smallest footprint (78 MB)" width="90%"></p>
 
 ## 05 · Every release
 
-<p align="center"><img src="docs/media/deck/frames/03-history.webp" alt="GPT-2 ms per token by release, from v0.2 to v1.8.0, on 1 and 16 threads" width="90%"></p>
+<p align="center"><img src="docs/media/deck/frames/03-history.webp" alt="GPT-2 ms per token by release, from v0.2 to v1.10.0, on 1 and 16 threads" width="90%"></p>
 
 Since v1.2.2, each change keeps the output bits it had (checked word by word, or against PyTorch where the order of
 sums changed on purpose):
