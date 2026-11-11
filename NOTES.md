@@ -2177,3 +2177,4 @@ output equal to C's).
   release's minor; tensor-gpu and tensor-fork change only their import, so a fourth-number bump.
 - The demos, the tests, the README and the package diagram move to 0.1.21.0 and 41 laws (`list_laws.py --check-readme`
   ok). `make check-full` 127/127 (GPU included); `reference/test_published.py` passes on every package.
+- PR #37, CI green, merged as 88fcc82, tag `v1.11.0`, GitHub release.
