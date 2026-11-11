@@ -8,7 +8,7 @@ Tensors in Bend 2 over a flat `Array<F32>`, **with the shape in the type**: the 
 
 ```python
 import Base
-import bend-ml-tensor-array@0.1.20.0/main.bend as TA
+import bend-ml-tensor-array@0.1.21.0/main.bend as TA
 
 def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 128n>:
   TA.Mat.matmul(100n, 784n, 128n, 3n, a, w)   # 3n = 2^3 = 8 parallel blocks
@@ -145,10 +145,11 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 
 ## Versions
 
-- Unreleased (`devel`): `Mat.reshape`, the same numbers under a new shape with the equal size as an erased proof, and
+- `0.1.21.0` (2026-11-11): `Mat.reshape`, the same numbers under a new shape with the equal size as an erased proof, and
   the law `reshape_len` (the new shape multiplies to the old one, and `to_list_len` gives the count). Contributed by
   @adeerkhan (bend-ml #35). The laws `pow_shr`, `pow_mask`, `pow_lt`, `pow_sub`, `new_apart` (helpers `Bits.*`) and
-  `apart_set` (helpers `Shape.*`), the `U32` and tree facts bend-ml #26 was waiting for. Every other def is 0.1.20.0's.
+  `apart_set` (helpers `Shape.*`), the `U32` and tree facts bend-ml #26 was waiting for. Only lines added: every
+  other def keeps 0.1.20.0's code and bits.
 
 - `0.1.20.0` (2026-11-06): the law `matvec_l_len`, `Bands.matvec_l`'s length over the whole tree, with its
   helpers (`al_c`, `bl_b`, `WAL`, `WBL`, `read_w` .. `bmv_w`, `w_len`). Only lines added: every def keeps its code and
