@@ -3035,3 +3035,144 @@ def new_apart(T, e, v, he, x, y, hx, hy, hd):
   %Equal.sym(Word(32n), Word.and(32n, x, Bits.mask(32n, e)), x, Bits.and_mask(32n, x, e, hx)) : ASet.Apart(T, Array.new(T, e, v), U32{Bits.pow(32n, e)}, U32{_}, U32.is_lt(U32{_}, U32.shr(U32{Bits.pow(32n, e)})), U32{Word.and(32n, y, Bits.mask(32n, e))}, U32.is_lt(U32{Word.and(32n, y, Bits.mask(32n, e))}, U32.shr(U32{Bits.pow(32n, e)})))
   %Equal.sym(Word(32n), Word.and(32n, y, Bits.mask(32n, e)), y, Bits.and_mask(32n, y, e, hy)) : ASet.Apart(T, Array.new(T, e, v), U32{Bits.pow(32n, e)}, U32{x}, U32.is_lt(U32{x}, U32.shr(U32{Bits.pow(32n, e)})), U32{_}, U32.is_lt(U32{_}, U32.shr(U32{Bits.pow(32n, e)})))
   Bits.apart_new(T, e, v, he, x, y, hx, hy, hd)
+
+# ---------------------------------------------------------------------
+# a write keeps the tree's shape: where two walks part does not change
+# ---------------------------------------------------------------------
+#
+# ASet.Apart looks only at the tree's nodes, never at the values in its leaves, and Array.set replaces one leaf.
+# So two walks that part on an array part on it after any write too (apart_set): with new_apart, the hypothesis of
+# get_other_set holds for every write after the first into an Array.new, which is what filling a matrix does.
+# The proof is one pass over the tree, like ASet.facts, for the affine reason given above get_other_set: it
+# returns ASet.Facts together with the implication (Shape.Keep), and at a node it uses the pair equation c2 to
+# see that the written array is the node with one half written.
+
+# what a pass over a proves for a write along (n, j0, z0): the six facts of ASet.Facts, and that every walk
+# that parts from another on a parts on the written array too (a write changes a leaf, not the tree's shape)
+def Shape.Keep(-T: Data, -a: Array<T>, -n: U32, -j0: U32, -v: T, -z0: Bool) -> Type:
+  ASet.Facts(T, a, n, j0, v, z0) & (@m:U32 -> @j:U32 -> @z:Bool -> @k:U32 -> @w:Bool -> ASet.Apart(T, a, m, j, z, k, w) -> ASet.Apart(T, ASet.NA(T, a, n, j0, v, z0), m, j, z, k, w)) & Unit
+
+# a leaf: no walk parts on it, before or after
+def Shape.leaf(-T: Data, -x: T, -n: U32, -j0: U32, -v: T, -z0: Bool, -m: U32, -j: U32, -z: Bool, -k: U32, -w: Bool, h: ASet.Apart(T, ALeaf{x}, m, j, z, k, w)) -> ASet.Apart(T, ASet.NA(T, ALeaf{x}, n, j0, v, z0), m, j, z, k, w):
+  h
+
+# a node the write enters on the left: the written array is ANode{the written left half, ys} (c2 opens the pair
+# the left half's write returns), so a walk into the left half goes on with kx and a walk into ys is unchanged
+def Shape.imp_t(-T: Data, -xs: Array<T>, -ys: Array<T>, +n: U32, +j0: U32, +v: T, +c2: {(ASet.NA(T, xs, U32.shr(n), j0, v, U32.is_lt(j0, U32.shr(U32.shr(n)))), Pair.snd(Array<T>, T, ASet.G(T, xs, U32.shr(n), j0, v, U32.is_lt(j0, U32.shr(U32.shr(n)))))) == ASet.G(T, xs, U32.shr(n), j0, v, U32.is_lt(j0, U32.shr(U32.shr(n)))) : Array<T> & T}, kx: @m:U32 -> @j:U32 -> @z:Bool -> @k:U32 -> @w:Bool -> ASet.Apart(T, xs, m, j, z, k, w) -> ASet.Apart(T, ASet.NA(T, xs, U32.shr(n), j0, v, U32.is_lt(j0, U32.shr(U32.shr(n)))), m, j, z, k, w), +m: U32, +j: U32, z: Bool, +k: U32, w: Bool, h: ASet.Apart(T, ANode{xs, ys}, m, j, z, k, w)) -> ASet.Apart(T, ASet.NA(T, ANode{xs, ys}, n, j0, v, True{}), m, j, z, k, w):
+  match z w:
+    case True{} True{}:
+      %c2 : ASet.Apart(T, Array.set.fin(T, Array.swap.lo(T, ys, _)), m, j, True{}, k, True{})
+      kx(U32.shr(m), j, U32.is_lt(j, U32.shr(U32.shr(m))), k, U32.is_lt(k, U32.shr(U32.shr(m))), h)
+    case False{} False{}:
+      %c2 : ASet.Apart(T, Array.set.fin(T, Array.swap.lo(T, ys, _)), m, j, False{}, k, False{})
+      h
+    case True{} False{}:
+      %c2 : ASet.Apart(T, Array.set.fin(T, Array.swap.lo(T, ys, _)), m, j, True{}, k, False{})
+      Unit{}
+    case False{} True{}:
+      %c2 : ASet.Apart(T, Array.set.fin(T, Array.swap.lo(T, ys, _)), m, j, False{}, k, True{})
+      Unit{}
+
+# the same, for a write that enters on the right
+def Shape.imp_f(-T: Data, -xs: Array<T>, -ys: Array<T>, +n: U32, +j0: U32, +v: T, +c2: {(ASet.NA(T, ys, U32.shr(n), U32.sub(j0, U32.shr(n)), v, U32.is_lt(U32.sub(j0, U32.shr(n)), U32.shr(U32.shr(n)))), Pair.snd(Array<T>, T, ASet.G(T, ys, U32.shr(n), U32.sub(j0, U32.shr(n)), v, U32.is_lt(U32.sub(j0, U32.shr(n)), U32.shr(U32.shr(n)))))) == ASet.G(T, ys, U32.shr(n), U32.sub(j0, U32.shr(n)), v, U32.is_lt(U32.sub(j0, U32.shr(n)), U32.shr(U32.shr(n)))) : Array<T> & T}, ky: @m:U32 -> @j:U32 -> @z:Bool -> @k:U32 -> @w:Bool -> ASet.Apart(T, ys, m, j, z, k, w) -> ASet.Apart(T, ASet.NA(T, ys, U32.shr(n), U32.sub(j0, U32.shr(n)), v, U32.is_lt(U32.sub(j0, U32.shr(n)), U32.shr(U32.shr(n)))), m, j, z, k, w), +m: U32, +j: U32, z: Bool, +k: U32, w: Bool, h: ASet.Apart(T, ANode{xs, ys}, m, j, z, k, w)) -> ASet.Apart(T, ASet.NA(T, ANode{xs, ys}, n, j0, v, False{}), m, j, z, k, w):
+  match z w:
+    case True{} True{}:
+      %c2 : ASet.Apart(T, Array.set.fin(T, Array.swap.hi(T, xs, _)), m, j, True{}, k, True{})
+      h
+    case False{} False{}:
+      %c2 : ASet.Apart(T, Array.set.fin(T, Array.swap.hi(T, xs, _)), m, j, False{}, k, False{})
+      ky(U32.shr(m), U32.sub(j, U32.shr(m)), U32.is_lt(U32.sub(j, U32.shr(m)), U32.shr(U32.shr(m))), U32.sub(k, U32.shr(m)), U32.is_lt(U32.sub(k, U32.shr(m)), U32.shr(U32.shr(m))), h)
+    case True{} False{}:
+      %c2 : ASet.Apart(T, Array.set.fin(T, Array.swap.hi(T, xs, _)), m, j, True{}, k, False{})
+      Unit{}
+    case False{} True{}:
+      %c2 : ASet.Apart(T, Array.set.fin(T, Array.swap.hi(T, xs, _)), m, j, False{}, k, True{})
+      Unit{}
+
+def Shape.node_t(-T: Data, -xs: Array<T>, -ys: Array<T>, +n: U32, +j0: U32, +v: T, r: Shape.Keep(T, xs, U32.shr(n), j0, v, U32.is_lt(j0, U32.shr(U32.shr(n))))) -> Shape.Keep(T, ANode{xs, ys}, n, j0, v, True{}):
+  match r:
+    case Tuple{f, r1}:
+      match f:
+        case Tuple{+c1, f1}:
+          match f1:
+            case Tuple{+c2, f2}:
+              match f2:
+                case Tuple{+c3, f3}:
+                  match f3:
+                    case Tuple{+c4, f4}:
+                      match f4:
+                        case Tuple{+c5, f5}:
+                          match f5:
+                            case Tuple{+c6, u}:
+                              match r1:
+                                case Tuple{kx, u2}:
+                                  (ASet.node_t(T, xs, ys, n, j0, v, (c1, c2, c3, c4, c5, c6, Unit{})), (m => j => z => k => w => h => Shape.imp_t(T, xs, ys, n, j0, v, c2, kx, m, j, z, k, w, h)), Unit{})
+
+def Shape.node_f(-T: Data, -xs: Array<T>, -ys: Array<T>, +n: U32, +j0: U32, +v: T, +s: {(xs, ASet.sz(T, xs)) == Array.size(T, xs) : Array<T> & U32}, r: Shape.Keep(T, ys, U32.shr(n), U32.sub(j0, U32.shr(n)), v, U32.is_lt(U32.sub(j0, U32.shr(n)), U32.shr(U32.shr(n))))) -> Shape.Keep(T, ANode{xs, ys}, n, j0, v, False{}):
+  match r:
+    case Tuple{f, r1}:
+      match f:
+        case Tuple{+c1, f1}:
+          match f1:
+            case Tuple{+c2, f2}:
+              match f2:
+                case Tuple{+c3, f3}:
+                  match f3:
+                    case Tuple{+c4, f4}:
+                      match f4:
+                        case Tuple{+c5, f5}:
+                          match f5:
+                            case Tuple{+c6, u}:
+                              match r1:
+                                case Tuple{ky, u2}:
+                                  (ASet.node_f(T, xs, ys, n, j0, v, s, (c1, c2, c3, c4, c5, c6, Unit{})), (m => j => z => k => w => h => Shape.imp_f(T, xs, ys, n, j0, v, c2, ky, m, j, z, k, w, h)), Unit{})
+
+def Shape.keep(-T: Data, a: Array<T>, +n: U32, +j0: U32, +v: T, +z0: Bool) -> Shape.Keep(T, a, n, j0, v, z0):
+  match a z0:
+    case ALeaf{x} _:
+      (ASet.facts(T, ALeaf{x}, n, j0, v, z0), (m => j => z => k => w => h => Shape.leaf(T, x, n, j0, v, z0, m, j, z, k, w, h)), Unit{})
+    case ANode{xs, ys} True{}:
+      Shape.node_t(T, xs, ys, n, j0, v, Shape.keep(T, xs, U32.shr(n), j0, v, U32.is_lt(j0, U32.shr(U32.shr(n)))))
+    case ANode{xs, ys} False{}:
+      Shape.node_f(T, xs, ys, n, j0, v, ASet.size_pair(T, xs), Shape.keep(T, ys, U32.shr(n), U32.sub(j0, U32.shr(n)), v, U32.is_lt(U32.sub(j0, U32.shr(n)), U32.shr(U32.shr(n)))))
+
+def Shape.close(-T: Data, -b: Array<T>, +n: U32, +i: U32, +v: T, +q: {n == ASet.sz(T, b) : U32}, r: Shape.Keep(T, b, n, ASet.J(i, n), v, ASet.Z(i, n)), +m: U32, +j: U32, +z: Bool, +k: U32, +w: Bool) -> ASet.Apart(T, b, m, j, z, k, w) -> ASet.Apart(T, Array.set(T, b, i, v), m, j, z, k, w):
+  match r:
+    case Tuple{f, r1}:
+      match f:
+        case Tuple{+c1, f1}:
+          match r1:
+            case Tuple{kb, u}:
+              %c1 : (ASet.Apart(T, b, m, j, z, k, w) -> ASet.Apart(T, Array.set.fin(T, Array.swap.at(T, i, v, _)), m, j, z, k, w))
+              %q : (ASet.Apart(T, b, m, j, z, k, w) -> ASet.Apart(T, Array.set.fin(T, Array.swap.go(T, b, _, ASet.J(i, _), v, ASet.Z(i, _))), m, j, z, k, w))
+              h => kb(m, j, z, k, w, h)
+
+def Shape.top(-T: Data, -a: Array<T>, +i: U32, +v: T, r: ASet.Copy(T, a), +m: U32, +j: U32, +z: Bool, +k: U32, +w: Bool) -> ASet.Apart(T, a, m, j, z, k, w) -> ASet.Apart(T, Array.set(T, a, i, v), m, j, z, k, w):
+  match r:
+    case Tuple{b, r1}:
+      match r1:
+        case Tuple{+n, r2}:
+          match r2:
+            case Tuple{+p, r3}:
+              match r3:
+                case Tuple{+q, r4}:
+                  %p : (ASet.Apart(T, _, m, j, z, k, w) -> ASet.Apart(T, Array.set(T, _, i, v), m, j, z, k, w))
+                  Shape.close(T, b, n, i, v, q, Shape.keep(T, b, n, ASet.J(i, n), v, ASet.Z(i, n)), m, j, z, k, w)
+
+# LAW (apart_set): a write keeps the tree's shape, so two walks that part on a part on the written array too
+# (any tree, any index and value: Array.set replaces one leaf and leaves every node where it was)
+law apart_set:
+  for -T: Data
+  for a: Array<T>
+  for +i: U32
+  for +v: T
+  for +m: U32
+  for +j: U32
+  for +z: Bool
+  for +k: U32
+  for +w: Bool
+  for h: ASet.Apart(T, a, m, j, z, k, w)
+  ASet.Apart(T, Array.set(T, a, i, v), m, j, z, k, w)
+
+def apart_set(T, a, i, v, m, j, z, k, w, h):
+  Shape.top(T, a, i, v, ASet.copy(T, a), m, j, z, k, w)(h)
