@@ -2057,8 +2057,8 @@ def reshape_len(r1, c1, r2, c2, p, m):
 # path, so in ANode{ANode{ALeaf, ALeaf}, ALeaf} (size 4) the indices 2 and 3 differ but both reach the
 # last leaf, and a write at 2 changes what a read at 3 returns (tests/array_laws.bend prints it: 9.0). On a
 # perfect tree of 2^d leaves, which Array.new and literals build, the descents part exactly when the masked
-# indices differ; that equivalence is not proved here, since it needs lemmas about U32 bits. For a concrete
-# tree ASet.Apart computes to Unit, so Unit{} proves it (tests/array_laws.bend).
+# indices differ; new_apart, at the end of the file, proves that two different indices below 2^d part on
+# Array.new's tree. For a concrete tree ASet.Apart computes to Unit, so Unit{} proves it (tests/array_laws.bend).
 #
 # Why the proofs are shaped this way: an Array is affine, and so is it inside a proof, so a proof may use a
 # given array once. The obvious lemmas each need the same subtree again (one to say Array.size of it is
@@ -2488,8 +2488,9 @@ def get_other_set(T, a, i, k, v, h):
 # ---------------------------------------------------------------------
 #
 # get_other_set needs ASet.Apart: the walks down the tree for the write's index and the read's index split
-# before a leaf. On the perfect tree Array.new builds (2^e leaves) that comes down to four facts about U32,
-# stated and proved here (bend-ml #26).
+# before a leaf. On the perfect tree Array.new builds (2^e leaves) that holds exactly when the two indices
+# differ, and new_apart proves the direction a round trip needs: two different indices below 2^e part.
+# (bend-ml #26; this is the piece the round trip Mat.to_list(Mat.of_list(xs)) == xs was waiting for.)
 #
 # A U32 is a Word of 32 Bools, lowest bit first, and Base computes on it bit by bit, so every fact here is
 # proved by walking the bits, with no arithmetic on numbers. The words the walks meet are named by their
@@ -2501,6 +2502,12 @@ def get_other_set(T, a, i, k, v, h):
 # - pow_mask: an index below 2^e is its own masked index (the mask Array.get and Array.set apply is 2^e - 1);
 # - pow_lt: below 2^(e+1), "x < 2^e" is "bit e of x is zero", so the branch a walk takes is bit e;
 # - pow_sub: taking 2^e from an x with bit e set clears that bit, which is the index carried into the right half.
+#
+# new_apart then goes down the tree by induction on e: at a node of size 2^(e+1) the two indices take the
+# branches their bit e picks. If the bits differ, the walks have split. If they agree, both walks go into the
+# same half, with that bit cleared on the right, and the indices still differ below e. At a leaf (e = 0) two
+# indices below 1 cannot differ, so that case cannot happen. Bits.size_p says Array.size of Array.new(T, e, v)
+# is 2^e. The defs are checked with e < 32, the depths a U32 index can address.
 
 # ---------------------------------------------------------------------
 # False == True cannot hold: these close the cases a hypothesis rules out
@@ -2955,3 +2962,76 @@ def pow_sub(x, e, h):
   %Equal.sym(U32, U32.shln(1, e), U32{Bits.pow(32n, e)}, Bits.shln_one(e)) : {U32.sub(U32{x}, _) == U32{Bits.clear(32n, x, e)} : U32}
   %Bits.sub_p(32n, x, e, h) : {U32{Word.adc(32n, x, Bits.pow(32n, e), True{}, True{})} == U32{_} : U32}
   {==}
+
+# ---------------------------------------------------------------------
+# a perfect tree: its size, and where two descents part
+# ---------------------------------------------------------------------
+
+# Array.size of Array.new(T, e, v) is 2^e
+def Bits.size_new(-T: Data, +e: Nat, +v: T) -> {ASet.sz(T, Array.new(T, e, v)) == U32.shln(1, e) : U32}:
+  match e:
+    case 0n:
+      {==}
+    case 1n+p:
+      %ASet.size_pair(T, Array.new(T, p, v)) : {Pair.snd(Array<T>, U32, Array.size.node(T, Array.new(T, p, v), _)) == U32.shln(1, 1n+p) : U32}
+      %Bits.size_new(T, p, v) : {U32.shl(ASet.sz(T, Array.new(T, p, v))) == U32.shl(_) : U32}
+      {==}
+
+def Bits.size_p(-T: Data, +e: Nat, +v: T) -> {ASet.sz(T, Array.new(T, e, v)) == U32{Bits.pow(32n, e)} : U32}:
+  Equal.trans(U32, ASet.sz(T, Array.new(T, e, v)), U32.shln(1, e), U32{Bits.pow(32n, e)}, Bits.size_new(T, e, v), Bits.shln_one(e))
+
+# the two descents over Array.new(T, e, v), from its size 2^e, for x and y below 2^e
+def Bits.Apart(-T: Data, +e: Nat, +v: T, +x: Word(32n), +y: Word(32n)) -> Type:
+  ASet.Apart(T, Array.new(T, e, v), U32{Bits.pow(32n, e)}, U32{x}, U32.is_lt(U32{x}, U32.shr(U32{Bits.pow(32n, e)})), U32{y}, U32.is_lt(U32{y}, U32.shr(U32{Bits.pow(32n, e)})))
+
+def Bits.IH(-T: Data, +p: Nat, +v: T) -> Type:
+  @x:Word(32n) -> @y:Word(32n) -> {Bits.below(32n, x, p) == True{} : Bool} -> {Bits.below(32n, y, p) == True{} : Bool} -> {Bits.differ(32n, x, y, p) == True{} : Bool} -> Bits.Apart(T, p, v, x, y)
+
+# one node of the tree: bit p of x and of y pick the branches; when they agree the descents go on
+# into one half, with x and y cleared of bit p on the right, and the induction hypothesis ih finishes
+def Bits.step(-T: Data, +p: Nat, +v: T, +x: Word(32n), +y: Word(32n), bx: Bool, +ex: {Bits.at(32n, x, p) == bx : Bool}, by: Bool, +ey: {Bits.at(32n, y, p) == by : Bool}, +he: {Nat.is_lt(1n+p, 32n) == True{} : Bool}, +hx: {Bits.below(32n, x, 1n+p) == True{} : Bool}, +hy: {Bits.below(32n, y, 1n+p) == True{} : Bool}, +hd: {Bits.differ(32n, x, y, 1n+p) == True{} : Bool}, ih: Bits.IH(T, p, v)) -> ASet.Apart(T, Array.new(T, 1n+p, v), U32{Bits.pow(32n, 1n+p)}, U32{x}, Bool.not(bx), U32{y}, Bool.not(by)):
+  match bx by:
+    case False{} False{}:
+      %Equal.sym(Word(32n), Word.shr(32n, Bits.pow(32n, 1n+p)), Bits.pow(32n, p), Bits.shr_p(31n, p, he)) : ASet.Apart(T, Array.new(T, p, v), U32{_}, U32{x}, U32.is_lt(U32{x}, U32.shr(U32{_})), U32{y}, U32.is_lt(U32{y}, U32.shr(U32{_})))
+      ih(x, y, Bits.hz_down(32n, x, p, hx, ex), Bits.hz_down(32n, y, p, hy, ey), Bits.dif_down(32n, x, y, p, hd, Equal.trans(Bool, Bits.at(32n, x, p), False{}, Bits.at(32n, y, p), ex, Equal.sym(Bool, Bits.at(32n, y, p), False{}, ey))))
+    case True{} True{}:
+      %Equal.sym(Word(32n), Word.shr(32n, Bits.pow(32n, 1n+p)), Bits.pow(32n, p), Bits.shr_p(31n, p, he)) : ASet.Apart(T, Array.new(T, p, v), U32{_}, U32.sub(U32{x}, U32{_}), U32.is_lt(U32.sub(U32{x}, U32{_}), U32.shr(U32{_})), U32.sub(U32{y}, U32{_}), U32.is_lt(U32.sub(U32{y}, U32{_}), U32.shr(U32{_})))
+      %Equal.sym(Word(32n), Word.adc(32n, x, Bits.pow(32n, p), True{}, True{}), Bits.clear(32n, x, p), Bits.sub_p(32n, x, p, ex)) : ASet.Apart(T, Array.new(T, p, v), U32{Bits.pow(32n, p)}, U32{_}, U32.is_lt(U32{_}, U32.shr(U32{Bits.pow(32n, p)})), U32.sub(U32{y}, U32{Bits.pow(32n, p)}), U32.is_lt(U32.sub(U32{y}, U32{Bits.pow(32n, p)}), U32.shr(U32{Bits.pow(32n, p)})))
+      %Equal.sym(Word(32n), Word.adc(32n, y, Bits.pow(32n, p), True{}, True{}), Bits.clear(32n, y, p), Bits.sub_p(32n, y, p, ey)) : ASet.Apart(T, Array.new(T, p, v), U32{Bits.pow(32n, p)}, U32{Bits.clear(32n, x, p)}, U32.is_lt(U32{Bits.clear(32n, x, p)}, U32.shr(U32{Bits.pow(32n, p)})), U32{_}, U32.is_lt(U32{_}, U32.shr(U32{Bits.pow(32n, p)})))
+      ih(Bits.clear(32n, x, p), Bits.clear(32n, y, p), Bits.hz_clr(32n, x, p, hx), Bits.hz_clr(32n, y, p, hy), Equal.trans(Bool, Bits.differ(32n, Bits.clear(32n, x, p), Bits.clear(32n, y, p), p), Bits.differ(32n, x, y, p), True{}, Bits.dif_clr(32n, x, y, p), Bits.dif_down(32n, x, y, p, hd, Equal.trans(Bool, Bits.at(32n, x, p), True{}, Bits.at(32n, y, p), ex, Equal.sym(Bool, Bits.at(32n, y, p), True{}, ey)))))
+    case False{} True{}:
+      Unit{}
+    case True{} False{}:
+      Unit{}
+
+# LAW: on Array.new's tree of depth e < 32, the descents for two different x and y below 2^e part
+def Bits.apart_new(-T: Data, +e: Nat, +v: T, +he: {Nat.is_lt(e, 32n) == True{} : Bool}, +x: Word(32n), +y: Word(32n), +hx: {Bits.below(32n, x, e) == True{} : Bool}, +hy: {Bits.below(32n, y, e) == True{} : Bool}, +hd: {Bits.differ(32n, x, y, e) == True{} : Bool}) -> Bits.Apart(T, e, v, x, y):
+  match e:
+    case 0n:
+      Bits.ft(Bits.Apart(T, 0n, v, x, y), Equal.trans(Bool, False{}, Bits.differ(32n, x, y, 0n), True{}, Equal.sym(Bool, Bits.differ(32n, x, y, 0n), False{}, Bits.dif_zero(32n, x, y)), hd))
+    case 1n+p:
+      %Equal.sym(Word(32n), Word.shr(32n, Bits.pow(32n, 1n+p)), Bits.pow(32n, p), Bits.shr_p(31n, p, he)) : ASet.Apart(T, Array.new(T, 1n+p, v), U32{Bits.pow(32n, 1n+p)}, U32{x}, U32.is_lt(U32{x}, U32{_}), U32{y}, U32.is_lt(U32{y}, U32{_}))
+      %Equal.sym(Bool, Cmp.is_lt(Word.cmp(32n, x, Bits.pow(32n, p))), Bool.not(Bits.at(32n, x, p)), Bits.lt_p(32n, x, p, Bits.lt_pred(p, 32n, he), hx)) : ASet.Apart(T, Array.new(T, 1n+p, v), U32{Bits.pow(32n, 1n+p)}, U32{x}, _, U32{y}, U32.is_lt(U32{y}, U32{Bits.pow(32n, p)}))
+      %Equal.sym(Bool, Cmp.is_lt(Word.cmp(32n, y, Bits.pow(32n, p))), Bool.not(Bits.at(32n, y, p)), Bits.lt_p(32n, y, p, Bits.lt_pred(p, 32n, he), hy)) : ASet.Apart(T, Array.new(T, 1n+p, v), U32{Bits.pow(32n, 1n+p)}, U32{x}, Bool.not(Bits.at(32n, x, p)), U32{y}, _)
+      Bits.step(T, p, v, x, y, Bits.at(32n, x, p), {==}, Bits.at(32n, y, p), {==}, he, hx, hy, hd, x2 => y2 => a => b => c => Bits.apart_new(T, p, v, Bits.lt_pred(p, 32n, he), x2, y2, a, b, c))
+
+# LAW (new_apart): on the tree Array.new builds, of depth e < 32, a write at x and a read at y part before a
+# leaf whenever x and y are below 2^e and differ: get_other_set's hypothesis, for Array.new's tree
+law new_apart:
+  for -T: Data
+  for +e: Nat
+  for +v: T
+  for +he: {Nat.is_lt(e, 32n) == True{} : Bool}
+  for +x: Word(32n)
+  for +y: Word(32n)
+  for +hx: {Bits.below(32n, x, e) == True{} : Bool}
+  for +hy: {Bits.below(32n, y, e) == True{} : Bool}
+  for +hd: {Bits.differ(32n, x, y, e) == True{} : Bool}
+  ASet.Apart(T, Array.new(T, e, v), ASet.sz(T, Array.new(T, e, v)), ASet.J(U32{x}, ASet.sz(T, Array.new(T, e, v))), ASet.Z(U32{x}, ASet.sz(T, Array.new(T, e, v))), ASet.J(U32{y}, ASet.sz(T, Array.new(T, e, v))), ASet.Z(U32{y}, ASet.sz(T, Array.new(T, e, v))))
+
+def new_apart(T, e, v, he, x, y, hx, hy, hd):
+  %Equal.sym(U32, ASet.sz(T, Array.new(T, e, v)), U32{Bits.pow(32n, e)}, Bits.size_p(T, e, v)) : ASet.Apart(T, Array.new(T, e, v), _, ASet.J(U32{x}, _), ASet.Z(U32{x}, _), ASet.J(U32{y}, _), ASet.Z(U32{y}, _))
+  %Equal.sym(Word(32n), Word.adc(32n, Bits.pow(32n, e), Bits.pow(32n, 0n), True{}, True{}), Bits.mask(32n, e), Bits.dec(32n, e)) : ASet.Apart(T, Array.new(T, e, v), U32{Bits.pow(32n, e)}, U32{Word.and(32n, x, _)}, U32.is_lt(U32{Word.and(32n, x, _)}, U32.shr(U32{Bits.pow(32n, e)})), U32{Word.and(32n, y, _)}, U32.is_lt(U32{Word.and(32n, y, _)}, U32.shr(U32{Bits.pow(32n, e)})))
+  %Equal.sym(Word(32n), Word.and(32n, x, Bits.mask(32n, e)), x, Bits.and_mask(32n, x, e, hx)) : ASet.Apart(T, Array.new(T, e, v), U32{Bits.pow(32n, e)}, U32{_}, U32.is_lt(U32{_}, U32.shr(U32{Bits.pow(32n, e)})), U32{Word.and(32n, y, Bits.mask(32n, e))}, U32.is_lt(U32{Word.and(32n, y, Bits.mask(32n, e))}, U32.shr(U32{Bits.pow(32n, e)})))
+  %Equal.sym(Word(32n), Word.and(32n, y, Bits.mask(32n, e)), y, Bits.and_mask(32n, y, e, hy)) : ASet.Apart(T, Array.new(T, e, v), U32{Bits.pow(32n, e)}, U32{x}, U32.is_lt(U32{x}, U32.shr(U32{Bits.pow(32n, e)})), U32{_}, U32.is_lt(U32{_}, U32.shr(U32{Bits.pow(32n, e)})))
+  Bits.apart_new(T, e, v, he, x, y, hx, hy, hd)
