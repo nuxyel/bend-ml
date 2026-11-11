@@ -6,7 +6,7 @@
 # Prints the differing words of each case summed over the seven depths, then the number of runs: "0 ... 0 77".
 # NaN counts as equal to NaN.
 import Base
-import bend-ml-tensor-array@0.1.20.0/main.bend as TA
+import bend-ml-tensor-array@0.1.21.0/main.bend as TA
 import ../main.bend as TF
 
 def val(+i: U32, +seed: U32) -> F32:
