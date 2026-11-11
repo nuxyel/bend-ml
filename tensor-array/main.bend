@@ -837,6 +837,15 @@ def Mat.clone(-r: Nat, -c: Nat, m: Mat<r, c>) -> MM2<r, c>:
     case Mat{d}:
       Mat.clone2(r, c, Array.clone(F32, d))
 
+# the same numbers under a new shape: the array is row-major and unchanged, and the equal size is
+# an erased proof, so `r1*c1 == r2*c2` is checked at compile time. Use `Mat.to_list` to read them
+# back in row order (tests/roundtrip.bend); the law below counts them.
+def Mat.reshape(-r1: Nat, -c1: Nat, +r2: Nat, +c2: Nat,
+    -p: {Nat.mul(r1, c1) == Nat.mul(r2, c2) : Nat}, m: Mat<r1, c1>) -> Mat<r2, c2>:
+  match m:
+    case Mat{d}:
+      Mat{d}
+
 type MMul<-n: Nat, -k: Nat, -m: Nat> is Type:
   MMul{a: Mat<n, k>, b: Mat<k, m>, c: Mat<n, m>}
 
@@ -2007,6 +2016,25 @@ def to_list_len(r, c, m):
   match m:
     case Mat{d}:
       to_list_count_len(r, c, d, Nat.mul(r, c))
+
+# LAW (reshape_len): a reshape reads the same number of elements. The new shape multiplies to the
+# old one by the proof `p`; the count then comes from to_list_len on both sides.
+law reshape_len:
+  for +r1: Nat
+  for +c1: Nat
+  for +r2: Nat
+  for +c2: Nat
+  for +p: {Nat.mul(r1, c1) == Nat.mul(r2, c2) : Nat}
+  for m: Mat<r1, c1>
+  {ML.len(r2, c2, Mat.to_list(r2, c2, Mat.reshape(r1, c1, r2, c2, p, m))) == Nat.mul(r1, c1) : Nat}
+
+def reshape_len(r1, c1, r2, c2, p, m):
+  Equal.trans(Nat,
+    ML.len(r2, c2, Mat.to_list(r2, c2, Mat.reshape(r1, c1, r2, c2, p, m))),
+    Nat.mul(r2, c2),
+    Nat.mul(r1, c1),
+    to_list_len(r2, c2, Mat.reshape(r1, c1, r2, c2, p, m)),
+    Equal.sym(Nat, Nat.mul(r1, c1), Nat.mul(r2, c2), p))
 
 # ---------------------------------------------------------------------
 # Base's Array: three laws about Array.set and Array.get
