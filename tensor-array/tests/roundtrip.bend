@@ -57,6 +57,17 @@ def sum(+xs: List<&2, Nat>, +acc: Nat) -> Nat:
     case Con{h, t}:
       sum(t, Nat.add(acc, h))
 
+# reshape keeps the numbers in row order: 2x3 -> 3x2 reads the same six numbers
+def reshape_m(m: Maybe<&1, TA.Mat<2n, 3n>>) -> Nat:
+  match m:
+    case Some{x}:
+      check_ml(3n, 2n, [1.0, 2.0, 3.0, 4.0, 5.0, 6.0], TA.Mat.to_list(3n, 2n, TA.Mat.reshape(2n, 3n, 3n, 2n, {==}, x)))
+    case None{}:
+      1n
+
+def reshape_case() -> Nat:
+  reshape_m(TA.Mat.of_list(2n, 3n, [1.0, 2.0, 3.0, 4.0, 5.0, 6.0]))
+
 def cases() -> Nat:
   sum([
     check(0n, 0n, Nil{}),
@@ -71,7 +82,8 @@ def cases() -> Nat:
     check(1n, 8n, [0.0, ((0.0 - 1.0 : F32) * 0.0 : F32), (1.0 / 0.0 : F32), ((0.0 - 1.0 : F32) / 0.0 : F32), (0.0 / 0.0 : F32), 1.0, 0.00000000000000000000000000000000000001, 3.0]),
     check(4n, 1n, [0.5, (0.0 - 0.5 : F32), 1.5, (0.0 - 1.5 : F32)]),
     check(3n, 5n, [1.0, 2.0, 3.0, 4.0, 5.0, 6.0, 7.0, 8.0, 9.0, 10.0, 11.0, 12.0, 13.0, 14.0, 15.0]),
-    check(64n, 64n, ramp(4096n, 0n, Nil{}))
+    check(64n, 64n, ramp(4096n, 0n, Nil{})),
+    reshape_case()
   ], 0n)
 
 def main() -> IO(Unit):

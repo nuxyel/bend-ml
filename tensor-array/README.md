@@ -36,6 +36,7 @@ def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 12
 | `Mat.softmax_ce` | mean cross-entropy and its gradient `(softmax − one-hot)/n` |
 | `Mat.count_correct` | argmax hits per row |
 | `Mat.read_row`, `Mat.write_row` | a row as a list |
+| `Mat.reshape` | the same numbers under a new shape; `r1*c1 == r2*c2` is an erased proof |
 
 ## Bands: matrix · vector in parallel without copying the weights
 
@@ -75,6 +76,7 @@ Ultra 7 155H (`bench/mv_bands.py`, `bench/results/`):
 |---|---|
 | `cap_ok` | an `Array` with `2^cap_depth(n)` slots always has room for `n` numbers, so the constructors never allocate too little |
 | `to_list_len` | `Mat.to_list` reads exactly `r*c` numbers, no more and no fewer; an empty matrix reads none and gives the empty list |
+| `reshape_len` | a reshape reads the same number of elements: the new shape multiplies to the old one, and `to_list_len` gives the count |
 | `half_cover` | the two bands of a node, `half(r)` rows and `r - half(r)` rows, add up to exactly `r` rows: no row is lost and none is counted twice |
 | `leaf_len` | reading a band's results back from its `Array` (`read_l`, then `bv_g2`) gives exactly one number per row read |
 | `band_len` | the product of one band with `rows` rows gives exactly `rows` numbers |
@@ -132,6 +134,10 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 - `F32` numerics are validated by tests against PyTorch, not by proof.
 
 ## Versions
+
+- Unreleased (`devel`): `Mat.reshape`, the same numbers under a new shape with the equal size as an erased proof, and
+  the law `reshape_len` (the new shape multiplies to the old one, and `to_list_len` gives the count). Contributed by
+  @adeerkhan (bend-ml #35); every other def is 0.1.20.0's.
 
 - `0.1.20.0` (2026-11-06): the law `matvec_l_len`, `Bands.matvec_l`'s length over the whole tree, with its
   helpers (`al_c`, `bl_b`, `WAL`, `WBL`, `read_w` .. `bmv_w`, `w_len`). Only lines added: every def keeps its code and
