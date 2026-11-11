@@ -2135,3 +2135,16 @@ output equal to C's).
 - A documentation patch: the entry above (the figures redrawn with v1.10.0's numbers on 2.0.40, the release line, the
   diagram at 34 laws). No package or code change, nothing published. PR #34, CI green, merged as 8af6052, tag
   `v1.10.2`, GitHub release.
+
+## tensor-array: Mat.reshape and the law reshape_len (bend-ml #36, 2026-11-11, not published yet)
+
+- Contributed by adeerkhan (pull request #36, asked in #35), merged into `devel` on 2026-11-11.
+- `Mat.reshape` gives the same array under a new shape; the equal size `r1*c1 == r2*c2` is an erased proof, so a
+  wrong shape does not type-check and nothing is copied. The law `reshape_len`: the reshaped matrix reads `r1*c1`
+  numbers, from `to_list_len` and the proof. The order is tested, not proved: `tests/roundtrip.bend` reads a 2 x 3
+  reshaped to 3 x 2 back in row order and prints 0.
+- 35 laws (`make laws`). The root README's table, the badge and the package diagram keep 0.1.20.0's 34 until
+  tensor-array is published with it.
+- Gates here: `make check-full` 122/127; the five left are the two MNIST pairs, whose data is not downloaded on this
+  machine, and the autograd fuzz, which refused the worktree's path under `.night/` (a dot starts a segment) and gave
+  94/94 from a path without one. CI on the pull request ran the whole gate and passed.
