@@ -2148,3 +2148,19 @@ output equal to C's).
 - Gates here: `make check-full` 122/127; the five left are the two MNIST pairs, whose data is not downloaded on this
   machine, and the autograd fuzz, which refused the worktree's path under `.night/` (a dot starts a segment) and gave
   94/94 from a path without one. CI on the pull request ran the whole gate and passed.
+
+## tensor-array: the U32 facts and the tree lemmas bend-ml #26 waits on (2026-11-11, not published yet)
+
+- Four facts about `U32` and powers of two, at `e < 32`, proved bit by bit (Base stores a `U32` as 32 Bools, lowest
+  first, so no arithmetic on numbers is needed): `pow_shr` (half of 2^(e+1) is 2^e), `pow_mask` (an index below 2^e is
+  its own masked index), `pow_lt` (below 2^(e+1), "x < 2^e" is "bit e of x is 0", the branch a walk takes) and
+  `pow_sub` (taking 2^e from an x with bit e set clears that bit). Helpers `Bits.*`; `Bits.size_p` says
+  `Array.size(Array.new(T, e, v))` is 2^e.
+- `new_apart`: on `Array.new`'s tree of depth e < 32, two different indices below 2^e part before a leaf, which is
+  `get_other_set`'s hypothesis. `apart_set`: a write keeps where two walks part, on any tree (helpers `Shape.*`). With
+  `size_set`, these are the two tree facts #26 named.
+- 41 laws (`list_laws.py --check-readme` ok); `--check-only` and `--verdict` ALL PROOFS CHECK; `make check` 116/116.
+- Not proved: the round trip `Mat.to_list(Mat.of_list(xs)) == xs` itself. It still needs the counters' bits
+  (`fill_list`'s `i + 1` and `read_l`'s `idx - 1` stay below 2^d and differ step by step), that `Array.get` hands back
+  the same array, and the list induction on both sides. Nothing in Base is in the way; it is a large proof. #26 stays
+  open for it, and BendTorch #29's adjoint needs the same counter lemmas over `im2col`'s window addresses.
