@@ -84,12 +84,22 @@ Ultra 7 155H (`bench/mv_bands.py`, `bench/results/`):
 | `size_set` | writing any value at any index keeps an `Array`'s size (Base's `Array.set` and `Array.size`, for any element type) |
 | `get_after_set` | reading at `i` right after writing `v` at `i` gives back `v` |
 | `get_other_set` | a write at `i` leaves alone the cell a read at `k` reaches, when the two walks down the tree split before a leaf (`ASet.Apart`); on a concrete tree that condition computes to true and `Unit{}` proves it |
+| `pow_shr` | half of `2^(e+1)` is `2^e` as a `U32` (`U32.shln(1, e)`, the size `Array.size` gives a tree of depth `e`), for `e < 31` |
+| `pow_mask` | an index below `2^e` is unchanged by the mask `Array.get` and `Array.set` apply to it on a tree of `2^e` cells |
+| `pow_lt` | for an index below `2^(e+1)`, "below `2^e`" is the same as "bit `e` is zero": the branch a walk down the tree takes |
+| `pow_sub` | taking `2^e` from an index whose bit `e` is set clears that bit: the index a walk carries into the right half |
+| `new_apart` | on the tree `Array.new` builds, two different indices below `2^e` part before a leaf, so `get_other_set` applies to them (any depth `e < 32`) |
+| `apart_set` | a write keeps the tree's shape, so two walks down the tree that part before a leaf still part after any `Array.set`: with `new_apart`, `get_other_set` applies to every write into an `Array.new` after the first |
 
 The last three are about Base's `Array` itself and live here until Base states them
 ([bendlang/bend#1934](https://github.com/bendlang/bend/issues/1934)). Their condition is not "`i` and `k` differ after
 the mask": on a tree that is not perfectly balanced two different indices can reach the same leaf
-(`tests/array_laws.bend` shows one). On the perfect trees `Array.new` and literals build, the two coincide, but that is
-not proved here.
+(`tests/array_laws.bend` shows one). On the perfect trees `Array.new` builds, two different indices do part:
+`new_apart` proves it, from the four `pow_*` facts about `U32`. Base keeps a `U32` as 32 bits, lowest first, and
+computes on it bit by bit, so these proofs walk the bits rather than reason about numbers (helpers `Bits.*`). The
+writes that fill the array keep that (`apart_set`). The round trip `Mat.to_list(Mat.of_list(xs)) == xs` is still
+tested, not proved: what is left is the bits of the counters `Mat.of_list` writes with (`i + 1`) and `Mat.to_list`
+reads with (`idx - 1`), and the induction over the list on both sides.
 
 `matvec_l_len` was open from 0.1.5.0 on. The direct proof applies the join lemma (`join_len`) to the two recursive
 results and to the induction hypotheses about the same calls, which uses each band's `Array` twice; Bend's affine
@@ -137,7 +147,8 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 
 - Unreleased (`devel`): `Mat.reshape`, the same numbers under a new shape with the equal size as an erased proof, and
   the law `reshape_len` (the new shape multiplies to the old one, and `to_list_len` gives the count). Contributed by
-  @adeerkhan (bend-ml #35); every other def is 0.1.20.0's.
+  @adeerkhan (bend-ml #35). The laws `pow_shr`, `pow_mask`, `pow_lt`, `pow_sub`, `new_apart` (helpers `Bits.*`) and
+  `apart_set` (helpers `Shape.*`), the `U32` and tree facts bend-ml #26 was waiting for. Every other def is 0.1.20.0's.
 
 - `0.1.20.0` (2026-11-06): the law `matvec_l_len`, `Bands.matvec_l`'s length over the whole tree, with its
   helpers (`al_c`, `bl_b`, `WAL`, `WBL`, `read_w` .. `bmv_w`, `w_len`). Only lines added: every def keeps its code and

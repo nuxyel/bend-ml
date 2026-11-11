@@ -2057,8 +2057,8 @@ def reshape_len(r1, c1, r2, c2, p, m):
 # path, so in ANode{ANode{ALeaf, ALeaf}, ALeaf} (size 4) the indices 2 and 3 differ but both reach the
 # last leaf, and a write at 2 changes what a read at 3 returns (tests/array_laws.bend prints it: 9.0). On a
 # perfect tree of 2^d leaves, which Array.new and literals build, the descents part exactly when the masked
-# indices differ; that equivalence is not proved here, since it needs lemmas about U32 bits. For a concrete
-# tree ASet.Apart computes to Unit, so Unit{} proves it (tests/array_laws.bend).
+# indices differ; new_apart, at the end of the file, proves that two different indices below 2^d part on
+# Array.new's tree. For a concrete tree ASet.Apart computes to Unit, so Unit{} proves it (tests/array_laws.bend).
 #
 # Why the proofs are shaped this way: an Array is affine, and so is it inside a proof, so a proof may use a
 # given array once. The obvious lemmas each need the same subtree again (one to say Array.size of it is
@@ -2481,3 +2481,698 @@ law get_other_set:
 
 def get_other_set(T, a, i, k, v, h):
   ASet.top_other(T, a, i, k, v, ASet.copy(T, a))(h)
+
+
+# ---------------------------------------------------------------------
+# Array.new's tree: where a write and a read part, from the bits of U32
+# ---------------------------------------------------------------------
+#
+# get_other_set needs ASet.Apart: the walks down the tree for the write's index and the read's index split
+# before a leaf. On the perfect tree Array.new builds (2^e leaves) that holds exactly when the two indices
+# differ, and new_apart proves the direction a round trip needs: two different indices below 2^e part.
+# (bend-ml #26; this is the piece the round trip Mat.to_list(Mat.of_list(xs)) == xs was waiting for.)
+#
+# A U32 is a Word of 32 Bools, lowest bit first, and Base computes on it bit by bit, so every fact here is
+# proved by walking the bits, with no arithmetic on numbers. The words the walks meet are named by their
+# bits: Bits.pow(m, e) is 2^e (only bit e set), Bits.mask(m, e) is 2^e - 1 (bits below e set), Bits.at reads
+# a bit, Bits.clear clears one, Bits.below(m, x, e) says every bit of x from e up is zero (x < 2^e), and
+# Bits.differ(m, x, y, e) says x and y differ at some bit below e. The four facts about U32 the walk uses:
+#
+# - pow_shr: half of 2^(e+1) is 2^e, so each node's half size is the next power down;
+# - pow_mask: an index below 2^e is its own masked index (the mask Array.get and Array.set apply is 2^e - 1);
+# - pow_lt: below 2^(e+1), "x < 2^e" is "bit e of x is zero", so the branch a walk takes is bit e;
+# - pow_sub: taking 2^e from an x with bit e set clears that bit, which is the index carried into the right half.
+#
+# new_apart then goes down the tree by induction on e: at a node of size 2^(e+1) the two indices take the
+# branches their bit e picks. If the bits differ, the walks have split. If they agree, both walks go into the
+# same half, with that bit cleared on the right, and the indices still differ below e. At a leaf (e = 0) two
+# indices below 1 cannot differ, so that case cannot happen. Bits.size_p says Array.size of Array.new(T, e, v)
+# is 2^e. The defs are checked with e < 32, the depths a U32 index can address.
+
+# ---------------------------------------------------------------------
+# False == True cannot hold: these close the cases a hypothesis rules out
+# ---------------------------------------------------------------------
+
+def Bits.disc(b: Bool) -> Type:
+  match b:
+    case False{}:
+      Empty
+    case True{}:
+      Unit
+
+def Bits.tf_e(h: {True{} == False{} : Bool}) -> Empty:
+  %h : Bits.disc(_)
+  Unit{}
+
+def Bits.ft_e(h: {False{} == True{} : Bool}) -> Empty:
+  %Equal.sym(Bool, False{}, True{}, h) : Bits.disc(_)
+  Unit{}
+
+def Bits.ft(-A: Type, h: {False{} == True{} : Bool}) -> A:
+  Empty.absurd(A, Bits.ft_e(h))
+
+def Bits.tf(-A: Type, h: {True{} == False{} : Bool}) -> A:
+  Empty.absurd(A, Bits.tf_e(h))
+
+# ---------------------------------------------------------------------
+# words by their bits (bit 0 is the head, the lowest)
+# ---------------------------------------------------------------------
+
+# Bits.pow(m, e): the m-bit word with only bit e set, the number 2^e (zero when e >= m)
+def Bits.pow(m: Nat, e: Nat) -> Word(m):
+  match m:
+    case 0n:
+      WNil{}
+    case 1n+p:
+      match e:
+        case 0n:
+          WCon{True{}, Word.zero(p)}
+        case 1n+q:
+          WCon{False{}, Bits.pow(p, q)}
+
+# Bits.mask(m, e): bits 0 .. e-1 set, the number 2^e - 1
+def Bits.mask(m: Nat, e: Nat) -> Word(m):
+  match m:
+    case 0n:
+      WNil{}
+    case 1n+p:
+      match e:
+        case 0n:
+          WCon{False{}, Word.zero(p)}
+        case 1n+q:
+          WCon{True{}, Bits.mask(p, q)}
+
+# Bits.at(m, w, e): bit e of w
+def Bits.at(m: Nat, w: Word(m), e: Nat) -> Bool:
+  match m:
+    case 0n:
+      False{}
+    case 1n+p:
+      match w:
+        case WCon{b, t}:
+          match e:
+            case 0n:
+              b
+            case 1n+q:
+              Bits.at(p, t, q)
+
+# Bits.below(m, w, e): every bit of w from e up is zero, i.e. w < 2^e
+def Bits.below(m: Nat, w: Word(m), e: Nat) -> Bool:
+  match m:
+    case 0n:
+      True{}
+    case 1n+p:
+      match w:
+        case WCon{b, t}:
+          match e:
+            case 0n:
+              Bool.and(Bool.not(b), Bits.below(p, t, 0n))
+            case 1n+q:
+              Bits.below(p, t, q)
+
+# Bits.clear(m, w, e): w with bit e cleared
+def Bits.clear(m: Nat, w: Word(m), e: Nat) -> Word(m):
+  match m:
+    case 0n:
+      w
+    case 1n+p:
+      match w:
+        case WCon{b, t}:
+          match e:
+            case 0n:
+              WCon{False{}, t}
+            case 1n+q:
+              WCon{b, Bits.clear(p, t, q)}
+
+# Bits.differ(m, a, b, e): a and b differ at some bit below e
+def Bits.differ(m: Nat, a: Word(m), b: Word(m), e: Nat) -> Bool:
+  match m:
+    case 0n:
+      False{}
+    case 1n+p:
+      match a b:
+        case WCon{x, s} WCon{y, t}:
+          match e:
+            case 0n:
+              False{}
+            case 1n+q:
+              Bool.or(Bool.xor(x, y), Bits.differ(p, s, t, q))
+
+# ---------------------------------------------------------------------
+# shifting left: U32.shln(1, e) is 2^e
+# ---------------------------------------------------------------------
+
+# shifting in a zero is Word.shl
+def Bits.put_f(+p: Nat, w: Word(p)) -> {Word.shl.put(p, False{}, w) == Word.shl(p, w) : Word(p)}:
+  match p:
+    case 0n:
+      {==}
+    case 1n+q:
+      match w:
+        case WCon{b, t}:
+          {==}
+
+def Bits.shl_zero(+p: Nat) -> {Word.shl(p, Word.zero(p)) == Word.zero(p) : Word(p)}:
+  match p:
+    case 0n:
+      {==}
+    case 1n+q:
+      %Bits.shl_zero(q) : {WCon{False{}, Word.shl.put(q, False{}, Word.zero(q))} == WCon{False{}, _} : Word(1n+q)}
+      %Bits.put_f(q, Word.zero(q)) : {WCon{False{}, Word.shl.put(q, False{}, Word.zero(q))} == WCon{False{}, _} : Word(1n+q)}
+      {==}
+
+# shifting a one into zero gives 2^0
+def Bits.put_one(+p: Nat) -> {Word.shl.put(p, True{}, Word.zero(p)) == Bits.pow(p, 0n) : Word(p)}:
+  match p:
+    case 0n:
+      {==}
+    case 1n+q:
+      %Bits.shl_zero(q) : {WCon{True{}, Word.shl.put(q, False{}, Word.zero(q))} == WCon{True{}, _} : Word(1n+q)}
+      %Bits.put_f(q, Word.zero(q)) : {WCon{True{}, Word.shl.put(q, False{}, Word.zero(q))} == WCon{True{}, _} : Word(1n+q)}
+      {==}
+
+# shifting 2^e left gives 2^(e+1)
+def Bits.shl_p(+m: Nat, +e: Nat) -> {Word.shl(m, Bits.pow(m, e)) == Bits.pow(m, 1n+e) : Word(m)}:
+  match m:
+    case 0n:
+      {==}
+    case 1n+p:
+      match e:
+        case 0n:
+          %Bits.put_one(p) : {WCon{False{}, Word.shl.put(p, True{}, Word.zero(p))} == WCon{False{}, _} : Word(1n+p)}
+          {==}
+        case 1n+q:
+          %Bits.shl_p(p, q) : {WCon{False{}, Word.shl.put(p, False{}, Bits.pow(p, q))} == WCon{False{}, _} : Word(1n+p)}
+          %Bits.put_f(p, Bits.pow(p, q)) : {WCon{False{}, Word.shl.put(p, False{}, Bits.pow(p, q))} == WCon{False{}, _} : Word(1n+p)}
+          {==}
+
+# U32.shln(1, e), the size Array.size computes for a tree of depth e, is the word with bit e set
+def Bits.shln_one(+e: Nat) -> {U32.shln(1, e) == U32{Bits.pow(32n, e)} : U32}:
+  match e:
+    case 0n:
+      {==}
+    case 1n+q:
+      %Bits.shl_p(32n, q) : {U32.shl(U32.shln(1, q)) == U32{_} : U32}
+      %Bits.shln_one(q) : {U32.shl(U32.shln(1, q)) == U32.shl(_) : U32}
+      {==}
+
+# ---------------------------------------------------------------------
+# shifting right: half of 2^(e+1) is 2^e
+# ---------------------------------------------------------------------
+
+def Bits.pad_zero(+p: Nat) -> {Word.shr.pad(p, Word.zero(p)) == Word.zero(1n+p) : Word(1n+p)}:
+  match p:
+    case 0n:
+      {==}
+    case 1n+q:
+      %Bits.pad_zero(q) : {WCon{False{}, Word.shr.pad(q, Word.zero(q))} == WCon{False{}, _} : Word(2n+q)}
+      {==}
+
+def Bits.pad_p(+p: Nat, +e: Nat, h: {Nat.is_lt(e, p) == True{} : Bool}) -> {Word.shr.pad(p, Bits.pow(p, e)) == Bits.pow(1n+p, e) : Word(1n+p)}:
+  match p e:
+    case 0n 0n:
+      Bits.ft({Word.shr.pad(0n, Bits.pow(0n, 0n)) == Bits.pow(1n, 0n) : Word(1n)}, h)
+    case 0n 1n+r:
+      Bits.ft({Word.shr.pad(0n, Bits.pow(0n, 1n+r)) == Bits.pow(1n, 1n+r) : Word(1n)}, h)
+    case 1n+q 0n:
+      %Bits.pad_zero(q) : {WCon{True{}, Word.shr.pad(q, Word.zero(q))} == WCon{True{}, _} : Word(2n+q)}
+      {==}
+    case 1n+q 1n+r:
+      %Bits.pad_p(q, r, h) : {WCon{False{}, Word.shr.pad(q, Bits.pow(q, r))} == WCon{False{}, _} : Word(2n+q)}
+      {==}
+
+# below the top bit, shifting 2^(e+1) right gives 2^e
+def Bits.shr_p(+p: Nat, +e: Nat, h: {Nat.is_lt(e, p) == True{} : Bool}) -> {Word.shr(1n+p, Bits.pow(1n+p, 1n+e)) == Bits.pow(1n+p, e) : Word(1n+p)}:
+  Bits.pad_p(p, e, h)
+
+# ---------------------------------------------------------------------
+# comparing with 2^e reads bit e
+# ---------------------------------------------------------------------
+
+def Bits.cmp_zero(+p: Nat, t: Word(p), h: {Bits.below(p, t, 0n) == True{} : Bool}) -> {Word.cmp(p, t, Word.zero(p)) == EQ{} : Cmp}:
+  match p:
+    case 0n:
+      {==}
+    case 1n+q:
+      match t:
+        case WCon{False{}, s}:
+          %Equal.sym(Cmp, Word.cmp(q, s, Word.zero(q)), EQ{}, Bits.cmp_zero(q, s, h)) : {Word.cmp.fin(False{}, False{}, _) == EQ{} : Cmp}
+          {==}
+        case WCon{True{}, s}:
+          Bits.ft({Word.cmp(1n+q, WCon{True{}, s}, Word.zero(1n+q)) == EQ{} : Cmp}, h)
+
+def Bits.fin_lt(b: Bool, c: Cmp) -> {Cmp.is_lt(Word.cmp.fin(b, False{}, c)) == Cmp.is_lt(c) : Bool}:
+  match b c:
+    case False{} LT{}:
+      {==}
+    case False{} EQ{}:
+      {==}
+    case False{} GT{}:
+      {==}
+    case True{} LT{}:
+      {==}
+    case True{} EQ{}:
+      {==}
+    case True{} GT{}:
+      {==}
+
+def Bits.fin_t(b: Bool) -> {Cmp.is_lt(Word.cmp.fin(b, True{}, EQ{})) == Bool.not(b) : Bool}:
+  match b:
+    case False{}:
+      {==}
+    case True{}:
+      {==}
+
+# when x < 2^(e+1), x < 2^e exactly when bit e of x is zero
+def Bits.lt_p(+m: Nat, +x: Word(m), +e: Nat, hb: {Nat.is_lt(e, m) == True{} : Bool}, h: {Bits.below(m, x, 1n+e) == True{} : Bool}) -> {Cmp.is_lt(Word.cmp(m, x, Bits.pow(m, e))) == Bool.not(Bits.at(m, x, e)) : Bool}:
+  match m x e:
+    case 0n _ 0n:
+      Bits.ft({Cmp.is_lt(Word.cmp(0n, x, Bits.pow(0n, 0n))) == Bool.not(Bits.at(0n, x, 0n)) : Bool}, hb)
+    case 0n _ 1n+q:
+      Bits.ft({Cmp.is_lt(Word.cmp(0n, x, Bits.pow(0n, 1n+q))) == Bool.not(Bits.at(0n, x, 1n+q)) : Bool}, hb)
+    case 1n+p WCon{b, t} 0n:
+      %Equal.sym(Cmp, Word.cmp(p, t, Word.zero(p)), EQ{}, Bits.cmp_zero(p, t, h)) : {Cmp.is_lt(Word.cmp.fin(b, True{}, _)) == Bool.not(b) : Bool}
+      Bits.fin_t(b)
+    case 1n+p WCon{b, t} 1n+q:
+      Equal.trans(Bool, Cmp.is_lt(Word.cmp.fin(b, False{}, Word.cmp(p, t, Bits.pow(p, q)))), Cmp.is_lt(Word.cmp(p, t, Bits.pow(p, q))), Bool.not(Bits.at(p, t, q)), Bits.fin_lt(b, Word.cmp(p, t, Bits.pow(p, q))), Bits.lt_p(p, t, q, hb, h))
+
+# ---------------------------------------------------------------------
+# subtracting: 2^e from a word with bit e set clears it; 2^e - 1 is the mask
+# ---------------------------------------------------------------------
+
+def Bits.sub_zero(+p: Nat, x: Word(p)) -> {Word.adc(p, x, Word.zero(p), True{}, True{}) == x : Word(p)}:
+  match p x:
+    case 0n WNil{}:
+      {==}
+    case 1n+q WCon{False{}, s}:
+      %Bits.sub_zero(q, s) : {WCon{False{}, Word.adc(q, s, Word.zero(q), True{}, True{})} == WCon{False{}, _} : Word(1n+q)}
+      {==}
+    case 1n+q WCon{True{}, s}:
+      %Bits.sub_zero(q, s) : {WCon{True{}, Word.adc(q, s, Word.zero(q), True{}, True{})} == WCon{True{}, _} : Word(1n+q)}
+      {==}
+
+def Bits.sub_p(+m: Nat, x: Word(m), +e: Nat, h: {Bits.at(m, x, e) == True{} : Bool}) -> {Word.adc(m, x, Bits.pow(m, e), True{}, True{}) == Bits.clear(m, x, e) : Word(m)}:
+  match m x e:
+    case 0n _ _:
+      Bits.ft({Word.adc(0n, x, Bits.pow(0n, e), True{}, True{}) == Bits.clear(0n, x, e) : Word(0n)}, h)
+    case 1n+p WCon{False{}, t} 0n:
+      Bits.ft({Word.adc(1n+p, WCon{False{}, t}, Bits.pow(1n+p, 0n), True{}, True{}) == Bits.clear(1n+p, WCon{False{}, t}, 0n) : Word(1n+p)}, h)
+    case 1n+p WCon{True{}, t} 0n:
+      %Bits.sub_zero(p, t) : {WCon{False{}, Word.adc(p, t, Word.zero(p), True{}, True{})} == WCon{False{}, _} : Word(1n+p)}
+      {==}
+    case 1n+p WCon{False{}, t} 1n+q:
+      %Bits.sub_p(p, t, q, h) : {WCon{False{}, Word.adc(p, t, Bits.pow(p, q), True{}, True{})} == WCon{False{}, _} : Word(1n+p)}
+      {==}
+    case 1n+p WCon{True{}, t} 1n+q:
+      %Bits.sub_p(p, t, q, h) : {WCon{True{}, Word.adc(p, t, Bits.pow(p, q), True{}, True{})} == WCon{True{}, _} : Word(1n+p)}
+      {==}
+
+def Bits.dec_p(+p: Nat, +q: Nat) -> {Word.adc(p, Bits.pow(p, q), Word.zero(p), True{}, False{}) == Bits.mask(p, q) : Word(p)}:
+  match p q:
+    case 0n _:
+      {==}
+    case 1n+r 0n:
+      %Bits.sub_zero(r, Word.zero(r)) : {WCon{False{}, Word.adc(r, Word.zero(r), Word.zero(r), True{}, True{})} == WCon{False{}, _} : Word(1n+r)}
+      {==}
+    case 1n+r 1n+s:
+      %Bits.dec_p(r, s) : {WCon{True{}, Word.adc(r, Bits.pow(r, s), Word.zero(r), True{}, False{})} == WCon{True{}, _} : Word(1n+r)}
+      {==}
+
+# 2^e - 1 is the mask of bits 0 .. e-1
+def Bits.dec(+m: Nat, +e: Nat) -> {Word.adc(m, Bits.pow(m, e), Bits.pow(m, 0n), True{}, True{}) == Bits.mask(m, e) : Word(m)}:
+  match m e:
+    case 0n _:
+      {==}
+    case 1n+p 0n:
+      %Bits.sub_zero(p, Word.zero(p)) : {WCon{False{}, Word.adc(p, Word.zero(p), Word.zero(p), True{}, True{})} == WCon{False{}, _} : Word(1n+p)}
+      {==}
+    case 1n+p 1n+q:
+      %Bits.dec_p(p, q) : {WCon{True{}, Word.adc(p, Bits.pow(p, q), Word.zero(p), True{}, False{})} == WCon{True{}, _} : Word(1n+p)}
+      {==}
+
+def Bits.and_zero(+p: Nat, t: Word(p), h: {Bits.below(p, t, 0n) == True{} : Bool}) -> {Word.and(p, t, Word.zero(p)) == t : Word(p)}:
+  match p t:
+    case 0n WNil{}:
+      {==}
+    case 1n+q WCon{False{}, s}:
+      %Bits.and_zero(q, s, h) : {WCon{False{}, Word.and(q, s, Word.zero(q))} == WCon{False{}, _} : Word(1n+q)}
+      {==}
+    case 1n+q WCon{True{}, s}:
+      Bits.ft({Word.and(1n+q, WCon{True{}, s}, Word.zero(1n+q)) == WCon{True{}, s} : Word(1n+q)}, h)
+
+# a word below 2^e is unchanged by the mask
+def Bits.and_mask(+m: Nat, x: Word(m), +e: Nat, h: {Bits.below(m, x, e) == True{} : Bool}) -> {Word.and(m, x, Bits.mask(m, e)) == x : Word(m)}:
+  match m x e:
+    case 0n WNil{} _:
+      {==}
+    case 1n+p WCon{False{}, t} 0n:
+      %Bits.and_zero(p, t, h) : {WCon{False{}, Word.and(p, t, Word.zero(p))} == WCon{False{}, _} : Word(1n+p)}
+      {==}
+    case 1n+p WCon{True{}, t} 0n:
+      Bits.ft({Word.and(1n+p, WCon{True{}, t}, Bits.mask(1n+p, 0n)) == WCon{True{}, t} : Word(1n+p)}, h)
+    case 1n+p WCon{False{}, t} 1n+q:
+      %Bits.and_mask(p, t, q, h) : {WCon{False{}, Word.and(p, t, Bits.mask(p, q))} == WCon{False{}, _} : Word(1n+p)}
+      {==}
+    case 1n+p WCon{True{}, t} 1n+q:
+      %Bits.and_mask(p, t, q, h) : {WCon{True{}, Word.and(p, t, Bits.mask(p, q))} == WCon{True{}, _} : Word(1n+p)}
+      {==}
+
+# ---------------------------------------------------------------------
+# what one step down the tree keeps: the bound, and a difference below it
+# ---------------------------------------------------------------------
+
+def Bits.hz_down(+m: Nat, x: Word(m), +e: Nat, h1: {Bits.below(m, x, 1n+e) == True{} : Bool}, h2: {Bits.at(m, x, e) == False{} : Bool}) -> {Bits.below(m, x, e) == True{} : Bool}:
+  match m x e:
+    case 0n _ _:
+      {==}
+    case 1n+p WCon{False{}, t} 0n:
+      h1
+    case 1n+p WCon{True{}, t} 0n:
+      Bits.tf({Bits.below(1n+p, WCon{True{}, t}, 0n) == True{} : Bool}, h2)
+    case 1n+p WCon{b, t} 1n+q:
+      Bits.hz_down(p, t, q, h1, h2)
+
+def Bits.hz_clr(+m: Nat, x: Word(m), +e: Nat, h: {Bits.below(m, x, 1n+e) == True{} : Bool}) -> {Bits.below(m, Bits.clear(m, x, e), e) == True{} : Bool}:
+  match m x e:
+    case 0n _ _:
+      {==}
+    case 1n+p WCon{b, t} 0n:
+      h
+    case 1n+p WCon{b, t} 1n+q:
+      Bits.hz_clr(p, t, q, h)
+
+def Bits.dif_zero(+m: Nat, a: Word(m), b: Word(m)) -> {Bits.differ(m, a, b, 0n) == False{} : Bool}:
+  match m a b:
+    case 0n _ _:
+      {==}
+    case 1n+p WCon{x, s} WCon{y, t}:
+      {==}
+
+def Bits.dif_clr(+m: Nat, x: Word(m), y: Word(m), +e: Nat) -> {Bits.differ(m, Bits.clear(m, x, e), Bits.clear(m, y, e), e) == Bits.differ(m, x, y, e) : Bool}:
+  match m x y e:
+    case 0n _ _ _:
+      {==}
+    case 1n+p WCon{a, s} WCon{b, t} 0n:
+      {==}
+    case 1n+p WCon{a, s} WCon{b, t} 1n+q:
+      %Bits.dif_clr(p, s, t, q) : {Bool.or(Bool.xor(a, b), Bits.differ(p, Bits.clear(p, s, q), Bits.clear(p, t, q), q)) == Bool.or(Bool.xor(a, b), _) : Bool}
+      {==}
+
+def Bits.dif_down(+m: Nat, x: Word(m), y: Word(m), +e: Nat, h: {Bits.differ(m, x, y, 1n+e) == True{} : Bool}, hb: {Bits.at(m, x, e) == Bits.at(m, y, e) : Bool}) -> {Bits.differ(m, x, y, e) == True{} : Bool}:
+  match m x y e:
+    case 0n _ _ _:
+      Bits.ft({Bits.differ(0n, x, y, e) == True{} : Bool}, h)
+    case 1n+p WCon{False{}, s} WCon{False{}, t} 0n:
+      Bits.ft({Bits.differ(1n+p, WCon{False{}, s}, WCon{False{}, t}, 0n) == True{} : Bool}, Equal.trans(Bool, False{}, Bits.differ(p, s, t, 0n), True{}, Equal.sym(Bool, Bits.differ(p, s, t, 0n), False{}, Bits.dif_zero(p, s, t)), h))
+    case 1n+p WCon{True{}, s} WCon{True{}, t} 0n:
+      Bits.ft({Bits.differ(1n+p, WCon{True{}, s}, WCon{True{}, t}, 0n) == True{} : Bool}, Equal.trans(Bool, False{}, Bits.differ(p, s, t, 0n), True{}, Equal.sym(Bool, Bits.differ(p, s, t, 0n), False{}, Bits.dif_zero(p, s, t)), h))
+    case 1n+p WCon{False{}, s} WCon{True{}, t} 0n:
+      Bits.ft({Bits.differ(1n+p, WCon{False{}, s}, WCon{True{}, t}, 0n) == True{} : Bool}, hb)
+    case 1n+p WCon{True{}, s} WCon{False{}, t} 0n:
+      Bits.tf({Bits.differ(1n+p, WCon{True{}, s}, WCon{False{}, t}, 0n) == True{} : Bool}, hb)
+    case 1n+p WCon{False{}, s} WCon{False{}, t} 1n+q:
+      Bits.dif_down(p, s, t, q, h, hb)
+    case 1n+p WCon{True{}, s} WCon{True{}, t} 1n+q:
+      Bits.dif_down(p, s, t, q, h, hb)
+    case 1n+p WCon{False{}, s} WCon{True{}, t} 1n+q:
+      {==}
+    case 1n+p WCon{True{}, s} WCon{False{}, t} 1n+q:
+      {==}
+
+def Bits.lt_pred(+p: Nat, +m: Nat, h: {Nat.is_lt(1n+p, m) == True{} : Bool}) -> {Nat.is_lt(p, m) == True{} : Bool}:
+  match p m:
+    case 0n 0n:
+      Bits.ft({Nat.is_lt(0n, 0n) == True{} : Bool}, h)
+    case 0n 1n+q:
+      {==}
+    case 1n+r 0n:
+      Bits.ft({Nat.is_lt(1n+r, 0n) == True{} : Bool}, h)
+    case 1n+r 1n+q:
+      Bits.lt_pred(r, q, h)
+
+# LAW (pow_shr): below the top bit, half of 2^(e+1) is 2^e (U32.shln(1, e) is 2^e, the size Array.size
+# computes for a tree of depth e)
+law pow_shr:
+  for +e: Nat
+  for h: {Nat.is_lt(e, 31n) == True{} : Bool}
+  {U32.shr(U32.shln(1, 1n+e)) == U32.shln(1, e) : U32}
+
+def pow_shr(e, h):
+  %Equal.sym(U32, U32.shln(1, e), U32{Bits.pow(32n, e)}, Bits.shln_one(e)) : {U32.shr(U32.shln(1, 1n+e)) == _ : U32}
+  %Equal.sym(U32, U32.shln(1, 1n+e), U32{Bits.pow(32n, 1n+e)}, Bits.shln_one(1n+e)) : {U32.shr(_) == U32{Bits.pow(32n, e)} : U32}
+  %Bits.shr_p(31n, e, h) : {U32{Word.shr(32n, Bits.pow(32n, 1n+e))} == U32{_} : U32}
+  {==}
+
+# LAW (pow_mask): an index x below 2^e is its own masked index: ASet.J, the mask Array.get and Array.set apply
+# with a size of 2^e, leaves it alone
+law pow_mask:
+  for +x: Word(32n)
+  for +e: Nat
+  for h: {Bits.below(32n, x, e) == True{} : Bool}
+  {ASet.J(U32{x}, U32.shln(1, e)) == U32{x} : U32}
+
+def pow_mask(x, e, h):
+  %Equal.sym(U32, U32.shln(1, e), U32{Bits.pow(32n, e)}, Bits.shln_one(e)) : {ASet.J(U32{x}, _) == U32{x} : U32}
+  %Equal.sym(Word(32n), Word.adc(32n, Bits.pow(32n, e), Bits.pow(32n, 0n), True{}, True{}), Bits.mask(32n, e), Bits.dec(32n, e)) : {U32{Word.and(32n, x, _)} == U32{x} : U32}
+  %Bits.and_mask(32n, x, e, h) : {U32{Word.and(32n, x, Bits.mask(32n, e))} == U32{_} : U32}
+  {==}
+
+# LAW (pow_lt): for x below 2^(e+1), x < 2^e exactly when bit e of x is zero: the branch a walk down the tree
+# takes at a node of size 2^(e+1)
+law pow_lt:
+  for +x: Word(32n)
+  for +e: Nat
+  for hb: {Nat.is_lt(e, 32n) == True{} : Bool}
+  for h: {Bits.below(32n, x, 1n+e) == True{} : Bool}
+  {U32.is_lt(U32{x}, U32.shln(1, e)) == Bool.not(Bits.at(32n, x, e)) : Bool}
+
+def pow_lt(x, e, hb, h):
+  %Equal.sym(U32, U32.shln(1, e), U32{Bits.pow(32n, e)}, Bits.shln_one(e)) : {U32.is_lt(U32{x}, _) == Bool.not(Bits.at(32n, x, e)) : Bool}
+  Bits.lt_p(32n, x, e, hb, h)
+
+# LAW (pow_sub): taking 2^e from an x whose bit e is set clears that bit: the index a walk down the tree
+# carries into the right half
+law pow_sub:
+  for +x: Word(32n)
+  for +e: Nat
+  for h: {Bits.at(32n, x, e) == True{} : Bool}
+  {U32.sub(U32{x}, U32.shln(1, e)) == U32{Bits.clear(32n, x, e)} : U32}
+
+def pow_sub(x, e, h):
+  %Equal.sym(U32, U32.shln(1, e), U32{Bits.pow(32n, e)}, Bits.shln_one(e)) : {U32.sub(U32{x}, _) == U32{Bits.clear(32n, x, e)} : U32}
+  %Bits.sub_p(32n, x, e, h) : {U32{Word.adc(32n, x, Bits.pow(32n, e), True{}, True{})} == U32{_} : U32}
+  {==}
+
+# ---------------------------------------------------------------------
+# a perfect tree: its size, and where two descents part
+# ---------------------------------------------------------------------
+
+# Array.size of Array.new(T, e, v) is 2^e
+def Bits.size_new(-T: Data, +e: Nat, +v: T) -> {ASet.sz(T, Array.new(T, e, v)) == U32.shln(1, e) : U32}:
+  match e:
+    case 0n:
+      {==}
+    case 1n+p:
+      %ASet.size_pair(T, Array.new(T, p, v)) : {Pair.snd(Array<T>, U32, Array.size.node(T, Array.new(T, p, v), _)) == U32.shln(1, 1n+p) : U32}
+      %Bits.size_new(T, p, v) : {U32.shl(ASet.sz(T, Array.new(T, p, v))) == U32.shl(_) : U32}
+      {==}
+
+def Bits.size_p(-T: Data, +e: Nat, +v: T) -> {ASet.sz(T, Array.new(T, e, v)) == U32{Bits.pow(32n, e)} : U32}:
+  Equal.trans(U32, ASet.sz(T, Array.new(T, e, v)), U32.shln(1, e), U32{Bits.pow(32n, e)}, Bits.size_new(T, e, v), Bits.shln_one(e))
+
+# the two descents over Array.new(T, e, v), from its size 2^e, for x and y below 2^e
+def Bits.Apart(-T: Data, +e: Nat, +v: T, +x: Word(32n), +y: Word(32n)) -> Type:
+  ASet.Apart(T, Array.new(T, e, v), U32{Bits.pow(32n, e)}, U32{x}, U32.is_lt(U32{x}, U32.shr(U32{Bits.pow(32n, e)})), U32{y}, U32.is_lt(U32{y}, U32.shr(U32{Bits.pow(32n, e)})))
+
+def Bits.IH(-T: Data, +p: Nat, +v: T) -> Type:
+  @x:Word(32n) -> @y:Word(32n) -> {Bits.below(32n, x, p) == True{} : Bool} -> {Bits.below(32n, y, p) == True{} : Bool} -> {Bits.differ(32n, x, y, p) == True{} : Bool} -> Bits.Apart(T, p, v, x, y)
+
+# one node of the tree: bit p of x and of y pick the branches; when they agree the descents go on
+# into one half, with x and y cleared of bit p on the right, and the induction hypothesis ih finishes
+def Bits.step(-T: Data, +p: Nat, +v: T, +x: Word(32n), +y: Word(32n), bx: Bool, +ex: {Bits.at(32n, x, p) == bx : Bool}, by: Bool, +ey: {Bits.at(32n, y, p) == by : Bool}, +he: {Nat.is_lt(1n+p, 32n) == True{} : Bool}, +hx: {Bits.below(32n, x, 1n+p) == True{} : Bool}, +hy: {Bits.below(32n, y, 1n+p) == True{} : Bool}, +hd: {Bits.differ(32n, x, y, 1n+p) == True{} : Bool}, ih: Bits.IH(T, p, v)) -> ASet.Apart(T, Array.new(T, 1n+p, v), U32{Bits.pow(32n, 1n+p)}, U32{x}, Bool.not(bx), U32{y}, Bool.not(by)):
+  match bx by:
+    case False{} False{}:
+      %Equal.sym(Word(32n), Word.shr(32n, Bits.pow(32n, 1n+p)), Bits.pow(32n, p), Bits.shr_p(31n, p, he)) : ASet.Apart(T, Array.new(T, p, v), U32{_}, U32{x}, U32.is_lt(U32{x}, U32.shr(U32{_})), U32{y}, U32.is_lt(U32{y}, U32.shr(U32{_})))
+      ih(x, y, Bits.hz_down(32n, x, p, hx, ex), Bits.hz_down(32n, y, p, hy, ey), Bits.dif_down(32n, x, y, p, hd, Equal.trans(Bool, Bits.at(32n, x, p), False{}, Bits.at(32n, y, p), ex, Equal.sym(Bool, Bits.at(32n, y, p), False{}, ey))))
+    case True{} True{}:
+      %Equal.sym(Word(32n), Word.shr(32n, Bits.pow(32n, 1n+p)), Bits.pow(32n, p), Bits.shr_p(31n, p, he)) : ASet.Apart(T, Array.new(T, p, v), U32{_}, U32.sub(U32{x}, U32{_}), U32.is_lt(U32.sub(U32{x}, U32{_}), U32.shr(U32{_})), U32.sub(U32{y}, U32{_}), U32.is_lt(U32.sub(U32{y}, U32{_}), U32.shr(U32{_})))
+      %Equal.sym(Word(32n), Word.adc(32n, x, Bits.pow(32n, p), True{}, True{}), Bits.clear(32n, x, p), Bits.sub_p(32n, x, p, ex)) : ASet.Apart(T, Array.new(T, p, v), U32{Bits.pow(32n, p)}, U32{_}, U32.is_lt(U32{_}, U32.shr(U32{Bits.pow(32n, p)})), U32.sub(U32{y}, U32{Bits.pow(32n, p)}), U32.is_lt(U32.sub(U32{y}, U32{Bits.pow(32n, p)}), U32.shr(U32{Bits.pow(32n, p)})))
+      %Equal.sym(Word(32n), Word.adc(32n, y, Bits.pow(32n, p), True{}, True{}), Bits.clear(32n, y, p), Bits.sub_p(32n, y, p, ey)) : ASet.Apart(T, Array.new(T, p, v), U32{Bits.pow(32n, p)}, U32{Bits.clear(32n, x, p)}, U32.is_lt(U32{Bits.clear(32n, x, p)}, U32.shr(U32{Bits.pow(32n, p)})), U32{_}, U32.is_lt(U32{_}, U32.shr(U32{Bits.pow(32n, p)})))
+      ih(Bits.clear(32n, x, p), Bits.clear(32n, y, p), Bits.hz_clr(32n, x, p, hx), Bits.hz_clr(32n, y, p, hy), Equal.trans(Bool, Bits.differ(32n, Bits.clear(32n, x, p), Bits.clear(32n, y, p), p), Bits.differ(32n, x, y, p), True{}, Bits.dif_clr(32n, x, y, p), Bits.dif_down(32n, x, y, p, hd, Equal.trans(Bool, Bits.at(32n, x, p), True{}, Bits.at(32n, y, p), ex, Equal.sym(Bool, Bits.at(32n, y, p), True{}, ey)))))
+    case False{} True{}:
+      Unit{}
+    case True{} False{}:
+      Unit{}
+
+# LAW: on Array.new's tree of depth e < 32, the descents for two different x and y below 2^e part
+def Bits.apart_new(-T: Data, +e: Nat, +v: T, +he: {Nat.is_lt(e, 32n) == True{} : Bool}, +x: Word(32n), +y: Word(32n), +hx: {Bits.below(32n, x, e) == True{} : Bool}, +hy: {Bits.below(32n, y, e) == True{} : Bool}, +hd: {Bits.differ(32n, x, y, e) == True{} : Bool}) -> Bits.Apart(T, e, v, x, y):
+  match e:
+    case 0n:
+      Bits.ft(Bits.Apart(T, 0n, v, x, y), Equal.trans(Bool, False{}, Bits.differ(32n, x, y, 0n), True{}, Equal.sym(Bool, Bits.differ(32n, x, y, 0n), False{}, Bits.dif_zero(32n, x, y)), hd))
+    case 1n+p:
+      %Equal.sym(Word(32n), Word.shr(32n, Bits.pow(32n, 1n+p)), Bits.pow(32n, p), Bits.shr_p(31n, p, he)) : ASet.Apart(T, Array.new(T, 1n+p, v), U32{Bits.pow(32n, 1n+p)}, U32{x}, U32.is_lt(U32{x}, U32{_}), U32{y}, U32.is_lt(U32{y}, U32{_}))
+      %Equal.sym(Bool, Cmp.is_lt(Word.cmp(32n, x, Bits.pow(32n, p))), Bool.not(Bits.at(32n, x, p)), Bits.lt_p(32n, x, p, Bits.lt_pred(p, 32n, he), hx)) : ASet.Apart(T, Array.new(T, 1n+p, v), U32{Bits.pow(32n, 1n+p)}, U32{x}, _, U32{y}, U32.is_lt(U32{y}, U32{Bits.pow(32n, p)}))
+      %Equal.sym(Bool, Cmp.is_lt(Word.cmp(32n, y, Bits.pow(32n, p))), Bool.not(Bits.at(32n, y, p)), Bits.lt_p(32n, y, p, Bits.lt_pred(p, 32n, he), hy)) : ASet.Apart(T, Array.new(T, 1n+p, v), U32{Bits.pow(32n, 1n+p)}, U32{x}, Bool.not(Bits.at(32n, x, p)), U32{y}, _)
+      Bits.step(T, p, v, x, y, Bits.at(32n, x, p), {==}, Bits.at(32n, y, p), {==}, he, hx, hy, hd, x2 => y2 => a => b => c => Bits.apart_new(T, p, v, Bits.lt_pred(p, 32n, he), x2, y2, a, b, c))
+
+# LAW (new_apart): on the tree Array.new builds, of depth e < 32, a write at x and a read at y part before a
+# leaf whenever x and y are below 2^e and differ: get_other_set's hypothesis, for Array.new's tree
+law new_apart:
+  for -T: Data
+  for +e: Nat
+  for +v: T
+  for +he: {Nat.is_lt(e, 32n) == True{} : Bool}
+  for +x: Word(32n)
+  for +y: Word(32n)
+  for +hx: {Bits.below(32n, x, e) == True{} : Bool}
+  for +hy: {Bits.below(32n, y, e) == True{} : Bool}
+  for +hd: {Bits.differ(32n, x, y, e) == True{} : Bool}
+  ASet.Apart(T, Array.new(T, e, v), ASet.sz(T, Array.new(T, e, v)), ASet.J(U32{x}, ASet.sz(T, Array.new(T, e, v))), ASet.Z(U32{x}, ASet.sz(T, Array.new(T, e, v))), ASet.J(U32{y}, ASet.sz(T, Array.new(T, e, v))), ASet.Z(U32{y}, ASet.sz(T, Array.new(T, e, v))))
+
+def new_apart(T, e, v, he, x, y, hx, hy, hd):
+  %Equal.sym(U32, ASet.sz(T, Array.new(T, e, v)), U32{Bits.pow(32n, e)}, Bits.size_p(T, e, v)) : ASet.Apart(T, Array.new(T, e, v), _, ASet.J(U32{x}, _), ASet.Z(U32{x}, _), ASet.J(U32{y}, _), ASet.Z(U32{y}, _))
+  %Equal.sym(Word(32n), Word.adc(32n, Bits.pow(32n, e), Bits.pow(32n, 0n), True{}, True{}), Bits.mask(32n, e), Bits.dec(32n, e)) : ASet.Apart(T, Array.new(T, e, v), U32{Bits.pow(32n, e)}, U32{Word.and(32n, x, _)}, U32.is_lt(U32{Word.and(32n, x, _)}, U32.shr(U32{Bits.pow(32n, e)})), U32{Word.and(32n, y, _)}, U32.is_lt(U32{Word.and(32n, y, _)}, U32.shr(U32{Bits.pow(32n, e)})))
+  %Equal.sym(Word(32n), Word.and(32n, x, Bits.mask(32n, e)), x, Bits.and_mask(32n, x, e, hx)) : ASet.Apart(T, Array.new(T, e, v), U32{Bits.pow(32n, e)}, U32{_}, U32.is_lt(U32{_}, U32.shr(U32{Bits.pow(32n, e)})), U32{Word.and(32n, y, Bits.mask(32n, e))}, U32.is_lt(U32{Word.and(32n, y, Bits.mask(32n, e))}, U32.shr(U32{Bits.pow(32n, e)})))
+  %Equal.sym(Word(32n), Word.and(32n, y, Bits.mask(32n, e)), y, Bits.and_mask(32n, y, e, hy)) : ASet.Apart(T, Array.new(T, e, v), U32{Bits.pow(32n, e)}, U32{x}, U32.is_lt(U32{x}, U32.shr(U32{Bits.pow(32n, e)})), U32{_}, U32.is_lt(U32{_}, U32.shr(U32{Bits.pow(32n, e)})))
+  Bits.apart_new(T, e, v, he, x, y, hx, hy, hd)
+
+# ---------------------------------------------------------------------
+# a write keeps the tree's shape: where two walks part does not change
+# ---------------------------------------------------------------------
+#
+# ASet.Apart looks only at the tree's nodes, never at the values in its leaves, and Array.set replaces one leaf.
+# So two walks that part on an array part on it after any write too (apart_set): with new_apart, the hypothesis of
+# get_other_set holds for every write after the first into an Array.new, which is what filling a matrix does.
+# The proof is one pass over the tree, like ASet.facts, for the affine reason given above get_other_set: it
+# returns ASet.Facts together with the implication (Shape.Keep), and at a node it uses the pair equation c2 to
+# see that the written array is the node with one half written.
+
+# what a pass over a proves for a write along (n, j0, z0): the six facts of ASet.Facts, and that every walk
+# that parts from another on a parts on the written array too (a write changes a leaf, not the tree's shape)
+def Shape.Keep(-T: Data, -a: Array<T>, -n: U32, -j0: U32, -v: T, -z0: Bool) -> Type:
+  ASet.Facts(T, a, n, j0, v, z0) & (@m:U32 -> @j:U32 -> @z:Bool -> @k:U32 -> @w:Bool -> ASet.Apart(T, a, m, j, z, k, w) -> ASet.Apart(T, ASet.NA(T, a, n, j0, v, z0), m, j, z, k, w)) & Unit
+
+# a leaf: no walk parts on it, before or after
+def Shape.leaf(-T: Data, -x: T, -n: U32, -j0: U32, -v: T, -z0: Bool, -m: U32, -j: U32, -z: Bool, -k: U32, -w: Bool, h: ASet.Apart(T, ALeaf{x}, m, j, z, k, w)) -> ASet.Apart(T, ASet.NA(T, ALeaf{x}, n, j0, v, z0), m, j, z, k, w):
+  h
+
+# a node the write enters on the left: the written array is ANode{the written left half, ys} (c2 opens the pair
+# the left half's write returns), so a walk into the left half goes on with kx and a walk into ys is unchanged
+def Shape.imp_t(-T: Data, -xs: Array<T>, -ys: Array<T>, +n: U32, +j0: U32, +v: T, +c2: {(ASet.NA(T, xs, U32.shr(n), j0, v, U32.is_lt(j0, U32.shr(U32.shr(n)))), Pair.snd(Array<T>, T, ASet.G(T, xs, U32.shr(n), j0, v, U32.is_lt(j0, U32.shr(U32.shr(n)))))) == ASet.G(T, xs, U32.shr(n), j0, v, U32.is_lt(j0, U32.shr(U32.shr(n)))) : Array<T> & T}, kx: @m:U32 -> @j:U32 -> @z:Bool -> @k:U32 -> @w:Bool -> ASet.Apart(T, xs, m, j, z, k, w) -> ASet.Apart(T, ASet.NA(T, xs, U32.shr(n), j0, v, U32.is_lt(j0, U32.shr(U32.shr(n)))), m, j, z, k, w), +m: U32, +j: U32, z: Bool, +k: U32, w: Bool, h: ASet.Apart(T, ANode{xs, ys}, m, j, z, k, w)) -> ASet.Apart(T, ASet.NA(T, ANode{xs, ys}, n, j0, v, True{}), m, j, z, k, w):
+  match z w:
+    case True{} True{}:
+      %c2 : ASet.Apart(T, Array.set.fin(T, Array.swap.lo(T, ys, _)), m, j, True{}, k, True{})
+      kx(U32.shr(m), j, U32.is_lt(j, U32.shr(U32.shr(m))), k, U32.is_lt(k, U32.shr(U32.shr(m))), h)
+    case False{} False{}:
+      %c2 : ASet.Apart(T, Array.set.fin(T, Array.swap.lo(T, ys, _)), m, j, False{}, k, False{})
+      h
+    case True{} False{}:
+      %c2 : ASet.Apart(T, Array.set.fin(T, Array.swap.lo(T, ys, _)), m, j, True{}, k, False{})
+      Unit{}
+    case False{} True{}:
+      %c2 : ASet.Apart(T, Array.set.fin(T, Array.swap.lo(T, ys, _)), m, j, False{}, k, True{})
+      Unit{}
+
+# the same, for a write that enters on the right
+def Shape.imp_f(-T: Data, -xs: Array<T>, -ys: Array<T>, +n: U32, +j0: U32, +v: T, +c2: {(ASet.NA(T, ys, U32.shr(n), U32.sub(j0, U32.shr(n)), v, U32.is_lt(U32.sub(j0, U32.shr(n)), U32.shr(U32.shr(n)))), Pair.snd(Array<T>, T, ASet.G(T, ys, U32.shr(n), U32.sub(j0, U32.shr(n)), v, U32.is_lt(U32.sub(j0, U32.shr(n)), U32.shr(U32.shr(n)))))) == ASet.G(T, ys, U32.shr(n), U32.sub(j0, U32.shr(n)), v, U32.is_lt(U32.sub(j0, U32.shr(n)), U32.shr(U32.shr(n)))) : Array<T> & T}, ky: @m:U32 -> @j:U32 -> @z:Bool -> @k:U32 -> @w:Bool -> ASet.Apart(T, ys, m, j, z, k, w) -> ASet.Apart(T, ASet.NA(T, ys, U32.shr(n), U32.sub(j0, U32.shr(n)), v, U32.is_lt(U32.sub(j0, U32.shr(n)), U32.shr(U32.shr(n)))), m, j, z, k, w), +m: U32, +j: U32, z: Bool, +k: U32, w: Bool, h: ASet.Apart(T, ANode{xs, ys}, m, j, z, k, w)) -> ASet.Apart(T, ASet.NA(T, ANode{xs, ys}, n, j0, v, False{}), m, j, z, k, w):
+  match z w:
+    case True{} True{}:
+      %c2 : ASet.Apart(T, Array.set.fin(T, Array.swap.hi(T, xs, _)), m, j, True{}, k, True{})
+      h
+    case False{} False{}:
+      %c2 : ASet.Apart(T, Array.set.fin(T, Array.swap.hi(T, xs, _)), m, j, False{}, k, False{})
+      ky(U32.shr(m), U32.sub(j, U32.shr(m)), U32.is_lt(U32.sub(j, U32.shr(m)), U32.shr(U32.shr(m))), U32.sub(k, U32.shr(m)), U32.is_lt(U32.sub(k, U32.shr(m)), U32.shr(U32.shr(m))), h)
+    case True{} False{}:
+      %c2 : ASet.Apart(T, Array.set.fin(T, Array.swap.hi(T, xs, _)), m, j, True{}, k, False{})
+      Unit{}
+    case False{} True{}:
+      %c2 : ASet.Apart(T, Array.set.fin(T, Array.swap.hi(T, xs, _)), m, j, False{}, k, True{})
+      Unit{}
+
+def Shape.node_t(-T: Data, -xs: Array<T>, -ys: Array<T>, +n: U32, +j0: U32, +v: T, r: Shape.Keep(T, xs, U32.shr(n), j0, v, U32.is_lt(j0, U32.shr(U32.shr(n))))) -> Shape.Keep(T, ANode{xs, ys}, n, j0, v, True{}):
+  match r:
+    case Tuple{f, r1}:
+      match f:
+        case Tuple{+c1, f1}:
+          match f1:
+            case Tuple{+c2, f2}:
+              match f2:
+                case Tuple{+c3, f3}:
+                  match f3:
+                    case Tuple{+c4, f4}:
+                      match f4:
+                        case Tuple{+c5, f5}:
+                          match f5:
+                            case Tuple{+c6, u}:
+                              match r1:
+                                case Tuple{kx, u2}:
+                                  (ASet.node_t(T, xs, ys, n, j0, v, (c1, c2, c3, c4, c5, c6, Unit{})), (m => j => z => k => w => h => Shape.imp_t(T, xs, ys, n, j0, v, c2, kx, m, j, z, k, w, h)), Unit{})
+
+def Shape.node_f(-T: Data, -xs: Array<T>, -ys: Array<T>, +n: U32, +j0: U32, +v: T, +s: {(xs, ASet.sz(T, xs)) == Array.size(T, xs) : Array<T> & U32}, r: Shape.Keep(T, ys, U32.shr(n), U32.sub(j0, U32.shr(n)), v, U32.is_lt(U32.sub(j0, U32.shr(n)), U32.shr(U32.shr(n))))) -> Shape.Keep(T, ANode{xs, ys}, n, j0, v, False{}):
+  match r:
+    case Tuple{f, r1}:
+      match f:
+        case Tuple{+c1, f1}:
+          match f1:
+            case Tuple{+c2, f2}:
+              match f2:
+                case Tuple{+c3, f3}:
+                  match f3:
+                    case Tuple{+c4, f4}:
+                      match f4:
+                        case Tuple{+c5, f5}:
+                          match f5:
+                            case Tuple{+c6, u}:
+                              match r1:
+                                case Tuple{ky, u2}:
+                                  (ASet.node_f(T, xs, ys, n, j0, v, s, (c1, c2, c3, c4, c5, c6, Unit{})), (m => j => z => k => w => h => Shape.imp_f(T, xs, ys, n, j0, v, c2, ky, m, j, z, k, w, h)), Unit{})
+
+def Shape.keep(-T: Data, a: Array<T>, +n: U32, +j0: U32, +v: T, +z0: Bool) -> Shape.Keep(T, a, n, j0, v, z0):
+  match a z0:
+    case ALeaf{x} _:
+      (ASet.facts(T, ALeaf{x}, n, j0, v, z0), (m => j => z => k => w => h => Shape.leaf(T, x, n, j0, v, z0, m, j, z, k, w, h)), Unit{})
+    case ANode{xs, ys} True{}:
+      Shape.node_t(T, xs, ys, n, j0, v, Shape.keep(T, xs, U32.shr(n), j0, v, U32.is_lt(j0, U32.shr(U32.shr(n)))))
+    case ANode{xs, ys} False{}:
+      Shape.node_f(T, xs, ys, n, j0, v, ASet.size_pair(T, xs), Shape.keep(T, ys, U32.shr(n), U32.sub(j0, U32.shr(n)), v, U32.is_lt(U32.sub(j0, U32.shr(n)), U32.shr(U32.shr(n)))))
+
+def Shape.close(-T: Data, -b: Array<T>, +n: U32, +i: U32, +v: T, +q: {n == ASet.sz(T, b) : U32}, r: Shape.Keep(T, b, n, ASet.J(i, n), v, ASet.Z(i, n)), +m: U32, +j: U32, +z: Bool, +k: U32, +w: Bool) -> ASet.Apart(T, b, m, j, z, k, w) -> ASet.Apart(T, Array.set(T, b, i, v), m, j, z, k, w):
+  match r:
+    case Tuple{f, r1}:
+      match f:
+        case Tuple{+c1, f1}:
+          match r1:
+            case Tuple{kb, u}:
+              %c1 : (ASet.Apart(T, b, m, j, z, k, w) -> ASet.Apart(T, Array.set.fin(T, Array.swap.at(T, i, v, _)), m, j, z, k, w))
+              %q : (ASet.Apart(T, b, m, j, z, k, w) -> ASet.Apart(T, Array.set.fin(T, Array.swap.go(T, b, _, ASet.J(i, _), v, ASet.Z(i, _))), m, j, z, k, w))
+              h => kb(m, j, z, k, w, h)
+
+def Shape.top(-T: Data, -a: Array<T>, +i: U32, +v: T, r: ASet.Copy(T, a), +m: U32, +j: U32, +z: Bool, +k: U32, +w: Bool) -> ASet.Apart(T, a, m, j, z, k, w) -> ASet.Apart(T, Array.set(T, a, i, v), m, j, z, k, w):
+  match r:
+    case Tuple{b, r1}:
+      match r1:
+        case Tuple{+n, r2}:
+          match r2:
+            case Tuple{+p, r3}:
+              match r3:
+                case Tuple{+q, r4}:
+                  %p : (ASet.Apart(T, _, m, j, z, k, w) -> ASet.Apart(T, Array.set(T, _, i, v), m, j, z, k, w))
+                  Shape.close(T, b, n, i, v, q, Shape.keep(T, b, n, ASet.J(i, n), v, ASet.Z(i, n)), m, j, z, k, w)
+
+# LAW (apart_set): a write keeps the tree's shape, so two walks that part on a part on the written array too
+# (any tree, any index and value: Array.set replaces one leaf and leaves every node where it was)
+law apart_set:
+  for -T: Data
+  for a: Array<T>
+  for +i: U32
+  for +v: T
+  for +m: U32
+  for +j: U32
+  for +z: Bool
+  for +k: U32
+  for +w: Bool
+  for h: ASet.Apart(T, a, m, j, z, k, w)
+  ASet.Apart(T, Array.set(T, a, i, v), m, j, z, k, w)
+
+def apart_set(T, a, i, v, m, j, z, k, w, h):
+  Shape.top(T, a, i, v, ASet.copy(T, a), m, j, z, k, w)(h)
