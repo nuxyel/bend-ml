@@ -6,15 +6,15 @@ of copying them, `par1`..`par4`, which run any kernel of yours over blocks of a 
 `softmax_ce`, tensor-array's cross-entropy with its rows in blocks (since 0.1.6.0).
 It is faster wherever the work splits into blocks; it is **not proved**, and says so.
 
-- Bend: **2.0.40** · License: MIT · Depends on `bend-ml-tensor-array@0.1.20.0`.
+- Bend: **2.0.40** · License: MIT · Depends on `bend-ml-tensor-array@0.1.21.0`.
 - `bend tensor-fork/main.bend` → `SOME PROOFS FAIL`, naming the 42 defs that rely on `@unsafe` code (below). All of it is
   Bend: no foreign code.
 - Tests: `tests/bits.bend`, `tests/precise.bend` and `tests/ce.bend`, against tensor-array, bit for bit (below).
 
 ```python
 import Base
-import bend-ml-tensor-array@0.1.20.0/main.bend as TA
-import bend-ml-tensor-fork@0.1.7.1/main.bend as TF
+import bend-ml-tensor-array@0.1.21.0/main.bend as TA
+import bend-ml-tensor-fork@0.1.7.2/main.bend as TF
 
 def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 128n>:
   TF.matmul(100n, 784n, 128n, 3n, a, w)   # instead of TA.Mat.matmul(100n, 784n, 128n, 3n, a, w)
@@ -175,3 +175,5 @@ first rows, so they run after the blocks, in order, as in tensor-array.
   2.0.40; 8.7% fewer instructions on a gemm at par 0 and 3.0% at par 3, the same bits (`tests/bits.bend`).
 - `0.1.7.1` (2026-11-06): 0.1.7.0's code on tensor-array 0.1.20.0, with its bits, so that it takes the same `Mat` as
   tensor-gpu 0.1.5.2 and tensor-array 0.1.20.0.
+- `0.1.7.2` (2026-11-11): 0.1.7.1's code on tensor-array 0.1.21.0, with its bits, so that it takes the same `Mat` as
+  tensor-gpu 0.1.5.3 and tensor-array 0.1.21.0.
