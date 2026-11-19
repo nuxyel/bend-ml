@@ -3176,3 +3176,95 @@ law apart_set:
 
 def apart_set(T, a, i, v, m, j, z, k, w, h):
   Shape.top(T, a, i, v, ASet.copy(T, a), m, j, z, k, w)(h)
+
+# ASet.GetG(T, a, n, i, z): one read's walk, with the two facts a parent
+# needs. The equation is about the pair Array.get.go returns, not the array
+# alone: a parent's Array.swap.lo takes that pair apart, so the equation is
+# what lets the parent's projections reduce (the same shape ASet.Facts uses
+# for the same reason).
+def ASet.GetG(-T: Data, -a: Array<T>, -n: U32, -i: U32, -z: Bool) -> Type:
+  &b: Array<T> ->
+  &v: T ->
+  {(b, v) == Array.get.go(T, a, n, i, z) : Array<T> & T} &
+  {b == a : Array<T>} &
+  Unit
+
+def ASet.getg_leaf(-T: Data, +x: T, +n: U32, +i: U32, +z: Bool) -> ASet.GetG(T, ALeaf{x}, n, i, z):
+  (ALeaf{x}, x, {==}, {==}, Unit{})
+
+# the true branch: the parent is ANode{b, ys}; xs is in the types only
+def ASet.getg_node_t(-T: Data, -xs: Array<T>, ys: Array<T>, +n: U32, +i: U32,
+    r: ASet.GetG(T, xs, U32.shr(n), i, U32.is_lt(i, U32.shr(U32.shr(n))))) -> ASet.GetG(T, ANode{xs, ys}, n, i, True{}):
+  match r:
+    case Tuple{b, r1}:
+      match r1:
+        case Tuple{+v, r2}:
+          match r2:
+            case Tuple{+e, r3}:
+              match r3:
+                case Tuple{+p, u}:
+                  (ANode{b, ys}, v,
+                    {(%e : {(ANode{b, ys}, v) == Array.swap.lo(T, ys, _) : Array<T> & T}; {==}) : {(ANode{b, ys}, v) == Array.swap.lo(T, ys, Array.get.go(T, xs, U32.shr(n), i, U32.is_lt(i, U32.shr(U32.shr(n))))) : Array<T> & T}},
+                    {(%p : {ANode{b, ys} == ANode{_, ys} : Array<T>}; {==}) : {ANode{b, ys} == ANode{xs, ys} : Array<T>}},
+                    Unit{})
+
+# the false branch: the parent is ANode{xs, b}; xs is a value here
+def ASet.getg_node_f(-T: Data, xs: Array<T>, -ys: Array<T>, +n: U32, +i: U32,
+    r: ASet.GetG(T, ys, U32.shr(n), U32.sub(i, U32.shr(n)), U32.is_lt(U32.sub(i, U32.shr(n)), U32.shr(U32.shr(n))))) -> ASet.GetG(T, ANode{xs, ys}, n, i, False{}):
+  match r:
+    case Tuple{b, r1}:
+      match r1:
+        case Tuple{+v, r2}:
+          match r2:
+            case Tuple{+e, r3}:
+              match r3:
+                case Tuple{+p, u}:
+                  (ANode{xs, b}, v,
+                    {(%e : {(ANode{xs, b}, v) == Array.swap.hi(T, xs, _) : Array<T> & T}; {==}) : {(ANode{xs, b}, v) == Array.swap.hi(T, xs, Array.get.go(T, ys, U32.shr(n), U32.sub(i, U32.shr(n)), U32.is_lt(U32.sub(i, U32.shr(n)), U32.shr(U32.shr(n))))) : Array<T> & T}},
+                    {(%p : {ANode{xs, b} == ANode{xs, _} : Array<T>}; {==}) : {ANode{xs, b} == ANode{xs, ys} : Array<T>}},
+                    Unit{})
+
+def ASet.getg(-T: Data, a: Array<T>, +n: U32, +i: U32, +z: Bool) -> ASet.GetG(T, a, n, i, z):
+  match a z:
+    case ALeaf{+x} _:
+      ASet.getg_leaf(T, x, n, i, z)
+    case ANode{xs, ys} True{}:
+      ASet.getg_node_t(T, xs, ys, n, i,
+        ASet.getg(T, xs, U32.shr(n), i, U32.is_lt(i, U32.shr(U32.shr(n)))))
+    case ANode{xs, ys} False{}:
+      ASet.getg_node_f(T, xs, ys, n, i,
+        ASet.getg(T, ys, U32.shr(n), U32.sub(i, U32.shr(n)),
+          U32.is_lt(U32.sub(i, U32.shr(n)), U32.shr(U32.shr(n)))))
+
+def ASet.getg_fst(-T: Data, -a: Array<T>, +n: U32, +i: U32, +z: Bool,
+    r: ASet.GetG(T, a, n, i, z)) -> {Pair.fst(Array<T>, T, Array.get.go(T, a, n, i, z)) == a : Array<T>}:
+  match r:
+    case Tuple{b, r1}:
+      match r1:
+        case Tuple{+v, r2}:
+          match r2:
+            case Tuple{+e, r3}:
+              match r3:
+                case Tuple{+p, u}:
+                  Equal.trans(Array<T>,
+                    Pair.fst(Array<T>, T, Array.get.go(T, a, n, i, z)), b, a,
+                    Equal.sym(Array<T>, b,
+                      Pair.fst(Array<T>, T, Array.get.go(T, a, n, i, z)),
+                      Equal.cong(Array<T> & T, Array<T>,
+                        k => Pair.fst(Array<T>, T, k), (b, v),
+                        Array.get.go(T, a, n, i, z), e)),
+                    p)
+
+# LAW (get_go_returns_array): the walk a read uses hands back the array it
+# walked. Array.get itself wraps this walk in Array.size and the mask; that
+# statement goes through ASet.Copy's size equation and is the next piece.
+law get_go_returns_array:
+  for -T: Data
+  for a: Array<T>
+  for +n: U32
+  for +i: U32
+  for +z: Bool
+  {Pair.fst(Array<T>, T, Array.get.go(T, a, n, i, z)) == a : Array<T>}
+
+def get_go_returns_array(T, a, n, i, z):
+  ASet.getg_fst(T, a, n, i, z, ASet.getg(T, a, n, i, z))
