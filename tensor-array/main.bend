@@ -3268,3 +3268,60 @@ law get_go_returns_array:
 
 def get_go_returns_array(T, a, n, i, z):
   ASet.getg_fst(T, a, n, i, z, ASet.getg(T, a, n, i, z))
+
+# One read through Array.size hands back the array in the size pair. This is
+# Array.get.at's walk plus get_go_returns_array; the mask and the index are
+# computed exactly as the Base definition computes them.
+def ArrayAt.fst(-T: Data, +i: U32, an: Array<T> & U32) -> {Pair.fst(Array<T>, T, Array.get.at(T, i, an)) == Pair.fst(Array<T>, U32, an) : Array<T>}:
+  match an:
+    case Tuple{a, +n}:
+      +j = U32.and(i, U32.sub(n, 1))
+      +z = U32.is_lt(j, U32.shr(n))
+      ASet.getg_fst(T, a, n, j, z, ASet.getg(T, a, n, j, z))
+
+# Lift that statement through ASet.Copy: its b == a and size equation let the
+# array in Array.size(a) be identified with a without reusing a as a value.
+def ASet.get_fst(-T: Data, -a: Array<T>, +i: U32, r: ASet.Copy(T, a)) -> {Pair.fst(Array<T>, T, Array.get(T, a, i)) == a : Array<T>}:
+  match r:
+    case Tuple{b, r1}:
+      match r1:
+        case Tuple{+n, r2}:
+          match r2:
+            case Tuple{+p, r3}:
+              match r3:
+                case Tuple{+q, r4}:
+                  match r4:
+                    case Tuple{+s, u}:
+                      +e1 = Equal.cong(Array<T> & U32, Array<T>,
+                        k => Pair.fst(Array<T>, U32, k),
+                        (b, ASet.sz(T, b)), Array.size(T, b), s)
+                      +e2 = Equal.sym(Array<T>, b,
+                        Pair.fst(Array<T>, U32, Array.size(T, b)), e1)
+                      +pb = Equal.trans(Array<T>,
+                        Pair.fst(Array<T>, T, Array.get(T, b, i)),
+                        Pair.fst(Array<T>, U32, Array.size(T, b)), b,
+                        ArrayAt.fst(T, i, Array.size(T, b)), e2)
+                      +e3 = Equal.cong(Array<T>, Array<T>,
+                        k => Pair.fst(Array<T>, T, Array.get(T, k, i)),
+                        b, a, p)
+                      +e4 = Equal.sym(Array<T>,
+                        Pair.fst(Array<T>, T, Array.get(T, b, i)),
+                        Pair.fst(Array<T>, T, Array.get(T, a, i)), e3)
+                      +pa = Equal.trans(Array<T>,
+                        Pair.fst(Array<T>, T, Array.get(T, b, i)), b, a,
+                        pb, p)
+                      Equal.trans(Array<T>,
+                        Pair.fst(Array<T>, T, Array.get(T, a, i)),
+                        Pair.fst(Array<T>, T, Array.get(T, b, i)), a,
+                        e4, pa)
+
+# LAW (get_returns_array): Array.get hands back the array it read. It follows
+# get.go's law through ASet.Copy's b == a and its size equation.
+law get_returns_array:
+  for -T: Data
+  for a: Array<T>
+  for +i: U32
+  {Pair.fst(Array<T>, T, Array.get(T, a, i)) == a : Array<T>}
+
+def get_returns_array(T, a, i):
+  ASet.get_fst(T, a, i, ASet.copy(T, a))
