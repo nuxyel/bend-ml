@@ -2178,3 +2178,15 @@ output equal to C's).
 - The demos, the tests, the README and the package diagram move to 0.1.21.0 and 41 laws (`list_laws.py --check-readme`
   ok). `make check-full` 127/127 (GPU included); `reference/test_published.py` passes on every package.
 - PR #37, CI green, merged as 88fcc82, tag `v1.11.0`, GitHub release.
+
+## Array.get hands back its array (branch feat/array-get-returns-array, not published)
+
+- `get_returns_array` proves `Pair.fst(Array.get(T, a, i)) == a` on top of PR
+  #38's `get_go_returns_array`. `ArrayAt.fst` runs the walk with the mask and
+  index Base's `Array.get.at` computes; `ASet.get_fst` lifts it through
+  `ASet.Copy`'s `b == a` and its size equation, so no second copy of `a` is
+  needed (the parameter is erased and the copy is consumed once).
+- Verified with `bend tensor-array/main.bend --check-only` and `--verdict`
+  (Lean 4.34.0): both `ALL PROOFS CHECK`. The README law table and
+  `list_laws.py --check-readme` were updated in the same change. Not released:
+  a new law is new API and needs its own published version.

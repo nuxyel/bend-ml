@@ -84,7 +84,8 @@ Ultra 7 155H (`bench/mv_bands.py`, `bench/results/`):
 | `size_set` | writing any value at any index keeps an `Array`'s size (Base's `Array.set` and `Array.size`, for any element type) |
 | `get_after_set` | reading at `i` right after writing `v` at `i` gives back `v` |
 | `get_other_set` | a write at `i` leaves alone the cell a read at `k` reaches, when the two walks down the tree split before a leaf (`ASet.Apart`); on a concrete tree that condition computes to true and `Unit{}` proves it |
-| `get_go_returns_array` | the walk `Array.get.go` makes hands back the array it walked: `Pair.fst(Array.get.go a n i z) == a`. The record carries `(b, v) == the pair` so a parent can lift it under `Array.swap.lo`/`swap.hi` and let its projections reduce; `Array.get`'s own statement, through the size mask, is the next piece |
+| `get_go_returns_array` | the walk `Array.get.go` makes hands back the array it walked: `Pair.fst(Array.get.go a n i z) == a`. The record carries `(b, v) == the pair` so a parent can lift it under `Array.swap.lo`/`swap.hi` and let its projections reduce |
+| `get_returns_array` | `Array.get` itself hands back the array it read: `Pair.fst(Array.get a i) == a`. `ArrayAt.fst` applies the walk with the mask and index Base computes; `ASet.get_fst` lifts that through `ASet.Copy`'s `b == a` and its size equation, so the array in `Array.size(a)` is identified with `a` |
 | `pow_shr` | half of `2^(e+1)` is `2^e` as a `U32` (`U32.shln(1, e)`, the size `Array.size` gives a tree of depth `e`), for `e < 31` |
 | `pow_mask` | an index below `2^e` is unchanged by the mask `Array.get` and `Array.set` apply to it on a tree of `2^e` cells |
 | `pow_lt` | for an index below `2^(e+1)`, "below `2^e`" is the same as "bit `e` is zero": the branch a walk down the tree takes |
