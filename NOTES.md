@@ -2179,14 +2179,15 @@ output equal to C's).
   ok). `make check-full` 127/127 (GPU included); `reference/test_published.py` passes on every package.
 - PR #37, CI green, merged as 88fcc82, tag `v1.11.0`, GitHub release.
 
-## Array.get hands back its array (branch feat/array-get-returns-array, not published)
+## tensor-array: a read hands back its array (bend-ml #38 and #39 by adeerkhan, 2026-11-23, not published yet)
 
-- `get_returns_array` proves `Pair.fst(Array.get(T, a, i)) == a` on top of PR
-  #38's `get_go_returns_array`. `ArrayAt.fst` runs the walk with the mask and
-  index Base's `Array.get.at` computes; `ASet.get_fst` lifts it through
-  `ASet.Copy`'s `b == a` and its size equation, so no second copy of `a` is
-  needed (the parameter is erased and the copy is consumed once).
-- Verified with `bend tensor-array/main.bend --check-only` and `--verdict`
-  (Lean 4.34.0): both `ALL PROOFS CHECK`. The README law table and
-  `list_laws.py --check-readme` were updated in the same change. Not released:
-  a new law is new API and needs its own published version.
+- `get_go_returns_array` (#38): the walk a read uses, `Array.get.go`, hands back the array it walked. It carries the
+  pair equation through `swap.lo`/`swap.hi` so the parent's `Pair.fst` reduces, and uses `copy_node`'s rewrite, which
+  keeps the array in the types only (the pointers I gave on #26).
+- `get_returns_array` (#39): `Pair.fst(Array.get(T, a, i)) == a`, the walk above with the mask and index Base's
+  `Array.get.at` computes, lifted through `ASet.Copy`; the erased copy is consumed once, so no second copy of `a`.
+- 43 laws (`list_laws.py --check-readme` ok); `--check-only` and `--verdict` ALL PROOFS CHECK; CI green on both PRs,
+  merged as 2131365 and fa885ae.
+- This settles one of the three pieces the round trip `Mat.to_list(Mat.of_list(xs)) == xs` waits on. Left on #26: the
+  counters' bits and the list induction on both sides. #40 (`roundtrip_one`) is held, to come as the base case of the
+  general round trip. Not released: new laws are new API and go out with tensor-array 0.1.22.0.
