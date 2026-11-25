@@ -8,7 +8,7 @@ Tensors in Bend 2 over a flat `Array<F32>`, **with the shape in the type**: the 
 
 ```python
 import Base
-import bend-ml-tensor-array@0.1.21.0/main.bend as TA
+import bend-ml-tensor-array@0.1.22.0/main.bend as TA
 
 def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 128n>:
   TA.Mat.matmul(100n, 784n, 128n, 3n, a, w)   # 3n = 2^3 = 8 parallel blocks
@@ -84,6 +84,8 @@ Ultra 7 155H (`bench/mv_bands.py`, `bench/results/`):
 | `size_set` | writing any value at any index keeps an `Array`'s size (Base's `Array.set` and `Array.size`, for any element type) |
 | `get_after_set` | reading at `i` right after writing `v` at `i` gives back `v` |
 | `get_other_set` | a write at `i` leaves alone the cell a read at `k` reaches, when the two walks down the tree split before a leaf (`ASet.Apart`); on a concrete tree that condition computes to true and `Unit{}` proves it |
+| `get_go_returns_array` | the walk `Array.get.go` makes hands back the array it walked: `Pair.fst(Array.get.go a n i z) == a`. The record carries `(b, v) == the pair` so a parent can lift it under `Array.swap.lo`/`swap.hi` and let its projections reduce |
+| `get_returns_array` | `Array.get` itself hands back the array it read: `Pair.fst(Array.get a i) == a`. `ArrayAt.fst` applies the walk with the mask and index Base computes; `ASet.get_fst` lifts that through `ASet.Copy`'s `b == a` and its size equation, so the array in `Array.size(a)` is identified with `a` |
 | `pow_shr` | half of `2^(e+1)` is `2^e` as a `U32` (`U32.shln(1, e)`, the size `Array.size` gives a tree of depth `e`), for `e < 31` |
 | `pow_mask` | an index below `2^e` is unchanged by the mask `Array.get` and `Array.set` apply to it on a tree of `2^e` cells |
 | `pow_lt` | for an index below `2^(e+1)`, "below `2^e`" is the same as "bit `e` is zero": the branch a walk down the tree takes |
@@ -144,6 +146,10 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 - `F32` numerics are validated by tests against PyTorch, not by proof.
 
 ## Versions
+
+- `0.1.22.0` (2026-11-25): the laws `get_go_returns_array` and `get_returns_array`, a read hands back the array it
+  read (contributed by @adeerkhan, bend-ml #38 and #39), one of the pieces the round trip of #26 waits on. Only lines
+  added: every other def keeps 0.1.21.0's code and bits.
 
 - `0.1.21.0` (2026-11-11): `Mat.reshape`, the same numbers under a new shape with the equal size as an erased proof, and
   the law `reshape_len` (the new shape multiplies to the old one, and `to_list_len` gives the count). Contributed by

@@ -34,7 +34,7 @@
  },
  "project": {
   "packages": 8,
-  "laws": 41,
+  "laws": 43,
   "checks_quick": 108,
   "checks_full": 119,
   "checks_quick_without_cuda": 99,
