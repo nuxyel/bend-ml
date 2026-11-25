@@ -77,6 +77,7 @@ Ultra 7 155H (`bench/mv_bands.py`, `bench/results/`):
 | `cap_ok` | an `Array` with `2^cap_depth(n)` slots always has room for `n` numbers, so the constructors never allocate too little |
 | `to_list_len` | `Mat.to_list` reads exactly `r*c` numbers, no more and no fewer; an empty matrix reads none and gives the empty list |
 | `reshape_len` | a reshape reads the same number of elements: the new shape multiplies to the old one, and `to_list_len` gives the count |
+| `roundtrip_one` | the one-cell round trip: `Mat.to_list(Mat.from_list [x]) == [x]`, proved from `get_after_set`; a proved base case for #26, not the general law |
 | `half_cover` | the two bands of a node, `half(r)` rows and `r - half(r)` rows, add up to exactly `r` rows: no row is lost and none is counted twice |
 | `leaf_len` | reading a band's results back from its `Array` (`read_l`, then `bv_g2`) gives exactly one number per row read |
 | `band_len` | the product of one band with `rows` rows gives exactly `rows` numbers |
@@ -142,7 +143,7 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 
 - The capacity arithmetic is proved (`cap_ok`: `2^cap_depth(n) >= n`), but that `Array.new(d)` really allocates `2^d` slots is a property of the runtime and stays trusted. The invariant "the `Array` capacity is `>= r*c`" is not carried in the type of `Mat`; the constructors (`zeros`, `fill`, `of_list`) establish it.
 - `softmax_ce` and `count_correct` expect `labels` with `n` entries (one per row); the type does not check it. Use `softmax_ce_checked` and `count_correct_checked`, which return `None` when `length(labels) != n`.
-- The list conversion's **count** is proved (`to_list_len`); that it gives back the same **numbers** is tested, not proved: `tensor-array/tests/roundtrip.bend` checks `Mat.of_list` then `Mat.to_list` on empty, row, column and rectangular matrices, with -0, infinities, NaN and a subnormal. The Array laws it needs (`size_set`, `get_after_set`, `get_other_set`) are now proved; the round trip on top of them is open ([#26](https://github.com/nuxyel/bend-ml/issues/26)). `leaf_len` and `band_len` count lists for the same reason.
+- The list conversion's **count** is proved (`to_list_len`); that it gives back the same **numbers** is tested, not proved: `tensor-array/tests/roundtrip.bend` checks `Mat.of_list` then `Mat.to_list` on empty, row, column and rectangular matrices, with -0, infinities, NaN and a subnormal. The Array laws it needs (`size_set`, `get_after_set`, `get_other_set`) are now proved; `roundtrip_one` proves the one-cell case, and the general round trip on top of them is still open ([#26](https://github.com/nuxyel/bend-ml/issues/26)). `leaf_len` and `band_len` count lists for the same reason.
 - `F32` numerics are validated by tests against PyTorch, not by proof.
 
 ## Versions

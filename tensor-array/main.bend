@@ -3325,3 +3325,26 @@ law get_returns_array:
 
 def get_returns_array(T, a, i):
   ASet.get_fst(T, a, i, ASet.copy(T, a))
+
+def ml_l(-r: Nat, -c: Nat, ml: ML<r, c>) -> List<&2, F32>:
+  match ml:
+    case ML{m, l}:
+      l
+
+# LAW (roundtrip_one): the one-cell round trip. A step toward issue #26's
+# general Mat.to_list(Mat.of_list xs) == xs; this case needs no counter lemmas.
+law roundtrip_one:
+  for +x: F32
+  {ml_l(1n, 1n, Mat.to_list(1n, 1n,
+     Mat.from_list(1n, 1n, Con{x, Nil{}}))) == Con{x, Nil{}} : List<&2, F32>}
+
+def roundtrip_one(x):
+  %Equal.cong(F32, List<&2, F32>, z => Con{z, Nil{}},
+      Pair.snd(Array<F32>, F32, Array.get(F32,
+        Array.set(F32, Array.new(F32, cap_depth(1n), 0.0), U32.from_nat(0n), x),
+        U32.from_nat(0n))), x,
+      get_after_set(F32, Array.new(F32, cap_depth(1n), 0.0), U32.from_nat(0n), x)) :
+    {Con{Pair.snd(Array<F32>, F32, Array.get(F32,
+      Array.set(F32, Array.new(F32, cap_depth(1n), 0.0), U32.from_nat(0n), x),
+      U32.from_nat(0n))), Nil{}} == Con{x, Nil{}} : List<&2, F32>}
+  {==}
