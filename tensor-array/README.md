@@ -8,7 +8,7 @@ Tensors in Bend 2 over a flat `Array<F32>`, **with the shape in the type**: the 
 
 ```python
 import Base
-import bend-ml-tensor-array@0.1.21.0/main.bend as TA
+import bend-ml-tensor-array@0.1.22.0/main.bend as TA
 
 def prod(a: TA.Mat<100n, 784n>, w: TA.Mat<784n, 128n>) -> TA.MMul<100n, 784n, 128n>:
   TA.Mat.matmul(100n, 784n, 128n, 3n, a, w)   # 3n = 2^3 = 8 parallel blocks
@@ -146,6 +146,10 @@ With parallel blocks, the large MNIST product (100×784·784×128) gains ~2x on 
 - `F32` numerics are validated by tests against PyTorch, not by proof.
 
 ## Versions
+
+- `0.1.22.0` (2026-11-25): the laws `get_go_returns_array` and `get_returns_array`, a read hands back the array it
+  read (contributed by @adeerkhan, bend-ml #38 and #39), one of the pieces the round trip of #26 waits on. Only lines
+  added: every other def keeps 0.1.21.0's code and bits.
 
 - `0.1.21.0` (2026-11-11): `Mat.reshape`, the same numbers under a new shape with the equal size as an erased proof, and
   the law `reshape_len` (the new shape multiplies to the old one, and `to_list_len` gives the count). Contributed by
